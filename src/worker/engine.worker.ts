@@ -16,13 +16,42 @@ import { runBacktest, runRolling, BacktestOptions, BacktestResult, RollingResult
 import { generateDataset, GeneratorOptions } from '../generator';
 import type { TruthFile } from '../generator/render';
 import { isBusinessDay, isoFromDay, Day } from '../lib/dates';
-import type { IngestSummary, CatSummary, TxnRow, ReviewGroup, DealQueue, TxnFilter, CategoryDetail, LoanPair } from './types';
+import type { IngestSummary, CatSummary, TxnRow, ReviewGroup, DealQueue, TxnFilter, CategoryDetail, LoanPair, RegisterInfo } from './types';
+import { readRegisterWorkbook, registerFromSnapshot, LoadedRegister, REG } from '../lib/register';
+import { registerEvents, registerAccounts, liquidBalances, toDay, CashEvent } from '../lib/register/cashflows';
+import { liabilityBenchmark } from '../lib/register/benchmark';
 
 let ds: Dataset | null = null;
 let res: CatResult | null = null;
 let basis: ForecastBasis | null = null;
 let truth: TruthFile | null = null;
 const demoFiles = new Map<string, string>();
+let demoRegister: unknown = null;
+let register: { loaded: LoadedRegister; events: CashEvent[]; example: boolean } | null = null;
+
+function registerInfo(): RegisterInfo | null {
+  if (!register) return null;
+  const { loaded, events, example } = register;
+  const reg = loaded.reg;
+  const dd = (x: Date | null) => (x ? toDay(x) : null);
+  const asAt = reg.asAt;
+  const live = (x: { history: boolean; runsOff: boolean }) => !x.history && x.runsOff;
+  return {
+    name: loaded.name, example, asAt: dd(asAt), stats: loaded.stats, issues: reg.issues.slice(0, 50),
+    liquid: liquidBalances(reg),
+    events: events.map((e) => ({ day: e.day, amount: e.amount, label: e.label, kind: e.kind, ref: e.ref })),
+    loboCalls: reg.loans.filter((l) => live(l) && l.type === 'LOBO' && l.nextCall && asAt && l.nextCall > asAt).map((l) => ({ day: toDay(l.nextCall!), amount: l.principal, label: `LOBO · ${l.lender}` })),
+    lb: liabilityBenchmark(reg),
+    loans: reg.loans.filter(live).map((l) => ({ ref: `loan:${l.row}`, type: l.type ?? l.typeRaw, lender: l.lender, principal: l.principal, rate: l.rate, start: dd(l.start), maturity: dd(l.maturity), profile: l.profile ?? 'Maturity', nextCall: dd(l.nextCall) })),
+    investments: reg.termInvestments.filter(live).map((t) => ({ ref: `term:${t.row}`, type: t.type ?? '', counterparty: t.counterparty, principal: t.principal, rate: t.rate, start: dd(t.start), maturity: dd(t.maturity) })),
+  };
+}
+
+function setRegister(loaded: LoadedRegister, example: boolean): RegisterInfo {
+  register = { loaded, events: registerEvents(loaded.reg), example };
+  return registerInfo()!;
+}
+void REG;
 let filterCache: { key: string; idx: Int32Array } | null = null;
 
 type Progress = (p: { phase: string; frac: number; rows?: number }) => void;
@@ -59,6 +88,7 @@ const api = {
   async generateDemo(o: GeneratorOptions): Promise<{ files: { name: string; size: number; report: DetectionReport }[]; rows: number }> {
     demoFiles.clear();
     const g = generateDataset(o);
+    demoRegister = g.register;
     for (const f of g.files) demoFiles.set(f.name, f.text);
     truth = g.truth;
     return {
@@ -66,6 +96,23 @@ const api = {
       rows: g.stats.rows,
     };
   },
+
+  // ------------------------------------------------------------- deal register
+
+  async loadRegister(bytes: Uint8Array, name: string): Promise<RegisterInfo> {
+    return setRegister(await readRegisterWorkbook(bytes, name), false);
+  },
+
+  hasExampleRegister(): boolean { return !!demoRegister; },
+
+  useExampleRegister(): RegisterInfo {
+    if (!demoRegister) throw new Error('Load the example bank data first.');
+    return setRegister(registerFromSnapshot(demoRegister, 'Northbridge Council deal register (example)'), true);
+  },
+
+  clearRegister(): void { register = null; },
+
+  registerInfo(): RegisterInfo | null { return registerInfo(); },
 
   demoFileBlob(name: string): Blob | null {
     const t = demoFiles.get(name);
@@ -132,7 +179,8 @@ const api = {
     const d = need(ds, 'Data');
     const t0 = performance.now();
     filterCache = null;
-    res = categorise(d, cfg, (phase, frac) => onProgress?.({ phase, frac }));
+    const withReg: CatConfig = register ? { ...cfg, registerEvents: register.events.filter((e) => e.day <= d.maxDay + 3), registerAccounts: registerAccounts(register.loaded.reg) } : cfg;
+    res = categorise(d, withReg, (phase, frac) => onProgress?.({ phase, frac }));
     basis = buildBasis(d, res);
     const r = res;
     const C = r.catIds.length;
@@ -174,6 +222,7 @@ const api = {
       ruleHits: r.ruleList.map((rule, k) => ({ id: rule.id, hits: r.ruleHits[k] })),
       rulesUsed: r.ruleHits.filter((h) => h > 0).length, flagCounts,
       bySource: [...bySourceMap.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.abs - a.abs),
+      registerMatch: r.registerMatch ?? null,
     };
   },
 

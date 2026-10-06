@@ -30,6 +30,8 @@ export const RULE_ROUND = -6;
 export const RULE_OVERRIDE = -7;
 export const RULE_FIXED_HALFYEARLY = -8;
 export const RULE_REGISTER = -9;
+/** narrative words that say a line is a deal (used only to confirm a register match) */
+const DEAL_WORDS = /\b(LOAN|LN|DEP|DEPOSIT|FD|DMADF|DMO|MMF|PWLB|LOBO|INT|INTEREST|REF|TRF|CHAPS|REPAY\w*|MATUR\w*|PRIN\w*|ADV\w*|REDM|REDEMPTION|SUB|SUBSCRIPTION|BORROW\w*)\b|LA\//;
 
 export const F_LARGE = 1;
 export const F_ROUND = 2;
@@ -112,7 +114,11 @@ export interface CatConfig {
 
 export interface RegisterEventLite { day: number; amount: number; categoryId: string; label: string; ref: string; kind: string }
 
-export interface RegisterMatch { events: number; matched: number; matchedAbs: number; unmatched: { day: number; amount: number; label: string }[] }
+export interface RegisterMatch {
+  events: number; matched: number; matchedAbs: number; unmatched: { day: number; amount: number; label: string }[];
+  /** how well the estimated interest agreed with the bank: a check on the interest assumptions */
+  interest: { estimated: number; found: number; within1: number; estimatedAbs: number; actualAbs: number };
+}
 
 export interface CatResult {
   catIds: string[];
@@ -289,8 +295,10 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
           if (diff > (tolerant ? Math.max(1, Math.abs(target) * 0.01) : 0.011)) continue;
           const clean = signatures[sig[i]];
           let shared = 0; for (const w of want) if (clean.includes(w.slice(0, 6))) shared++;
-          // an inexact amount needs the narrative to agree (the lender's or bank's name)
-          if (diff > 0.011 && !shared && !/\bINT(EREST)?\b|DIVIDEND/.test(clean) && !TREASURY_COUNTERPARTIES.some((c) => c.pattern.test(clean))) continue;
+          // the narrative must look like a deal: the counterparty's name, a treasury counterparty,
+          // a council, or deal words. An inexact (interest) amount must name the counterparty or say interest.
+          const dealish = shared > 0 || TREASURY_COUNTERPARTIES.some((c) => c.pattern.test(clean)) || LA_PATTERN.test(clean);
+          if (diff > 0.011 ? !dealish && !/\bINT(EREST)?\b|DIVIDEND/.test(clean) : !dealish && !DEAL_WORDS.test(clean)) continue;
           const score = shared * 10 - Math.abs(dd) - diff / Math.max(1, Math.abs(target)) * 100;
           if (score > bestScore) { bestScore = score; best = i; }
         }
@@ -302,18 +310,23 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
     const catOf = (id: string) => catIndex.get(id) ?? catIndex.get('la_loans') ?? -1;
     const mark = (i: number, e: RegisterEventLite) => { done[i] = 1; cat[i] = catOf(e.categoryId); rule[i] = RULE_REGISTER; conf[i] = CONF_HIGH; deal[i] = DEAL_YES; matched++; matchedAbs += Math.abs(ds.amount[i]); };
     const usedInterest = new Set<string>();
+    const intr = { estimated: 0, found: 0, within1: 0, estimatedAbs: 0, actualAbs: 0 };
     for (const e of inWindow) {
-      if ((e.kind === 'loan_interest' || e.kind === 'inv_interest') && usedInterest.has(`${e.ref}|${e.day}`)) continue;
-      const tolerant = e.kind === 'loan_interest' || e.kind === 'inv_interest';
+      const isInt = e.kind === 'loan_interest' || e.kind === 'inv_interest';
+      const inData = e.day >= ds.minDay + 4 && e.day <= ds.maxDay - 4;
+      if (isInt && inData) intr.estimated++;
+      if (isInt && usedInterest.has(`${e.ref}|${e.day}`)) { if (inData) { intr.found++; intr.within1++; intr.estimatedAbs += Math.abs(e.amount); intr.actualAbs += Math.abs(e.amount); } continue; }
+      const tolerant = isInt;
       let i = take(e.amount, e.day, e.label, tolerant);
       if (i < 0 && (e.kind === 'loan_repayment' || e.kind === 'inv_maturity')) {
         const extra = combined.get(`${e.ref}|${e.day}`);
         if (extra) { i = take(e.amount + extra, e.day, e.label, true); if (i >= 0) usedInterest.add(`${e.ref}|${e.day}`); }
       }
+      if (i >= 0 && isInt && inData) { intr.found++; intr.estimatedAbs += Math.abs(e.amount); intr.actualAbs += Math.abs(ds.amount[i]); if (Math.abs(ds.amount[i] - e.amount) <= 1) intr.within1++; }
       if (i >= 0) mark(i, e);
       else if (e.day >= ds.minDay && e.day <= ds.maxDay && Math.abs(e.amount) >= 10_000) unmatched.push({ day: e.day, amount: e.amount, label: e.label });
     }
-    registerMatch = { events: inWindow.length, matched, matchedAbs, unmatched };
+    registerMatch = { events: inWindow.length, matched, matchedAbs, unmatched, interest: intr };
   }
   lap('register');
 

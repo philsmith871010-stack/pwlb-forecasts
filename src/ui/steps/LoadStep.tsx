@@ -5,6 +5,7 @@ import { openWithPicker, fsAccessSupported, downloadBlob } from '../../lib/teamf
 import { bytes, day, ago, int } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
 import { engine } from '../../worker/client';
+import { RegisterCard } from '../register/RegisterCard';
 
 export function LoadStep() {
   const s = useStore();
@@ -34,6 +35,8 @@ export function LoadStep() {
           {realSources.length > 0 && <FileList />}
         </>
       )}
+
+      {!busy && <RegisterCard />}
 
       <TeamFileLine />
     </div>
@@ -133,7 +136,7 @@ function DoneCard() {
       </div>
       <ul className="done-list">
         <li><i className="bi bi-check2" /> {(Math.floor(cat.valueCategorisedPct * 1000) / 10).toFixed(1)}% of the money has been sorted into categories such as council tax, salaries and suppliers.</li>
-        <li><i className="bi bi-check2" /> Loans and investments have been spotted and set aside.</li>
+        <li><i className="bi bi-check2" /> Loans and investments have been spotted and set aside{cat.registerMatch?.matched ? <>, {int(cat.registerMatch.matched)} of them matched exactly to your deal register</> : ''}.</li>
         {ingest.rejectsTotal > 0 && <li className="muted"><i className="bi bi-info-circle" /> {int(ingest.rejectsTotal)} lines were skipped, such as totals rows or lines without a date. <button className="link-btn" onClick={async () => downloadBlob(await engine().rejectLogBlob(), 'skipped-lines.csv')}>See which</button></li>}
         {needCheck.length > 0 && <li className="warn"><i className="bi bi-exclamation-triangle" /> {needCheck.length} file{needCheck.length > 1 ? 's have' : ' has'} an unusual layout. <button className="link-btn" onClick={() => goto('map')}>Check {needCheck.length > 1 ? 'them' : 'it'}</button></li>}
       </ul>

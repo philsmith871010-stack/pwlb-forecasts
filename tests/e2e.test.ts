@@ -68,3 +68,40 @@ describe('end to end on generated data', async () => {
     expect(wb.SheetNames).toEqual(expect.arrayContaining(['Summary', 'History by month', 'Year on year', 'Seasonal profiles', 'Forecast', 'Forecast daily', 'Methods & assumptions', 'Rules']));
   });
 });
+
+describe('end to end with the example deal register', async () => {
+  const { registerFromSnapshot } = await import('../src/lib/register');
+  const { registerEvents, registerAccounts, liquidBalances } = await import('../src/lib/register/cashflows');
+  const { liabilityBenchmark } = await import('../src/lib/register/benchmark');
+  const { buildStrategy } = await import('../src/lib/forecast/strategy');
+  const g = generateDataset({ ...DEFAULT_GENERATOR_OPTIONS, seed: 'e2e-reg' });
+  const ds = await ingest(g.files.map((f) => ({ name: f.name, data: f.text, size: f.text.length, mapping: detectMapping(f.text.slice(0, 96000), f.name).mapping })));
+  const reg = registerFromSnapshot(g.register).reg;
+  const ev = registerEvents(reg);
+  const res = categorise(ds, { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true, registerEvents: ev.filter((e) => !e.future), registerAccounts: registerAccounts(reg) });
+
+  it('matches bank lines to the register and excludes every deal, with nothing operational taken', () => {
+    const m = res.registerMatch!;
+    expect(m.matched / m.events).toBeGreaterThan(0.9);
+    expect(m.interest.found / m.interest.estimated).toBeGreaterThan(0.9);
+    const acc = computeAccuracy(ds, res, g.truth);
+    expect(acc.deal.pctExcluded).toBeGreaterThan(0.995);
+    expect(acc.deal.wronglyExcludedValue).toBe(0);
+  });
+
+  it('carries the register into the forecast and the options', () => {
+    const basis = buildBasis(ds, res);
+    const start = basis.dataEnd + 1;
+    const settings = { start: isoFromDay(start), end: isoFromDay(addMonths(start, 24) - 1), granularity: 'monthly' as const, openingPosition: null, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: true, bandZ: 1.645 };
+    const liq = liquidBalances(reg);
+    const future = ev.filter((e) => e.future);
+    const fc = runForecast({ basis, categories: DEFAULT_CATEGORIES, settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 2e6, register: { liquid: liq.total, events: future } });
+    // the headline line = everyday cash + funds + every register cash flow in the window
+    const inWindow = future.filter((e) => e.day >= fc.start && e.day < fc.start + fc.H).reduce((s, e) => s + e.amount, 0);
+    expect(fc.cumulative[fc.H - 1] - fc.cumulativeBefore[fc.H - 1]).toBeCloseTo(liq.total + inWindow, 0);
+    const st = buildStrategy(fc, { repayments: future.filter((e) => e.kind === 'loan_repayment'), loboCalls: [], lb: liabilityBenchmark(reg), liquid: liq.total, debt: 0 });
+    expect(st.lasting + st.shortTerm).toBeCloseTo(st.shortfall, 0);
+    expect(st.benchmark).not.toBeNull();
+    expect(st.options.length).toBeGreaterThan(1);
+  });
+});

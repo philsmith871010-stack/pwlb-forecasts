@@ -4,7 +4,7 @@ import { headerSignature } from '../lib/ingest/detect';
 import type { TeamFile, Rule, Scenario, TxnOverride, SeriesOverride, ForecastSettings, Alias } from '../lib/model';
 import { uid } from '../lib/model';
 import { emptyTeamFile, parseTeamFile, serialiseTeamFile, teamHash, fsAccessSupported, readHandle, writeHandle, saveAsWithPicker, downloadText, mergeTeamFiles, MergeConflict } from '../lib/teamfile';
-import type { IngestSummary, CatSummary } from '../worker/types';
+import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
 import type { GeneratorOptions } from '../generator';
@@ -76,6 +76,10 @@ interface State {
   basis: ForecastBasis | null;
   hasTruth: boolean;
   demo: { rows: number; options: GeneratorOptions } | null;
+  /** the council's deal register, read in this browser for this session only (never saved to the team file) */
+  register: RegisterInfo | null;
+  registerBusy: boolean;
+  registerError: string | null;
   step: StepId;
   reached: number;
   workspace: boolean;
@@ -111,6 +115,9 @@ interface Actions {
   setMapping: (name: string, m: ColumnMapping) => void;
   saveProfile: (name: string, profileName: string) => void;
   generateDemo: (o: GeneratorOptions) => Promise<void>;
+  loadRegisterFile: (f: File) => Promise<void>;
+  useExampleRegister: () => Promise<void>;
+  clearRegister: () => Promise<void>;
   runIngest: () => Promise<boolean>;
   runCategorise: () => Promise<void>;
   saveTeam: (mode?: 'save' | 'saveAs' | 'download') => Promise<void>;
@@ -161,6 +168,9 @@ export const useStore = create<State & Actions>((set, get) => ({
   basis: null,
   hasTruth: false,
   demo: null,
+  register: null,
+  registerBusy: false,
+  registerError: null,
   step: 'home',
   reached: 0,
   workspace: false,
@@ -292,10 +302,40 @@ export const useStore = create<State & Actions>((set, get) => ({
       const sources: Source[] = r.files.map((f) => applyProfile({ name: f.name, size: f.size, demo: true, report: f.report, mapping: f.report.mapping }, get().team));
       if (get().team.authorityName === 'My Council') set((st) => ({ team: { ...st.team, authorityName: 'Northbridge Council (example)' } }));
       set({ sources, demo: { rows: r.rows, options: o }, hasTruth: true });
+      // the example council comes with its deal register, so the whole tool can be tried
+      if (!get().register || get().register!.example) set({ register: await engine().useExampleRegister(), registerError: null });
       await get().runIngest();
     } catch (e) {
       set({ ingestBusy: null, ingestError: (e as Error).message });
     }
+  },
+
+  loadRegisterFile: async (f) => {
+    set({ registerBusy: true, registerError: null });
+    try {
+      const info = await engine().loadRegister(new Uint8Array(await f.arrayBuffer()), f.name);
+      set({ register: info, registerBusy: false });
+      get().toast(`Deal register read: ${info.stats.loans} loans, ${info.stats.deals} deals`, 'ok');
+      if (get().ingest) await get().runCategorise();
+    } catch (e) {
+      set({ registerBusy: false, registerError: (e as Error).message });
+    }
+  },
+
+  useExampleRegister: async () => {
+    set({ registerBusy: true, registerError: null });
+    try {
+      set({ register: await engine().useExampleRegister(), registerBusy: false });
+      if (get().ingest) await get().runCategorise();
+    } catch (e) {
+      set({ registerBusy: false, registerError: (e as Error).message });
+    }
+  },
+
+  clearRegister: async () => {
+    await engine().clearRegister();
+    set({ register: null, registerError: null });
+    if (get().ingest) await get().runCategorise();
   },
 
   runIngest: async () => {

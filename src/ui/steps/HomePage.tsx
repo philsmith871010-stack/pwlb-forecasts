@@ -13,17 +13,17 @@ const STAGES = [
 const BENEFITS = [
   { icon: 'bi-clock-history', title: 'Hours, not days', text: 'No more grouping thousands of bank lines by hand in Excel. Sorting a five-year history takes seconds.' },
   { icon: 'bi-bank', title: 'The real borrowing question', text: 'Loans and investments are kept out, so you see your underlying cash — and exactly when and how much you may need to borrow.' },
+  { icon: 'bi-journal-check', title: 'Works with your deal register', text: 'Add your PWLBtoday deal register and the forecast includes loan repayments and maturing investments, then sets out borrowing and investing options alongside your liability benchmark.' },
   { icon: 'bi-search', title: 'Every number explained', text: 'Each line records the rule that sorted it; each forecast figure traces back to history or to an assumption you made. Audit-friendly.' },
   { icon: 'bi-people', title: 'Your team’s knowledge, kept', text: 'Rules, bank layouts and forecasts live in one shared team file, so the tool gets better every time anyone uses it.' },
-  { icon: 'bi-sliders', title: 'What-if in real time', text: 'Change a growth rate or add a one-off and the forecast, low point and plain-English summary update instantly.' },
-  { icon: 'bi-file-earmark-text', title: 'Report-ready', text: 'Excel workbook and a clean printable summary for treasury reports and Section 151 briefings.' },
+  { icon: 'bi-sliders', title: 'What-if in real time', text: 'Change a growth rate or add a one-off and the forecast, low point and plain-English summary update instantly — then download a ready-made report.' },
 ];
 
 const SECURITY = [
   { icon: 'bi-pc-display', title: 'Runs on your computer', text: 'Bank files are read and processed inside this browser tab. There is no server behind this tool.' },
   { icon: 'bi-cloud-slash', title: 'Nothing is uploaded', text: 'No transaction data is sent anywhere — no uploads, no analytics, no tracking. The page is locked so it cannot contact any other website.' },
   { icon: 'bi-robot', title: 'No AI', text: 'Sorting uses clear, visible rules — never an AI service. You can see and change every rule.' },
-  { icon: 'bi-file-earmark-lock', title: 'The team file holds no transactions', text: 'Only rules, layouts, categories and forecast totals are saved. Bank lines vanish when you close the tab.' },
+  { icon: 'bi-file-earmark-lock', title: 'The team file holds no transactions', text: 'Only rules, layouts, categories and forecast totals are saved. Bank lines and your deal register vanish when you close the tab.' },
 ];
 
 export function HomePage() {

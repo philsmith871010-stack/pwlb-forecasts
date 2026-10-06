@@ -78,6 +78,16 @@ A forecast recomputes in 10–30 ms; changing an assumption updates the chart an
 
 After the first full run the sidebar becomes a **workspace** (Data, History, Forecast, Backtest, Save & export, Settings) instead of repeating the wizard.
 
+## Deal register (optional, recommended)
+
+On step 1 you can add your PWLBtoday **deal register** (the Excel workbook of loans and investments). The example data comes with one. With it:
+
+- bank lines are matched to your deals exactly, so loans and investments are set aside with certainty;
+- the forecast includes loan repayments, interest (estimated, and checked against your bank history), maturing investments and the money held in funds;
+- **Look ahead → What you could do** sets out options to discuss: how much to borrow and when, how much is lasting versus short term, how that compares with your liability benchmark (and so how long loans could run), refinancing and LOBO call dates in the period, and how much cash could be invested for longer.
+
+The register is read in the browser and kept for the session only. It is not saved in the team file. To refresh the vendored reader from the TMS repo, run `node scripts/sync-register.mjs <path-to-pwlbtoday-tms>`.
+
 ## The team file
 
 One JSON file kept on the team's shared drive holds the authority name and settings, categories, rules, aliases, bank profiles, series and transaction decisions, scenarios and a change log.

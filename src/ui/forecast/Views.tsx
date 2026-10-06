@@ -176,7 +176,8 @@ export function ForecastTable({ b, granularity }: { b: ForecastBundle; granulari
 export function CompareView() {
   const { team, basis, compareIds, setCompare } = useStore();
   const fyStart = +team.settings.financialYearStart.split('-')[0] || 4;
-  const results = useMemo(() => (basis ? compareIds.map((id) => team.forecasts.find((f) => f.id === id)).filter(Boolean).map((sc) => ({ sc: sc!, b: computeForecast(basis, sc!, team.categories, team.settings.liquidityBuffer, fyStart) })) : []), [basis, compareIds, team, fyStart]);
+  const register = useStore((s) => s.register);
+  const results = useMemo(() => (basis ? compareIds.map((id) => team.forecasts.find((f) => f.id === id)).filter(Boolean).map((sc) => ({ sc: sc!, b: computeForecast(basis, sc!, team.categories, team.settings.liquidityBuffer, fyStart, register) })) : []), [basis, compareIds, team, fyStart, register]);
   const colours = ['#0a2540', '#fd7e14', '#2caffe'];
   return (
     <div className="stack">

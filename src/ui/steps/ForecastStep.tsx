@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { ECharts } from 'echarts/core';
 import { useStore, useEyebrow } from '../../state/store';
+import { StrategyView } from '../forecast/StrategyView';
 import { PageHead, Panel, Kpi, StepFooter, Seg, Empty, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast } from '../forecast/useForecast';
@@ -16,6 +17,7 @@ import { buildResultsSnapshot } from '../../lib/analysis/snapshot';
 
 const FC_TABS: TabDef[] = [
   { id: 'result', label: 'Result' },
+  { id: 'options', label: 'What you could do' },
   { id: 'setup', label: 'Starting point' },
   { id: 'growth', label: 'Growth' },
   { id: 'changes', label: 'Planned changes' },
@@ -27,6 +29,7 @@ const FC_TABS: TabDef[] = [
 
 const FC_TABS_SIMPLE: TabDef[] = [
   { id: 'result', label: 'Your forecast' },
+  { id: 'options', label: 'What you could do' },
   { id: 's-start', label: 'Starting cash' },
   { id: 's-growth', label: 'Growth' },
   { id: 's-items', label: 'Known future items' },
@@ -34,6 +37,7 @@ const FC_TABS_SIMPLE: TabDef[] = [
 ];
 
 const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
+  options: { what: 'Borrowing and investing options worked out from your forecast and, if you added it, your deal register.', why: 'The forecast shows when cash runs short or sits idle. These options turn that into figures to take to your treasury meeting.', todo: 'Read the options, then check them against your treasury management strategy. Change the forecast and they update.' },
   's-start': { what: 'Three simple settings that frame the forecast: the cash you start with, the minimum you want to keep, and how far ahead to look.', todo: 'Check each one. The figures we’ve filled in are a sensible starting point.' },
   's-growth': { what: 'How much each kind of money is expected to grow each year. We’ve worked out the past trend for you (shown in grey).', why: 'Small changes add up: 2% more on salaries over two years is millions of pounds.', todo: <>Leave a box empty to use the past trend. Type a number to use your own — e.g. <strong>3</strong> for a 3% pay award.</> },
   's-items': { what: 'Things you know are coming that past years can’t predict: a land sale, a grant that ends, a pay award.', why: 'These often decide whether the low point is £10m or £30m.', todo: 'Pick the kind of item, fill in the short form and click Add. Each appears on the chart as an orange diamond.' },
@@ -84,7 +88,7 @@ export function ForecastStep() {
   const upd = (fn: (s: Scenario) => Scenario) => updateScenario(sc.id, fn);
   const fc = b.fc;
   const endPos = fc.cumulative[fc.H - 1];
-  const help = FC_HELP[tab];
+  const help = tab === 'result' && fc.register ? { ...FC_HELP.result, what: <>Your cash, day by day, <strong>including your loans and investments</strong> from the deal register. The <strong>navy line</strong> is the past, the <strong>orange dashed line</strong> the forecast, and the grey dotted line is your everyday cash without the deals. The red dashed line is the minimum cash you want to keep.</> } : FC_HELP[tab];
   const idx = TABS.findIndex((t) => t.id === tab);
   const tabs = TABS.map((t) => ({ ...t, badge:
     t.id === 's-items' ? sc.oneOffs.length + sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').length || '' :
@@ -109,13 +113,13 @@ export function ForecastStep() {
             <Kpi label="Lowest point" value={money(fc.low.amount)} sub={`on ${day(fc.low.day)}`} />
             <Kpi label="You may need to borrow" value={money(fc.borrowingRequirement)} sub={`to keep at least ${money(fc.buffer)} in the bank`} />
             <Kpi label="Highest point" value={money(fc.high.amount)} sub={`on ${day(fc.high.day)} — best time to invest`} />
-            <Kpi label={`Position at ${day(fc.start + fc.H - 1)}`} value={money(endPos)} sub={fc.treasuryDaily.some((v) => v) ? `after known loan repayments: ${money(fc.cumulativeAfterTreasury[fc.H - 1])}` : `starting from ${money(fc.opening)}`} />
+            <Kpi label={`Position at ${day(fc.start + fc.H - 1)}`} value={money(endPos)} sub={fc.treasuryDaily.some((v) => v) ? `after known loan repayments: ${money(fc.cumulativeAfterTreasury[fc.H - 1])}` : fc.register ? `starting from ${money(fc.opening)}, including ${money(fc.register.liquid)} in funds` : `starting from ${money(fc.opening)}`} />
           </div>
           <div className="summary-box" aria-live="polite">
             <div className="eyebrow">In plain English{advanced ? ` · ${sc.name}` : ''}</div>
             <SummaryText text={fc.summary} />
           </div>
-          <Panel title="Your everyday cash: past and forecast" sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
+          <Panel title={fc.register ? 'Your cash, with your loans and investments: past and forecast' : 'Your everyday cash: past and forecast'} sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
             right={advanced ? <>
               <Seg dark value={histMonths} onChange={setHistMonths} options={[{ v: 12, label: '1y' }, { v: 24, label: '2y' }, { v: 60, label: 'all' }]} ariaLabel="History shown" />
               <Seg dark value={gran} onChange={setGran} options={[{ v: 'daily', label: 'Daily' }, { v: 'weekly', label: 'Weekly' }, { v: 'monthly', label: 'Monthly' }]} ariaLabel="Granularity" />
@@ -129,13 +133,19 @@ export function ForecastStep() {
               {fc.breaches.length > 0 && <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(176,70,50,.25)' }} />below your minimum cash</span>}
             </div>
           </Panel>
-          {fc.markers.length > 0 && (
+          {fc.markers.some((m) => m.kind !== 'treasury') && (
             <Panel title="What you’ve added to this forecast" sub="changes, one-offs and schedules on the timeline">
-              <ul className="list-plain small">{fc.markers.map((m, i) => <li key={i} className="row tight"><span className={`badge ${m.kind === 'oneoff' ? 'soft' : m.kind === 'schedule' ? 'green' : 'navy'}`}>{m.kind === 'oneoff' ? 'one-off' : m.kind === 'assumption' ? 'change' : m.kind}</span><span className="xs muted" style={{ width: 90 }}>{day(m.day)}</span><span>{m.label}</span></li>)}</ul>
+              <ul className="list-plain small">{fc.markers.filter((m) => m.kind !== 'treasury').map((m, i) => <li key={i} className="row tight"><span className={`badge ${m.kind === 'oneoff' ? 'soft' : m.kind === 'schedule' ? 'green' : 'navy'}`}>{m.kind === 'oneoff' ? 'one-off' : m.kind === 'assumption' ? 'change' : m.kind}</span><span className="xs muted" style={{ width: 90 }}>{day(m.day)}</span><span>{m.label}</span></li>)}</ul>
+            </Panel>
+          )}
+          {fc.register && fc.markers.some((m) => m.kind === 'treasury') && (
+            <Panel title="Coming up from your deal register" sub="loans repaid, borrowing received and investments maturing (£1m or more); interest is included in the forecast too">
+              <ul className="list-plain small">{fc.markers.filter((m) => m.kind === 'treasury').map((m, i) => <li key={i} className="row tight"><span className={`badge ${(m.amount ?? 0) < 0 ? 'navy' : 'green'}`}>{(m.amount ?? 0) < 0 ? 'out' : 'in'}</span><span className="xs muted" style={{ width: 90 }}>{day(m.day)}</span><span>{m.label}</span></li>)}</ul>
             </Panel>
           )}
         </div>
       )}
+      {tab === 'options' && <StrategyView b={b} />}
       {tab === 's-start' && <SimpleStart sc={sc} upd={upd} b={b} />}
       {tab === 's-growth' && <SimpleGrowth sc={sc} upd={upd} b={b} />}
       {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}

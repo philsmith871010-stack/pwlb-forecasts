@@ -7,9 +7,11 @@ import type { BacktestResult } from '../forecast/backtest';
 import type { Scenario, TeamFile } from '../model';
 import { STARTER_RULES } from '../categorise/starterRules';
 import { isoFromDay, fmtDay } from '../dates';
+import { STRATEGY_CAVEAT, Strategy } from '../forecast/strategy';
 
 export async function buildWorkbook(o: {
   team: TeamFile; agg: Aggregates; scenario: Scenario; fc: ForecastResult; backtest: BacktestResult | null; appName: string;
+  strategy?: Strategy; registerName?: string | null;
 }): Promise<Blob> {
   const XLSX = await import('xlsx');
   const { team, agg, scenario, fc, backtest } = o;
@@ -38,8 +40,29 @@ export async function buildWorkbook(o: {
     [],
     ['Summary', fc.summary],
     [],
-    ['Operational flows only. Treasury / deal flows (PWLB, LOBO, LA loans, MMF, DMADF, deposits) are excluded from the model.'],
+    fc.register
+      ? [`Includes the deal register (${o.registerName ?? 'deal register'}): ${r0(fc.register.liquid)} held in funds at the start, and ${fc.register.events} dated loan and investment cash flows. Interest on deals is estimated from rates and dates.`]
+      : ['Operational flows only. Treasury / deal flows (PWLB, LOBO, LA loans, MMF, DMADF, deposits) are excluded from the model.'],
   ], [28, 60, 20]);
+
+  if (o.strategy) {
+    const st = o.strategy;
+    add('Options to discuss', [
+      ['Options to discuss'], [STRATEGY_CAVEAT], [],
+      ['Borrowing needed', r0(st.shortfall), st.shortfallDay ? fmtDay(st.shortfallDay) : ''],
+      ['Lasting (over a year)', r0(st.lasting)],
+      ['Short term (under a year)', r0(st.shortTerm)],
+      [],
+      ['Could invest for at least', 'Amount'],
+      ...st.ladder.map((r) => [`${r.months} months`, r0(r.amount)]),
+      [],
+      ['Borrowing needed by', 'Amount'],
+      ...st.needBy.map((q) => [isoFromDay(q.day), r0(q.amount)]),
+      [],
+      ...st.options.map((x) => [x.title, x.body]),
+      ...(st.benchmark ? [[], ['Liability benchmark (£m)', 'Benchmark', 'Existing loans', 'Room to borrow', 'Above benchmark', 'CFR'], ...st.benchmark.rows.map((r) => [r.fy, r0(r.lb), r0(r.existingLoans), r0(r.need), r0(r.over), r0(r.cfr)])] : []),
+    ], [34, 90, 16, 16, 16, 16]);
+  }
 
   // categorised summary by month (history)
   const ms = monthlyTotals(agg, 'op');
@@ -72,6 +95,7 @@ export async function buildWorkbook(o: {
     ['Cumulative position', ...lastByPeriod(fc.cumulative, fc.H, p.index, n).map(r0)],
     ['Lower (90%)', ...lastByPeriod(fc.lower, fc.H, p.index, n).map(r0)],
     ['Upper (90%)', ...lastByPeriod(fc.upper, fc.H, p.index, n).map(r0)],
+    ...(fc.register ? [['Everyday cash only (before deal register)', ...lastByPeriod(fc.cumulativeBefore, fc.H, p.index, n).map(r0)]] : []),
     ...(fc.treasuryDaily.some((v) => v) ? [['After known treasury schedule', ...lastByPeriod(fc.cumulativeAfterTreasury, fc.H, p.index, n).map(r0)]] : []),
   ], [30]);
 

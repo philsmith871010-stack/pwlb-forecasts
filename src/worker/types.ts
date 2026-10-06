@@ -45,6 +45,8 @@ export interface CatSummary {
   rulesUsed: number;
   flagCounts: Record<number, number>;
   bySource: { label: string; rows: number; abs: number }[];
+  /** bank lines matched to the deal register (null when no register is loaded) */
+  registerMatch: import('../lib/categorise/engine').RegisterMatch | null;
 }
 
 export interface TxnRow {
@@ -121,4 +123,20 @@ export interface CategoryDetail {
   topSignatures: { sigIdx: number; signature: string; count: number; total: number; abs: number }[];
   oneOffs: TxnRow[];
   excludedAsDeal: number;
+}
+
+/** What the screens need from the council's deal register (all small; the register stays in the worker). */
+export interface RegisterInfo {
+  name: string;
+  example: boolean;
+  asAt: Day | null;
+  stats: { debt: number; invested: number; callTotal: number; loans: number; deals: number; flagged: number };
+  issues: string[];
+  liquid: { total: number; instant: number; notice: number; rows: { name: string; amount: number; notice: number | null }[] };
+  /** every dated cash event the register implies (the forecast takes those after the bank data ends) */
+  events: { day: Day; amount: number; label: string; kind: string; ref: string }[];
+  loboCalls: { day: Day; amount: number; label: string }[];
+  lb: { fy: string; yearEnd: number; lb: number; existingLoans: number; need: number; over: number; cfr: number; obs: number; liq: number; actual: boolean }[] | null;
+  loans: { ref: string; type: string; lender: string; principal: number; rate: number | null; start: Day | null; maturity: Day | null; profile: string; nextCall: Day | null }[];
+  investments: { ref: string; type: string; counterparty: string; principal: number; rate: number | null; start: Day | null; maturity: Day | null }[];
 }

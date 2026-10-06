@@ -38,10 +38,16 @@ export function SimpleStart({ sc, upd, b }: { sc: Scenario; upd: Upd; b: Forecas
         <div className="qa-n">1</div>
         <div className="qa-body">
           <h3>How much cash does the council have at the start?</h3>
-          <p>We’ve used the bank balance at the end of your files. If you know today’s figure (including money in instant-access investments), type it instead.</p>
+          <p>We’ve used the bank balance at the end of your files. If you know today’s figure, type it instead.{b.fc.register ? '' : ' Include money in instant-access investments.'}</p>
           <Seg value={manual ? 'manual' : 'bank'} onChange={(v) => set(v === 'manual' ? { openingMode: 'manual', openingPosition: Math.round(b.bankEnd) } : { openingMode: 'bank', openingPosition: null })}
             options={[{ v: 'bank', label: `Use the balance from my files (${money(b.bankEnd)})` }, { v: 'manual', label: 'Type a figure' }]} />
-          {manual && <div className="mt" style={{ maxWidth: 260 }}><MoneyInput id="opening" label="Starting cash" value={st.openingPosition ?? 0} onChange={(v) => set({ openingPosition: v })} /></div>}
+          {manual && <div className="mt" style={{ maxWidth: 260 }}><MoneyInput id="opening" label={b.fc.register ? 'Bank balance' : 'Starting cash'} value={st.openingPosition ?? 0} onChange={(v) => set({ openingPosition: v })} /></div>}
+          {b.fc.register && (
+            <div className="callout green mt small">
+              <strong>Plus {money(b.fc.register.liquid)} from your deal register</strong>, held in money market funds and call accounts, so the forecast starts from <strong>{money(b.fc.opening)}</strong>.
+              Fixed-term investments come back as they mature, and loans are repaid on their dates.
+            </div>
+          )}
         </div>
       </div>
       <div className="qa">

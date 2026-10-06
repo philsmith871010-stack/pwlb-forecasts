@@ -22,6 +22,9 @@ export interface ForecastRequest {
   liquidityBuffer: number;
   /** default opening position if settings.openingPosition is null */
   defaultOpening: number;
+  /** the council's deal register: money available now (MMFs, call accounts) and its dated
+   * loan and investment cash flows. When present the headline position includes both. */
+  register?: { liquid: number; events: { day: Day; amount: number; label: string; kind: string }[] } | null;
 }
 
 export interface Clamp { year: number; month: number; value: number; clampedTo: number }
@@ -61,6 +64,11 @@ export interface ForecastResult {
   net: Float64Array;
   cumulative: Float64Array;
   cumulativeAfterTreasury: Float64Array;
+  /** everyday cash only, before the deal register (equals cumulative when there is no register) */
+  cumulativeBefore: Float64Array;
+  /** deal register cash flows per day (included in cumulative) */
+  registerDaily: Float64Array;
+  register: { liquid: number; events: number; net: number } | null;
   lower: Float64Array;
   upper: Float64Array;
   opening: number;
@@ -477,14 +485,34 @@ export function runForecast(req: ForecastRequest): ForecastResult {
     if (day >= start && day <= end) treasuryDaily[day - start] += t.amount;
   }
 
+  // ---------- the deal register (loans, investments, money market funds) ----------
+  const registerDaily = new Float64Array(H);
+  let regInfo: ForecastResult['register'] = null;
+  if (req.register) {
+    let k = 0, sum = 0;
+    for (const e of req.register.events) {
+      if (e.day < start || e.day > end) continue;
+      const day = isBusinessDay(e.day) ? e.day : nextBusinessDay(e.day);
+      const d = Math.min(H - 1, Math.max(0, day - start));
+      registerDaily[d] += e.amount; k++; sum += e.amount;
+      if (Math.abs(e.amount) >= 1e6 && !/interest/.test(e.kind)) markers.push({ day: start + d, label: `${e.label} ${fmtMoney(e.amount)}`, kind: 'treasury', amount: e.amount });
+    }
+    regInfo = { liquid: req.register.liquid, events: k, net: sum };
+  }
+
   // ---------- totals ----------
-  const opening = settings.openingPosition ?? req.defaultOpening;
+  const everyday = settings.openingPosition ?? req.defaultOpening;
+  const opening = everyday + (regInfo?.liquid ?? 0);
   const net = new Float64Array(H);
   for (let c = 0; c <= C; c++) for (let d = 0; d < H; d++) net[d] += daily[c * H + d];
   const cumulative = new Float64Array(H);
   const cumulativeAfterTreasury = new Float64Array(H);
-  let run = opening, runT = opening;
-  for (let d = 0; d < H; d++) { run += net[d]; runT += net[d] + treasuryDaily[d]; cumulative[d] = run; cumulativeAfterTreasury[d] = runT; }
+  const cumulativeBefore = new Float64Array(H);
+  let run = opening, runB = everyday, runT = 0;
+  for (let d = 0; d < H; d++) {
+    run += net[d] + registerDaily[d]; runB += net[d]; runT += treasuryDaily[d];
+    cumulative[d] = run; cumulativeBefore[d] = runB; cumulativeAfterTreasury[d] = run + runT;
+  }
 
   // uncertainty: random-walk accumulation of monthly category variability
   const sigma2 = explain.reduce((s, e) => s + e.sigmaMonthly * e.sigmaMonthly, 0);
@@ -525,10 +553,10 @@ export function runForecast(req: ForecastRequest): ForecastResult {
     for (let d = windowFrom; d <= lo; d++) s += daily[c * H + d];
     return { id, name: c === C ? 'Uncategorised' : catById.get(id)?.name ?? id, amount: s };
   }).filter((x) => x.amount < 0).sort((a, b) => a.amount - b.amount).slice(0, 3);
-  const summary = buildSummary({ start, lo, hi, cumulative, buffer, borrowingRequirement, drivers, windowFrom, breaches, H, end });
+  const summary = buildSummary({ start, lo, hi, cumulative, buffer, borrowingRequirement, drivers, windowFrom, breaches, H, end, withRegister: !!regInfo });
 
   return {
-    start, H, catIds, daily, oneOffDaily, treasuryDaily, net, cumulative, cumulativeAfterTreasury, lower, upper, opening,
+    start, H, catIds, daily, oneOffDaily, treasuryDaily, net, cumulative, cumulativeAfterTreasury, cumulativeBefore, registerDaily, register: regInfo, lower, upper, opening,
     low: { day: start + lo, amount: cumulative[lo] }, high: { day: start + hi, amount: cumulative[hi] },
     lowAfterTreasury: { day: start + loT, amount: cumulativeAfterTreasury[loT] },
     breaches, borrowingRequirement, buffer, explain, markers: markers.sort((a, b) => a.day - b.day), summary, drivers, ms: performance.now() - t0,
@@ -588,13 +616,13 @@ export function projectDates(s: Pick<SeriesBasis, 'cadence' | 'dayOfMonth' | 'la
 
 function buildSummary(x: {
   start: Day; lo: number; hi: number; cumulative: Float64Array; buffer: number; borrowingRequirement: number;
-  drivers: { name: string; amount: number }[]; windowFrom: number; breaches: { from: Day; to: Day }[]; H: number; end: Day;
+  drivers: { name: string; amount: number }[]; windowFrom: number; breaches: { from: Day; to: Day }[]; H: number; end: Day; withRegister?: boolean;
 }): string {
   const low = x.cumulative[x.lo];
   const lowDay = x.start + x.lo;
   const parts: string[] = [];
   const falls = low < x.cumulative[0];
-  parts.push(`Your everyday cash is expected to ${falls ? 'fall to' : 'be'} its lowest point of ${fmtMoney(low)} on ${fmtDay(lowDay)}.`);
+  parts.push(`${x.withRegister ? 'Your cash, after the loans and investments in your deal register,' : 'Your everyday cash'} is expected to ${falls ? 'fall to' : 'be'} its lowest point of ${fmtMoney(low)} on ${fmtDay(lowDay)}.`);
   if (x.drivers.length) {
     const names = x.drivers.map((d) => d.name.toLowerCase());
     parts.push(`The biggest reasons are ${names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0]}.`);

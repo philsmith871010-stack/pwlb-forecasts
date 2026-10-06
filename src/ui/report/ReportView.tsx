@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
+import { STRATEGY_CAVEAT } from '../../lib/forecast/strategy';
 import { EChart, axisMoney } from '../components/EChart';
 import { computeForecast, ForecastBundle } from '../forecast/useForecast';
 import { periodise, sumByPeriod, lastByPeriod } from '../../lib/forecast/engine';
@@ -70,7 +71,8 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
   }, [agg, fyStart, team.categories]);
 
   // ---------- scenarios ----------
-  const compare = useMemo(() => (basis && team.forecasts.length > 1 ? team.forecasts.slice(0, 4).map((f) => ({ f, r: computeForecast(basis, f, team.categories, team.settings.liquidityBuffer, fyStart) })) : []), [basis, team, fyStart]);
+  const register = useStore((s) => s.register);
+  const compare = useMemo(() => (basis && team.forecasts.length > 1 ? team.forecasts.slice(0, 4).map((f) => ({ f, r: computeForecast(basis, f, team.categories, team.settings.liquidityBuffer, fyStart, register) })) : []), [basis, team, fyStart, register]);
 
   const firstBreach = fc.breaches[0];
   const horizonEnd = fc.start + fc.H - 1;
@@ -94,7 +96,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
     fc.drivers.length ? <>The biggest reasons for the fall are {fc.drivers.map((d) => d.name.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}.</> : null,
     fc.treasuryDaily.some((v) => v) ? <>After known treasury commitments the position at {fmtDay(horizonEnd)} is <strong>{money(fc.cumulativeAfterTreasury[fc.H - 1])}</strong>.</> : null,
   ].filter(Boolean);
-  const common = { total: 6, head: s.advanced ? `${team.authorityName} · ${sc.name} scenario` : team.authorityName, foot: `Prepared ${prepared}${s.user ? ` by ${s.user}` : ''}` };
+  const common = { total: 7, head: s.advanced ? `${team.authorityName} · ${sc.name} scenario` : team.authorityName, foot: `Prepared ${prepared}${s.user ? ` by ${s.user}` : ''}` };
   return (
     <div className="r-doc">
       {/* 1 ---------------------------------------------------------------- cover */}
@@ -127,7 +129,9 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
 
       {/* 2 ---------------------------------------------------------------- executive summary */}
       <RPage {...common} n={2} title="1. Executive summary">
-        <p className="r-intro">This forecast shows the council’s <strong>everyday cash</strong> — normal income and spending, leaving out borrowing and investments — so you can see when the council may need to borrow and when it will have spare cash to invest.</p>
+        {register
+          ? <p className="r-intro">This forecast shows the council’s <strong>cash position</strong>: normal income and spending projected from bank history, plus the loans, investments and interest recorded in the deal register ({register.name}), and money held in funds. It shows when the council may need to borrow and when it will have spare cash to invest.</p>
+          : <p className="r-intro">This forecast shows the council’s <strong>everyday cash</strong> — normal income and spending, leaving out borrowing and investments — so you can see when the council may need to borrow and when it will have spare cash to invest.</p>}
         <div className="r-callout">
           <div className="r-label">Key points</div>
           <ul>{keyPoints.map((k, i) => <li key={i}>{k}</li>)}</ul>
@@ -146,8 +150,37 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
         )}
       </RPage>
 
-      {/* 3 ---------------------------------------------------------------- monthly profile */}
-      <RPage {...common} n={3} title="2. Month by month">
+      {/* 3 ---------------------------------------------------------------- options to discuss */}
+      <RPage {...common} n={3} title="2. Options to discuss">
+        <p className="r-intro">What the forecast{register ? ' and the council’s deal register' : ''} suggest about borrowing and investing. {STRATEGY_CAVEAT}</p>
+        <div className="r-cover-kpis r-kpis-inline">
+          <div className="hl"><div className="l">Borrowing needed</div><div className="v">{money(b.strategy.shortfall)}</div><div className="s">{b.strategy.shortfallDay ? `by ${fmtDay(b.strategy.shortfallDay)}` : 'none'}</div></div>
+          <div><div className="l">Lasting (over a year)</div><div className="v">{money(b.strategy.lasting)}</div><div className="s">does not recover in 12 months</div></div>
+          <div><div className="l">Short term</div><div className="v">{money(b.strategy.shortTerm)}</div><div className="s">recovers within 12 months</div></div>
+          <div><div className="l">Could invest 12 months</div><div className="v">{money(b.strategy.ladder.find((r) => r.months === 12)?.amount ?? 0)}</div><div className="s">on the cautious line</div></div>
+        </div>
+        <ol className="r-options">{b.strategy.options.map((o, i) => <li key={i} className={o.tone}><strong>{o.title}.</strong> {o.body}</li>)}</ol>
+        {register?.lb && b.strategy.benchmark && (
+          <>
+            <h3>The long-term view: liability benchmark</h3>
+            <p className="r-caption" style={{ marginTop: 0 }}>The forecast is <strong>bottom up</strong> (bank history: when cash runs short); the benchmark is <strong>top down</strong> (balance sheet projections: how much long-term borrowing is needed, and for how long).</p>
+            <table className="r-tbl r-tbl-tight">
+              <thead><tr><th>Year</th><th className="n">Capital financing requirement</th><th className="n">Liability benchmark</th><th className="n">Existing loans</th><th className="n">Room to borrow</th><th className="n">Above benchmark</th></tr></thead>
+              <tbody>{register.lb.filter((r) => !r.actual).slice(0, 5).map((r) => <tr key={r.fy}><td>{r.fy}</td><td className="n">{money(r.cfr * 1e6)}</td><td className="n"><strong>{money(r.lb * 1e6)}</strong></td><td className="n">{money(r.existingLoans * 1e6)}</td><td className="n">{money(r.need * 1e6)}</td><td className="n">{money(r.over * 1e6)}</td></tr>)}</tbody>
+            </table>
+          </>
+        )}
+        {b.strategy.ladder.length > 0 && (
+          <>
+            <h3>Cash that could be invested for longer <span className="r-muted" style={{ fontWeight: 400, fontSize: '9pt' }}>(stays above the {money(fc.buffer)} minimum that long, even at the bottom of the likely range)</span></h3>
+            <table className="r-tbl r-tbl-tight"><thead><tr>{b.strategy.ladder.map((r) => <th key={r.months} className="n">{r.months} months</th>)}</tr></thead>
+              <tbody><tr>{b.strategy.ladder.map((r) => <td key={r.months} className="n">{money(r.amount)}</td>)}</tr></tbody></table>
+          </>
+        )}
+      </RPage>
+
+      {/* 4 ---------------------------------------------------------------- monthly profile */}
+      <RPage {...common} n={4} title="3. Month by month">
         <p className="r-intro">Expected money in and out each month, with the cash position at the end of the month and the lowest point during it. Months where cash dips below the {money(fc.buffer)} minimum are highlighted.</p>
         <EChart height={190} option={{
           animation: false, grid: { left: 58, right: 10, top: 10, bottom: 24 },
@@ -168,7 +201,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
       </RPage>
 
       {/* 4 ---------------------------------------------------------------- drivers & assumptions */}
-      <RPage {...common} n={4} title="3. What drives the forecast">
+      <RPage {...common} n={5} title="4. What drives the forecast">
         <p className="r-intro">The forecast for each category by financial year (April to March), and how each is worked out. Money in is positive, money out negative.</p>
         <table className="r-tbl r-tbl-tight">
           <thead><tr><th>Category</th><th>Worked out from</th><th className="n">Growth</th>{fyLabels.map((l) => <th key={l} className="n">{l}</th>)}</tr></thead>
@@ -195,7 +228,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
       </RPage>
 
       {/* 5 ---------------------------------------------------------------- history */}
-      <RPage {...common} n={5} title="4. The history behind it">
+      <RPage {...common} n={6} title="5. The history behind it">
         <p className="r-intro">The forecast is built from the council’s own bank history. The difference between money in and money out each year shows the trend the forecast continues.</p>
         {hist ? (
           <>
@@ -216,7 +249,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
       </RPage>
 
       {/* 6 ---------------------------------------------------------------- confidence */}
-      <RPage {...common} n={6} title="5. How much confidence to place in it">
+      <RPage {...common} n={7} title="6. How much confidence to place in it">
         <h3 style={{ marginTop: 0 }}>Backtest</h3>
         {bt ? (
           <>

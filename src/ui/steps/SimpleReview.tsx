@@ -84,6 +84,8 @@ export function SimpleReview() {
         {catBusy && <span className="spinner" title="Updating" />}
       </div>
 
+      <RegisterNote />
+
       {allDone ? (
         <div className="card done-card fade">
           <div className="done-head"><i className="bi bi-check-circle-fill" /><div><h2>All checked</h2><p>Every transaction is sorted, and loans and investments are set aside. Your decisions are remembered for next time.</p></div></div>
@@ -111,6 +113,26 @@ export function SimpleReview() {
           </>}
           <StepFooter nextLabel={allDone ? 'Next: look back' : 'Done for now — next: look back'} />
         </>
+      )}
+    </div>
+  );
+}
+
+/** What matching to the deal register did, and anything in the register the bank didn’t show. */
+function RegisterNote() {
+  const m = useStore((s) => s.cat?.registerMatch);
+  if (!m) return null;
+  const miss = m.unmatched;
+  return (
+    <div className="callout navy mb small">
+      <i className="bi bi-journal-check" /> <strong>{int(m.matched)} bank lines matched to your deal register</strong> ({money(m.matchedAbs)}), so these loans, investments and interest are set aside with certainty.
+      {miss.length > 0 && (
+        <details style={{ marginTop: 6 }}>
+          <summary>{miss.length} register item{miss.length > 1 ? 's' : ''} over £10k weren’t found in the bank files</summary>
+          <p className="xs muted" style={{ margin: '6px 0' }}>Usually interest paid on a slightly different date or amount, a deal settled through another account, or a date to correct in the register. Nothing to do here unless the amounts are large.</p>
+          <ul className="list-plain xs">{miss.slice(0, 12).map((u, i) => <li key={i} className="row tight"><span style={{ width: 90 }} className="muted">{day(u.day)}</span><span style={{ width: 90 }} className="num"><Money v={u.amount} /></span><span>{u.label}</span></li>)}</ul>
+          {miss.length > 12 && <div className="xs muted">…and {miss.length - 12} more.</div>}
+        </details>
       )}
     </div>
   );

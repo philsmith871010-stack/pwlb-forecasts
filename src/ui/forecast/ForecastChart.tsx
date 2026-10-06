@@ -30,6 +30,8 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
     const fcVals = idx.map((i, k) => (k === lastHistIdx ? histVals[k] : fcAt(days[i], fc.cumulative)));
     const lo = idx.map((i, k) => (k === lastHistIdx ? histVals[k] : fcAt(days[i], fc.lower)));
     const width = idx.map((i, k) => { const l = lo[k]; const u = k === lastHistIdx ? histVals[k] : fcAt(days[i], fc.upper); return l === null || u === null ? null : (u as number) - (l as number); });
+    const before = fc.register ? idx.map((i) => fcAt(days[i], fc.cumulativeBefore)) : null;
+    const fcName = fc.register ? 'Forecast (with your deals)' : 'Forecast';
     const tr = fc.treasuryDaily.some((v) => v) && showTreasury ? idx.map((i, k) => (k === lastHistIdx ? histVals[k] : fcAt(days[i], fc.cumulativeAfterTreasury))) : null;
     const nearest = (d: Day) => { const s = isoFromDay(d); let best = x[0]; for (const v of x) { if (v <= s) best = v; else break; } return best; };
     const breaches = fc.breaches.map((br) => [{ xAxis: nearest(br.from), itemStyle: { color: 'rgba(176,70,50,.045)' } }, { xAxis: nearest(br.to) }]);
@@ -39,12 +41,15 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
         trigger: 'axis',
         formatter: (ps: { seriesName: string; value: number | null; axisValue: string; marker: string }[]) => {
           const head = fmtDay(Math.floor(Date.parse(ps[0].axisValue) / 864e5));
-          const rows = ps.filter((p) => p.value != null && !p.seriesName.startsWith('_')).map((p) => `${p.marker}${p.seriesName}: <b>${money(p.value as number)}</b>`);
+          const loV = ps.find((p) => p.seriesName === '_lo')?.value;
+          const rows = ps.filter((p) => p.value != null && !p.seriesName.startsWith('_')).map((p) => p.seriesName === 'Likely range' && loV != null
+            ? `${p.marker}Likely range: <b>${money(loV)}</b> to <b>${money(loV + (p.value as number))}</b>`
+            : `${p.marker}${p.seriesName}: <b>${money(p.value as number)}</b>`);
           const ms = markers.filter((m) => isoFromDay(m.day) === ps[0].axisValue || (granularity !== 'daily' && nearest(m.day) === ps[0].axisValue)).map((m) => `<span style="color:#fd7e14">◆</span> ${m.label}`);
           return [head, ...rows, ...ms].join('<br/>');
         },
       },
-      legend: { top: 0, right: 0, data: ['Past', 'Forecast', 'Likely range', ...(tr ? ['After known loan repayments'] : [])] },
+      legend: { top: 0, right: 0, data: ['Past', fcName, 'Likely range', ...(before ? ['Everyday cash only'] : []), ...(tr ? ['After known loan repayments'] : [])] },
       grid: { left: 72, right: 24, top: 36, bottom: 64 },
       xAxis: { type: 'category', data: x, axisLabel: { formatter: (v: string) => { const { y, m } = ymdFromDay(Math.floor(Date.parse(v) / 864e5)); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${String(y).slice(2)}`; } } },
       yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
@@ -57,7 +62,7 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
           markLine: { silent: true, symbol: 'none', data: [{ xAxis: nearest(fc.start - 1), lineStyle: { color: '#adb5bd', type: 'solid' }, label: { formatter: 'today', color: '#6c757d', fontSize: 11 } }] },
         },
         {
-          name: 'Forecast', type: 'line', data: fcVals, showSymbol: false, lineStyle: { width: 2.6, color: '#fd7e14', type: 'dashed' }, itemStyle: { color: '#fd7e14' }, sampling: 'lttb',
+          name: fcName, type: 'line', data: fcVals, showSymbol: false, lineStyle: { width: 2.6, color: '#fd7e14', type: 'dashed' }, itemStyle: { color: '#fd7e14' }, sampling: 'lttb',
           markLine: { silent: true, symbol: 'none', data: [{ yAxis: fc.buffer, lineStyle: { color: '#b04632', type: 'dashed', width: 1.5 }, label: { formatter: `minimum cash ${money(fc.buffer)}`, position: 'insideStartTop', color: '#b04632', fontSize: 10.5 } }] },
           markPoint: {
             symbol: 'circle', symbolSize: 10,
@@ -68,10 +73,11 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
           },
           markArea: breaches.length ? { silent: true, data: breaches } : undefined,
         },
+        ...(before ? [{ name: 'Everyday cash only', type: 'line', data: before, showSymbol: false, lineStyle: { width: 1.4, color: '#8a96a3', type: 'dotted' }, itemStyle: { color: '#8a96a3' } }] : []),
         ...(tr ? [{ name: 'After known loan repayments', type: 'line', data: tr, showSymbol: false, lineStyle: { width: 1.6, color: '#544fc5', type: 'dotted' }, itemStyle: { color: '#544fc5' } }] : []),
         {
           name: '_markers', type: 'scatter', symbol: 'diamond', symbolSize: 9, itemStyle: { color: '#fd7e14', borderColor: '#fff', borderWidth: 1 }, z: 5,
-          data: markers.map((m) => { const k = x.indexOf(nearest(m.day)); return k >= 0 ? [x[k], fcVals[k]] : null; }).filter(Boolean),
+          data: markers.filter((m) => m.kind !== 'treasury').map((m) => { const k = x.indexOf(nearest(m.day)); return k >= 0 ? [x[k], fcVals[k]] : null; }).filter(Boolean),
           tooltip: { show: false },
         },
       ],

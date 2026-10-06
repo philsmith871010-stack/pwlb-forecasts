@@ -60,7 +60,7 @@ function SimpleSave() {
         <div className="save-card primary">
           <i className="bi bi-file-earmark-richtext" />
           <h3>The report</h3>
-          <p>A clear six-page summary for your manager, a treasury report or a Section 151 briefing: the low point, how much you may need to borrow, charts and the assumptions behind it.</p>
+          <p>A clear seven-page summary for your manager, a treasury report or a Section 151 briefing: the low point, how much you may need to borrow, options to discuss, charts and the assumptions behind it.</p>
           <button className="btn primary lg" disabled={!b} onClick={() => setView('report')}><i className="bi bi-eye" /> View and download</button>
         </div>
         <div className="save-card">
@@ -70,7 +70,7 @@ function SimpleSave() {
           <button className="btn lg" disabled={!b || !agg || busy === 'xlsx'} onClick={async () => {
             if (!b || !agg) return;
             setBusy('xlsx');
-            try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME }), `cash-flow-forecast-${team.authorityName.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
+            try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `cash-flow-forecast-${team.authorityName.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
             finally { setBusy(null); }
           }}>{busy === 'xlsx' ? <span className="spinner" /> : <i className="bi bi-download" />} Download Excel</button>
         </div>
@@ -150,7 +150,7 @@ function AdvancedSave() {
               busy={busy === 'xlsx'} onClick={async () => {
                 if (!b || !agg) return;
                 setBusy('xlsx');
-                try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME }), `cash-flow-insight-${sc.name.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
+                try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `cash-flow-insight-${sc.name.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
                 finally { setBusy(null); }
               }} />
             <ExportRow icon="bi-filetype-csv" title="Categorised transactions (CSV)" text="Every line with its category, deal flag, classification, confidence and the rule that decided it — for your own audit trail." disabled={!cat}

@@ -501,7 +501,7 @@ export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end:
       for (const { y, m } of monthsIter) {
         let need = 0;
         for (let d = dom(y, m, 1); d <= dom(y, m, 31); d++) need -= netBy.get(`3:${d}`) ?? 0;
-        if (need > 0) xfer(prevBusinessDay(dom(y, m, 1) - 1), 0, 3, need, `SCHOOLS AC FUNDING ${nums[3]}`, `TFR FROM ${nums[0]}`);
+        if (need > 0) xfer(Math.max(start, prevBusinessDay(dom(y, m, 1) - 1)), 0, 3, need, `SCHOOLS AC FUNDING ${nums[3]}`, `TFR FROM ${nums[0]}`);
       }
     }
   }
@@ -667,8 +667,11 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
       }
     } else if (bal < lo) {
       let need = target - bal;
-      for (let i = 0; i < mmf.length && need > 0; i++) {
-        const w = Math.min(mmf[i], Math.ceil(need / 5e4) * 5e4);
+      // keep about £10m in funds as the liquidity reserve; borrow rather than run it down
+      let avail = Math.max(0, mmf.reduce((a, b) => a + b, 0) - 10e6);
+      for (let i = 0; i < mmf.length && need > 0 && avail > 0; i++) {
+        const w = Math.min(mmf[i], avail, Math.ceil(need / 5e4) * 5e4);
+        avail -= Math.max(0, w);
         if (w <= 0) continue;
         mmf[i] -= w; need -= w;
         const f = N.MMF_FUNDS[i];
@@ -694,13 +697,15 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
       }
     }
   }
-  return buildRegisterSnapshot({ loans, lobos, deals, mmf, end, start });
+  // the council's own capital financing need: what everyday cash fell short by in the last year
+  const opNet = out.filter((t) => !t.deal && t.cat !== 'internal_transfer' && t.day > end - 365).reduce((s2, t) => s2 + t.amount, 0);
+  return buildRegisterSnapshot({ loans, lobos, deals, mmf, end, start, deficit: Math.max(0, -opNet) / 1e6 });
 }
 
 const title = (s: string) => s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\bBc\b/, 'BC').replace(/\bMetropolitan Bc\b/, 'Metropolitan BC');
 
 /** The example council's deal register at the end of its history, in the register's snapshot form. */
-function buildRegisterSnapshot(x: { loans: GLoan[]; lobos: GLoan[]; deals: Pos[]; mmf: number[]; end: Day; start: Day }) {
+function buildRegisterSnapshot(x: { loans: GLoan[]; lobos: GLoan[]; deals: Pos[]; mmf: number[]; end: Day; start: Day; deficit: number }) {
   const asAt = x.end;
   let row = 4;
   const outstanding = (l: GLoan) => l.principal - l.life.filter((p) => p.day <= asAt).reduce((s, p) => s + p.principal, 0);
@@ -727,13 +732,15 @@ function buildRegisterSnapshot(x: { loans: GLoan[]; lobos: GLoan[]; deals: Pos[]
   const call = N.MMF_FUNDS.map((f, i) => ({ row: row++, type: 'Money market fund', counterparty: f.name.replace(/\b[A-Z]+\b/g, (w) => w[0] + w.slice(1).toLowerCase()), cpType: 'Money market fund', balance: Math.round(x.mmf[i] / 1000) * 1000, rate: Math.max(0.0005, bankRate(asAt) - 0.001), noticeDays: null, rating: 'AAAm', avgBalance: null, avgRate: null }));
 
   // The top-down projection (£m): CFR from the debt and resources at the as-at date,
-  // a five-year capital programme financed by borrowing, MRP at 3.5%, reserves used.
+  // a five-year capital programme financed by borrowing (sized from the council's own
+  // bank history, so the two views agree), MRP at 3.5%, reserves used.
   const extDebt = loansRows.filter((l) => l.maturity > isoOf(asAt) && !(l.start > isoOf(asAt))).reduce((s, l) => s + l.principal, 0) / 1e6;
   const invested = (term.filter((t) => t.maturity > isoOf(asAt)).reduce((s, t) => s + t.principal, 0) + call.reduce((s, c) => s + c.balance, 0)) / 1e6;
   const obs0 = 95;
   const cfr0 = Math.round((extDebt - invested + obs0) * 10) / 10;
   const fy0 = fyOf(asAt);
-  const capex = [46, 48, 41, 34, 28];
+  const c0 = Math.max(20, x.deficit);
+  const capex = [1.0, 1.04, 0.95, 0.8, 0.65].map((f) => Math.round(c0 * f));
   const rows: (string | number | null)[][] = [];
   let cfr = cfr0;
   for (let k = 0; k <= 30; k++) {

@@ -5,6 +5,8 @@ import { positions } from '../../lib/analysis/history';
 import type { Scenario } from '../../lib/model';
 import type { ForecastBasis } from '../../lib/analysis/aggregates';
 import type { Category } from '../../lib/categories';
+import type { RegisterInfo } from '../../worker/types';
+import { buildStrategy, Strategy, StrategyRegister } from '../../lib/forecast/strategy';
 
 export interface ForecastBundle {
   fc: ForecastResult;
@@ -13,9 +15,19 @@ export interface ForecastBundle {
   operationalEnd: number;
   /** history of the operational position, rebased so it ends at the forecast opening */
   hist: { startDay: number; values: Float64Array };
+  /** options to discuss, from the forecast and (when loaded) the deal register */
+  strategy: Strategy;
 }
 
-export function computeForecast(basis: ForecastBasis, sc: Scenario, categories: Category[], buffer: number, fyStartMonth: number): ForecastBundle {
+export function strategyRegister(r: RegisterInfo | null): StrategyRegister | null {
+  if (!r) return null;
+  return {
+    repayments: r.events.filter((e) => e.kind === 'loan_repayment'),
+    loboCalls: r.loboCalls, lb: r.lb, liquid: r.liquid.total, debt: r.stats.debt,
+  };
+}
+
+export function computeForecast(basis: ForecastBasis, sc: Scenario, categories: Category[], buffer: number, fyStartMonth: number, register: RegisterInfo | null = null): ForecastBundle {
   const pos = positions(basis.agg);
   const bankEnd = pos.actual[pos.actual.length - 1];
   const operationalEnd = pos.operational[pos.operational.length - 1];
@@ -25,11 +37,12 @@ export function computeForecast(basis: ForecastBasis, sc: Scenario, categories: 
     basis, categories, settings: { ...sc.settings, openingPosition: mode === 'manual' ? sc.settings.openingPosition ?? bankEnd : null },
     assumptions: sc.assumptions, oneOffs: sc.oneOffs, pastedSchedules: sc.pastedSchedules, treasurySchedule: sc.treasurySchedule,
     fyStartMonth, liquidityBuffer: buffer, defaultOpening,
+    register: register ? { liquid: register.liquid.total, events: register.events } : null,
   };
   const fc = runForecast(req);
   const shift = fc.opening - operationalEnd;
   const values = Float64Array.from(pos.operational, (v) => v + shift);
-  return { fc, req, bankEnd, operationalEnd, hist: { startDay: basis.agg.startDay, values } };
+  return { fc, req, bankEnd, operationalEnd, hist: { startDay: basis.agg.startDay, values }, strategy: buildStrategy(fc, strategyRegister(register)) };
 }
 
 export function useForecast(sc: Scenario | undefined): ForecastBundle | null {
@@ -37,5 +50,6 @@ export function useForecast(sc: Scenario | undefined): ForecastBundle | null {
   const categories = useStore((s) => s.team.categories);
   const buffer = useStore((s) => s.team.settings.liquidityBuffer);
   const fyStart = useStore((s) => +s.team.settings.financialYearStart.split('-')[0] || 4);
-  return useMemo(() => (basis && sc ? computeForecast(basis, sc, categories, buffer, fyStart) : null), [basis, sc, categories, buffer, fyStart]);
+  const register = useStore((s) => s.register);
+  return useMemo(() => (basis && sc ? computeForecast(basis, sc, categories, buffer, fyStart, register) : null), [basis, sc, categories, buffer, fyStart, register]);
 }

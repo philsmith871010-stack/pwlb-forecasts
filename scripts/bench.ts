@@ -123,6 +123,29 @@ if (args.includes('--register-debug')) {
     const tdeal = ds0.truth.files[fi].deal[k] === '1';
     if (tdeal) good++; else { bad++; if (badEx.length < 12) badEx.push(`${ds.narratives[ds.narr[i]]} ${ds.amount[i]} truth=${ds0.truth.categories[ds0.truth.files[fi].cat[k]]}`); }
   }
-  console.log('register-matched rows: deal', good, 'non-deal', bad); console.log(badEx.join('\n'));
+  console.log('register-matched rows: deal', good, 'non-deal', bad, 'interest check', res.registerMatch?.interest); console.log(badEx.join('\n'));
   console.log('unmatched sample', res.registerMatch?.unmatched.slice(0, 12).map((u) => `${new Date(u.day * 864e5).toISOString().slice(0, 10)} ${Math.round(u.amount)} ${u.label}`).join('\n'));
+}
+if (args.includes('--strategy')) {
+  const { buildBasis } = await import('../src/lib/analysis/aggregates');
+  const { runForecast, fmtMoney } = await import('../src/lib/forecast/engine');
+  const { buildStrategy } = await import('../src/lib/forecast/strategy');
+  const { liquidBalances } = await import('../src/lib/register/cashflows');
+  const { liabilityBenchmark } = await import('../src/lib/register/benchmark');
+  const { defaultSettings } = await import('../src/state/store');
+  const loaded = registerFromSnapshot(ds0.register);
+  const ev = registerEvents(loaded.reg);
+  const basis = buildBasis(ds, res);
+  const settings = defaultSettings(basis);
+  const liq = liquidBalances(loaded.reg);
+  const pos = basis.agg;
+  void pos;
+  const fc = runForecast({ basis, categories: DEFAULT_CATEGORIES, settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 1.5e6, register: { liquid: liq.total, events: ev.filter((e) => e.future) } });
+  console.log(`\nWith register: liquid ${fmtMoney(liq.total)}, ${fc.register?.events} events net ${fmtMoney(fc.register?.net ?? 0)}; low ${fmtMoney(fc.low.amount)} ${new Date(fc.low.day * 864e5).toISOString().slice(0, 10)}; before-register low ${fmtMoney(Math.min(...fc.cumulativeBefore))}`);
+  const lb = liabilityBenchmark(loaded.reg);
+  console.log('LB', lb?.slice(0, 6).map((r) => `${r.fy} lb ${r.lb.toFixed(1)} loans ${r.existingLoans.toFixed(1)} need ${r.need.toFixed(1)}`).join(' | '));
+  const st = buildStrategy(fc, { repayments: ev.filter((e) => e.future && e.kind === 'loan_repayment'), loboCalls: [], lb, liquid: liq.total, debt: 0 });
+  console.log(`shortfall ${fmtMoney(st.shortfall)} lasting ${fmtMoney(st.lasting)} short ${fmtMoney(st.shortTerm)}; ladder ${st.ladder.map((r) => `${r.months}m ${fmtMoney(r.amount)}`).join(' ')}`);
+  console.log(st.benchmark?.tranches);
+  for (const o of st.options) console.log(`- [${o.tone}] ${o.title}\n    ${o.body}`);
 }
