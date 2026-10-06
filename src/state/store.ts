@@ -12,16 +12,32 @@ import { isoFromDay, addMonths } from '../lib/dates';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
 export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home';
+/** Full step list (advanced tools on). */
 export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] = [
-  { id: 'load', label: 'Load data', sub: 'Team file & bank statements', icon: 'bi-cloud-arrow-up' },
-  { id: 'map', label: 'Check the files', sub: 'Is each column read right?', icon: 'bi-layout-three-columns' },
-  { id: 'categorise', label: 'Sort transactions', sub: 'Into categories, automatically', icon: 'bi-tags' },
-  { id: 'review', label: 'Review', sub: 'Confirm the unsure ones', icon: 'bi-ui-checks' },
-  { id: 'history', label: 'Look back', sub: 'How cash has behaved', icon: 'bi-bar-chart-line' },
-  { id: 'forecast', label: 'Look ahead', sub: 'The forecast', icon: 'bi-graph-up-arrow' },
-  { id: 'backtest', label: 'Test it', sub: 'Would it have worked?', icon: 'bi-bullseye' },
-  { id: 'save', label: 'Save & share', sub: 'Team file, Excel, report', icon: 'bi-box-arrow-down' },
+  { id: 'load', label: 'Add your data', sub: 'Bank statement files', icon: 'bi-cloud-arrow-up' },
+  { id: 'map', label: 'Check the files', sub: 'How each column is read', icon: 'bi-layout-three-columns' },
+  { id: 'categorise', label: 'Sorting results', sub: 'How lines were sorted', icon: 'bi-tags' },
+  { id: 'review', label: 'Check the sorting', sub: 'Confirm a few items', icon: 'bi-ui-checks' },
+  { id: 'history', label: 'Look back', sub: 'Your cash so far', icon: 'bi-bar-chart-line' },
+  { id: 'forecast', label: 'Look ahead', sub: 'Your forecast', icon: 'bi-graph-up-arrow' },
+  { id: 'backtest', label: 'Test the forecast', sub: 'Against past years', icon: 'bi-bullseye' },
+  { id: 'save', label: 'Save & share', sub: 'Report, Excel, team file', icon: 'bi-box-arrow-down' },
 ];
+
+/** The beginner's path. */
+export const SIMPLE_STEPS = STEPS.filter((s) => ['load', 'review', 'history', 'forecast', 'save'].includes(s.id));
+
+export function stepsFor(advanced: boolean) {
+  return advanced ? STEPS : SIMPLE_STEPS;
+}
+
+/** "Step 2 of 5" for a step in the current list. */
+export function useEyebrow(id: StepId): string {
+  const advanced = useStore((s) => s.advanced);
+  const list = stepsFor(advanced);
+  const i = list.findIndex((x) => x.id === id);
+  return i >= 0 ? `Step ${i + 1} of ${list.length}` : advanced ? 'Advanced tool' : '';
+}
 
 export interface Source {
   name: string;
@@ -67,6 +83,7 @@ interface State {
   compareIds: string[];
   toasts: Toast[];
   showTips: boolean;
+  advanced: boolean;
   stepTab: Record<string, string>;
   mergeState: { theirs: TeamFile; conflicts: MergeConflict[]; summary: string[]; resolve: Record<string, 'mine' | 'theirs'> } | null;
 }
@@ -75,6 +92,7 @@ interface Actions {
   toast: (text: string, kind?: 'ok' | 'err', action?: Toast['action']) => void;
   dismissToast: (id: string) => void;
   setShowTips: (v: boolean) => void;
+  setAdvanced: (v: boolean) => void;
   setStepTab: (step: string, tab: string) => void;
   setUser: (u: string) => void;
   goto: (s: StepId) => void;
@@ -150,9 +168,11 @@ export const useStore = create<State & Actions>((set, get) => ({
   compareIds: [],
   toasts: [],
   showTips: lsGet('cfi.tips') !== '0',
+  advanced: lsGet('cfi.advanced') === '1',
   stepTab: {},
   mergeState: null,
 
+  setAdvanced: (v) => { lsSet('cfi.advanced', v ? '1' : '0'); set({ advanced: v }); },
   setShowTips: (v) => { lsSet('cfi.tips', v ? '1' : '0'); set({ showTips: v }); },
   setStepTab: (step, tab) => { set((s) => ({ stepTab: { ...s.stepTab, [step]: tab } })); document.querySelector('.main')?.scrollTo({ top: 0 }); },
   toast: (text, kind = 'ok', action) => {
@@ -164,13 +184,15 @@ export const useStore = create<State & Actions>((set, get) => ({
   setUser: (u) => { lsSet(LS_USER, u); set({ user: u }); },
 
   goto: (step) => {
-    const i = STEPS.findIndex((s) => s.id === step);
-    set((s) => ({ step, reached: Math.max(s.reached, i), workspace: s.workspace || i >= STEPS.findIndex((x) => x.id === 'forecast') }));
+    const list = stepsFor(get().advanced);
+    const i = list.findIndex((s) => s.id === step);
+    set((s) => ({ step, reached: Math.max(s.reached, i) }));
     document.querySelector('.main')?.scrollTo({ top: 0 });
   },
   next: () => {
-    const i = STEPS.findIndex((s) => s.id === get().step);
-    if (i < STEPS.length - 1) get().goto(STEPS[i + 1].id);
+    const list = stepsFor(get().advanced);
+    const i = list.findIndex((s) => s.id === get().step);
+    if (i < list.length - 1) get().goto(list[i + 1].id);
   },
   enterWorkspace: () => set({ workspace: true }),
 
@@ -268,6 +290,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     try {
       const r = await engine().generateDemo(o);
       const sources: Source[] = r.files.map((f) => applyProfile({ name: f.name, size: f.size, demo: true, report: f.report, mapping: f.report.mapping }, get().team));
+      if (get().team.authorityName === 'My Council') set((st) => ({ team: { ...st.team, authorityName: 'Northbridge Council (example)' } }));
       set({ sources, demo: { rows: r.rows, options: o }, hasTruth: true });
       await get().runIngest();
     } catch (e) {
@@ -310,8 +333,9 @@ export const useStore = create<State & Actions>((set, get) => ({
         team: { ...s.team, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
       }));
       if (!get().activeScenarioId && !get().team.forecasts.length) {
+        const wasDirty = get().dirty;
         const id = get().newScenario('Base');
-        set({ activeScenarioId: id, dirty: get().dirty });
+        set({ activeScenarioId: id, dirty: wasDirty });
       }
     } catch (e) {
       set({ catBusy: null });

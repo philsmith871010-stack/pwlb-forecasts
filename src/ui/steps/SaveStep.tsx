@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../../state/store';
+import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Panel, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { useForecast } from '../forecast/useForecast';
 import { engine } from '../../worker/client';
@@ -8,16 +8,93 @@ import { buildHistorySummary } from '../../lib/analysis/snapshot';
 import { buildWorkbook } from '../../lib/export/xlsx';
 import { ReportView } from '../report/ReportView';
 import type { BacktestResult } from '../../lib/forecast/backtest';
-import { ago } from '../../lib/format';
+import { ago, money, day } from '../../lib/format';
 import { addMonths, ymdFromDay, dayFromYMD } from '../../lib/dates';
 import { APP_NAME } from '../../config';
 
 export function SaveStep() {
+  const advanced = useStore((st) => st.advanced);
+  return advanced ? <AdvancedSave /> : <SimpleSave />;
+}
+
+function SimpleSave() {
+  const s = useStore();
+  const { team, agg, cat, dirty, teamName, saveTeam, updateTeam, user, setUser } = s;
+  const sc = team.forecasts.find((f) => f.id === s.activeScenarioId) ?? team.forecasts[0];
+  const b = useForecast(sc);
+  const eyebrow = useEyebrow('save');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [view, setView] = useState<'cards' | 'report'>('cards');
+  const defaultBacktest = async (): Promise<BacktestResult | null> => {
+    if (!cat || !s.ingest) return null;
+    const { y, m } = ymdFromDay(addMonths(s.ingest.maxDay + 1, -24));
+    return engine().backtest({ cutoff: dayFromYMD(y, m, 1), horizonMonths: 12, categories: team.categories, settings: sc.settings, includeActualOneOffs: false, fyStartMonth: +team.settings.financialYearStart.split('-')[0] || 4 });
+  };
+  const save = async () => {
+    if (agg && team.settings.includeHistorySummary) updateTeam((t) => ({ ...t, historySummary: buildHistorySummary(agg) }));
+    await saveTeam(fsAccessSupported() && teamName ? 'save' : fsAccessSupported() ? 'saveAs' : 'download');
+  };
+  if (view === 'report' && b) {
+    return (
+      <div className="page">
+        <div className="row no-print mb">
+          <button className="btn" onClick={() => setView('cards')}><i className="bi bi-arrow-left" /> Back</button>
+          <div className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><label htmlFor="rep-name" style={{ whiteSpace: 'nowrap' }}>Council name</label><input id="rep-name" className="input" style={{ width: 220 }} value={team.authorityName} onChange={(e) => updateTeam((t) => ({ ...t, authorityName: e.target.value }))} /></div>
+          <span className="small muted">To keep it as a PDF, click the orange button and choose <strong>Save as PDF</strong>.</span>
+          <span className="spacer" />
+          <button className="btn primary lg" onClick={() => window.print()}><i className="bi bi-file-earmark-pdf" /> Print or save as PDF</button>
+        </div>
+        <ReportView b={b} backtest={defaultBacktest} />
+      </div>
+    );
+  }
+  return (
+    <div className="page narrow">
+      <PageHead eyebrow={eyebrow} title="Save & share">
+        Take your forecast away as a report or spreadsheet, and save your work so you can pick it up next time.
+      </PageHead>
+      {b && <div className="summary-box mb"><div className="eyebrow">Your forecast in one line</div>
+        Lowest point <strong>{money(b.fc.low.amount)}</strong> on <strong>{day(b.fc.low.day)}</strong>{b.fc.borrowingRequirement > 0 ? <> — you may need to borrow about <strong>{money(b.fc.borrowingRequirement)}</strong> to keep {money(b.fc.buffer)} in the bank.</> : <> — no borrowing needed to keep {money(b.fc.buffer)} in the bank.</>}
+      </div>}
+      <div className="save-cards">
+        <div className="save-card primary">
+          <i className="bi bi-file-earmark-richtext" />
+          <h3>The report</h3>
+          <p>A clear six-page summary for your manager, a treasury report or a Section 151 briefing: the low point, how much you may need to borrow, charts and the assumptions behind it.</p>
+          <button className="btn primary lg" disabled={!b} onClick={() => setView('report')}><i className="bi bi-eye" /> View and download</button>
+        </div>
+        <div className="save-card">
+          <i className="bi bi-file-earmark-excel" />
+          <h3>Excel spreadsheet</h3>
+          <p>All the numbers: the forecast month by month, past years by category, growth rates and your assumptions — ready to use in your own spreadsheets.</p>
+          <button className="btn lg" disabled={!b || !agg || busy === 'xlsx'} onClick={async () => {
+            if (!b || !agg) return;
+            setBusy('xlsx');
+            try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME }), `cash-flow-forecast-${team.authorityName.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
+            finally { setBusy(null); }
+          }}>{busy === 'xlsx' ? <span className="spinner" /> : <i className="bi bi-download" />} Download Excel</button>
+        </div>
+        <div className="save-card">
+          <i className="bi bi-floppy" />
+          <h3>Save your work</h3>
+          <p>Saves the sorting decisions and forecast settings you made today in a small <strong>team file</strong> (no bank transactions). Next time, open it on step 1 and everything is remembered.</p>
+          <div className="field"><label htmlFor="who-s">Your name or initials</label><input id="who-s" className="input" value={user} placeholder="e.g. Sam Patel" onChange={(e) => setUser(e.target.value)} /></div>
+          <div className="field"><label htmlFor="auth-s">Council name</label><input id="auth-s" className="input" value={team.authorityName} onChange={(e) => updateTeam((t) => ({ ...t, authorityName: e.target.value }))} /></div>
+          <button className={`btn lg ${dirty ? 'navy' : ''}`} onClick={() => void save()}><i className="bi bi-save" /> {dirty ? 'Save team file' : team.savedAt ? `Saved ${ago(team.savedAt)}` : 'Save team file'}</button>
+          <span className="xs muted">Keep it somewhere your team can reach, such as a shared drive.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdvancedSave() {
   const s = useStore();
   const { team, agg, cat, dirty, teamName, saveTeam, updateTeam, user, setUser } = s;
   const sc = team.forecasts.find((f) => f.id === s.activeScenarioId) ?? team.forecasts[0];
   const b = useForecast(sc);
   const [busy, setBusy] = useState<string | null>(null);
+  const eyebrow = useEyebrow('save');
   const tabs: TabDef[] = [{ id: 'team', label: 'Save team file', badge: dirty ? 'unsaved' : '' }, { id: 'exports', label: 'Excel & CSV' }, { id: 'report', label: 'Report / PDF', disabled: !b }];
   const [tab, setTab] = useStepTab('save', tabs);
 
@@ -34,7 +111,7 @@ export function SaveStep() {
   return (
     <div className="page">
       <div className="no-print">
-        <PageHead eyebrow={s.workspace ? 'Workspace' : 'Step 8 of 8'} title="Save and share">
+        <PageHead eyebrow={eyebrow} title="Save and share">
           Save your team’s knowledge for next time, and take the results into your treasury report.
         </PageHead>
         <StepTabs tabs={tabs} value={tab} onChange={setTab} />

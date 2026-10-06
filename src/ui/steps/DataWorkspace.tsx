@@ -21,7 +21,7 @@ export function DataWorkspace() {
   return (
     <div>
       <div className="page" style={{ paddingBottom: 0 }}>
-        <PageHead eyebrow="Workspace" title="Data">Your bank files and how every transaction has been sorted. Come here to add new statements or review what’s been categorised.</PageHead>
+        <PageHead eyebrow="Advanced tools" title="Data">Your bank files and how every transaction has been sorted. Come here to add new statements or review what’s been categorised.</PageHead>
         <StepTabs numbered={false} value={tab} onChange={(t) => setTab(t as Tab)} tabs={([['files', 'Files', 'bi-cloud-arrow-up'], ['mapping', 'Column check', 'bi-layout-three-columns'], ['categorise', 'Sorting', 'bi-tags'], ['review', 'Review', 'bi-ui-checks'], ['transactions', 'All transactions', 'bi-list-ul'], ['quality', 'Data quality', 'bi-clipboard-check']] as [Tab, string, string][]).map(([id, label, icon]) => ({ id, label, icon, disabled: !cat && id !== 'files' }))} />
       </div>
       <div className="ws-embed">

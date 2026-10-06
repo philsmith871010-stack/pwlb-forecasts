@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useStore, STEPS, StepId } from '../state/store';
+import { useStore, stepsFor, SIMPLE_STEPS, StepId } from '../state/store';
 import { APP_NAME_PARTS, APP_TAGLINE } from '../config';
 import { Toasts, Modal } from './components/common';
 import { ago } from '../lib/format';
@@ -27,18 +27,10 @@ function Logo() {
   );
 }
 
-const WORKSPACE: { id: StepId; label: string; icon: string }[] = [
-  { id: 'data', label: 'Data', icon: 'bi-database' },
-  { id: 'history', label: 'History', icon: 'bi-bar-chart-line' },
-  { id: 'forecast', label: 'Forecast', icon: 'bi-graph-up-arrow' },
-  { id: 'backtest', label: 'Backtest', icon: 'bi-bullseye' },
-  { id: 'save', label: 'Save & export', icon: 'bi-box-arrow-down' },
-  { id: 'settings', label: 'Settings', icon: 'bi-sliders' },
-];
-
 export function App() {
   const s = useStore();
-  const { step, reached, workspace, team, dirty, teamName, cat, ingest, goto } = s;
+  const { step, reached, team, dirty, cat, ingest, goto, advanced } = s;
+  const steps = stepsFor(advanced);
 
   // Warn before closing with unsaved team-file changes
   useEffect(() => {
@@ -47,15 +39,15 @@ export function App() {
     return () => window.removeEventListener('beforeunload', h);
   }, []);
 
-  const stepIndex = STEPS.findIndex((x) => x.id === step);
-  const enabled = (i: number) => {
-    const id = STEPS[i].id;
+  const stepIndex = steps.findIndex((x) => x.id === step);
+  const enabled = (id: StepId) => {
     if (id === 'load') return true;
     if (id === 'map') return s.sources.length > 0;
     if (id === 'save') return true;
-    if (['history', 'forecast'].includes(id) && !cat) return team.forecasts.some((f) => f.resultsSnapshot) || !!team.historySummary;
+    if ((id === 'history' || id === 'forecast') && !cat) return team.forecasts.some((f) => f.resultsSnapshot) || !!team.historySummary;
     return !!cat || (id === 'categorise' && !!ingest);
   };
+  const doneStep = (i: number) => i < reached && i !== stepIndex && enabled(steps[i].id);
 
   return (
     <div className="shell">
@@ -68,49 +60,35 @@ export function App() {
           <span className="product-tag">{APP_TAGLINE}</span>
         </div>
         <div className="header-spacer" />
-        <span className="privacy-badge" title="All parsing, categorisation and forecasting runs in this browser tab. Nothing is uploaded."><i className="bi bi-shield-lock-fill" /> Your bank data stays on this computer</span>
-        <div className="team-status">
-          <span><span className={`dot ${dirty ? 'warn' : 'ok'}`} /><strong>{team.authorityName}</strong></span>
-          <span className="muted">{teamName ?? 'Unsaved team file'} · {dirty ? 'unsaved changes' : team.savedAt ? `saved ${ago(team.savedAt)}` : 'not saved yet'}</span>
-        </div>
-        <button className="btn ghost" onClick={() => s.setShowTips(!s.showTips)} title="Show or hide the plain-English guidance on every tab"><i className={`bi ${s.showTips ? 'bi-lightbulb-fill orange' : 'bi-lightbulb'}`} /> {s.showTips ? 'Tips on' : 'Tips off'}</button>
-        <button className={`btn ${dirty ? 'primary' : ''}`} onClick={() => void s.saveTeam()} title="Save the shared team file (rules, profiles, forecasts — never transactions)">
-          <i className="bi bi-save" /> Save
-        </button>
+        <span className="privacy-badge" title="All processing happens in this browser tab. Nothing is uploaded."><i className="bi bi-shield-lock-fill" /> Your data stays on this computer</span>
+        {(ingest || dirty || team.savedAt) && <>
+          <span className="save-state" title={team.savedAt ? `Last saved ${ago(team.savedAt)}` : 'Not saved yet'}>
+            <span className={`dot ${dirty ? 'warn' : 'ok'}`} />{dirty ? 'Unsaved changes' : team.savedAt ? 'All changes saved' : 'Not saved yet'}
+          </span>
+          <button className={`btn ${dirty ? 'primary' : ''}`} onClick={() => goto('save')} title="Save your work so you (and colleagues) can pick up where you left off">
+            <i className="bi bi-save" /> Save my work
+          </button>
+        </>}
       </header>
 
       <nav className="sidebar" aria-label="Steps">
-        {workspace ? (
-          <>
-            <button className={`nav-item ${step === 'home' ? 'active' : ''}`} onClick={() => goto('home')}><i className="bi bi-house" /> About this tool</button>
-            <div className="nav-label">Workspace</div>
-            {WORKSPACE.map((w) => (
-              <button key={w.id} className={`nav-item ${step === w.id || (w.id === 'data' && ['load', 'map', 'categorise', 'review'].includes(step)) ? 'active' : ''}`} onClick={() => goto(w.id)}>
-                <i className={`bi ${w.icon}`} /> {w.label}
-              </button>
-            ))}
-            <div className="nav-label">Guided steps</div>
-            <button className="nav-item" onClick={() => { useStore.setState({ workspace: false }); goto('load'); }}><i className="bi bi-signpost-split" /> Re-run the wizard</button>
-          </>
-        ) : (
-          <>
-            <button className={`nav-item ${step === 'home' ? 'active' : ''}`} onClick={() => goto('home')} style={{ marginTop: 6 }}><i className="bi bi-house" /> About this tool</button>
-            <div className="nav-label">Guided steps</div>
-            {STEPS.map((x, i) => (
-              <button key={x.id} className={`nav-item ${x.id === step ? 'active' : ''} ${i < stepIndex || i <= reached && x.id !== step && i < reached ? 'done' : ''}`} disabled={!enabled(i)} onClick={() => goto(x.id)} aria-current={x.id === step ? 'step' : undefined}>
-                <span className="step-num">{i < reached && x.id !== step ? <i className="bi bi-check-lg" style={{ fontSize: 12, color: 'inherit', width: 'auto' }} /> : i + 1}</span>
-                <span>{x.label}<span className="step-sub">{x.sub}</span></span>
-              </button>
-            ))}
-            {cat && <>
-              <div className="nav-label">Shortcuts</div>
-              <button className="nav-item" onClick={() => { useStore.setState({ workspace: true }); goto('forecast'); }}><i className="bi bi-grid-1x2" /> Open workspace</button>
-            </>}
-          </>
-        )}
+        <button className={`nav-item ${step === 'home' ? 'active' : ''}`} onClick={() => goto('home')} style={{ marginTop: 6 }}><i className="bi bi-house" /> Start here</button>
+        <div className="nav-label">Your steps</div>
+        {steps.map((x, i) => (
+          <button key={x.id} className={`nav-item ${x.id === step ? 'active' : ''} ${doneStep(i) ? 'done' : ''}`} disabled={!enabled(x.id)} onClick={() => goto(x.id)} aria-current={x.id === step ? 'step' : undefined}>
+            <span className="step-num">{doneStep(i) ? <i className="bi bi-check-lg" style={{ fontSize: 12, color: 'inherit', width: 'auto' }} /> : i + 1}</span>
+            <span>{x.label}<span className="step-sub">{x.sub}</span></span>
+          </button>
+        ))}
+        {advanced && <>
+          <div className="nav-label">Advanced tools</div>
+          <button className={`nav-item ${step === 'data' ? 'active' : ''}`} disabled={!cat} onClick={() => goto('data')}><i className="bi bi-list-ul" /> All transactions</button>
+          <button className={`nav-item ${step === 'settings' ? 'active' : ''}`} onClick={() => goto('settings')}><i className="bi bi-sliders" /> Settings</button>
+        </>}
         <div className="sidebar-foot">
-          <i className="bi bi-lock" /> <strong>Private by design.</strong> Bank files are read inside this tab by a background worker. No server, no uploads, no tracking.
-          {ingest && <div style={{ marginTop: 8 }}>{ingest.rows.toLocaleString('en-GB')} transactions in memory</div>}
+          <label className="side-switch"><input type="checkbox" checked={s.showTips} onChange={(e) => s.setShowTips(e.target.checked)} /><span className="sw" /> Show tips</label>
+          <label className="side-switch" title="Extra screens for experienced users: column mapping, rules, backtesting, scenarios, schedules"><input type="checkbox" checked={advanced} onChange={(e) => { s.setAdvanced(e.target.checked); if (!e.target.checked && !SIMPLE_STEPS.some((x) => x.id === step) && step !== 'home') goto(cat ? 'forecast' : 'load'); }} /><span className="sw" /> Advanced tools</label>
+          <div style={{ marginTop: 12 }}><i className="bi bi-lock" /> <strong>Private by design.</strong> Your bank files are read inside this browser tab. Nothing is uploaded.</div>
         </div>
       </nav>
 

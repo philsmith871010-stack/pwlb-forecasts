@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useStore } from '../../state/store';
+import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Panel, Kpi, StepFooter, Seg, Empty, Money, Progress, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { engine, proxy } from '../../worker/client';
@@ -8,7 +8,9 @@ import { money, pct, day } from '../../lib/format';
 import { addMonths, dayFromYMD, ymdFromDay, isoFromDay, Day } from '../../lib/dates';
 
 export function BacktestStep() {
-  const { cat, ingest, team, workspace, activeScenarioId, catVersion } = useStore();
+  const { cat, ingest, team, activeScenarioId, catVersion } = useStore();
+  const workspace = false;
+  const eyebrow = useEyebrow('backtest');
   const sc = team.forecasts.find((f) => f.id === activeScenarioId) ?? team.forecasts[0];
   const fyStartMonth = +team.settings.financialYearStart.split('-')[0] || 4;
   const months = useMemo(() => {
@@ -43,7 +45,7 @@ export function BacktestStep() {
   if (!cat || !ingest) return <div className="page"><Empty icon="bi-bullseye" title="Nothing to backtest yet">Load and categorise bank data first.</Empty></div>;
   return (
     <div className="page">
-      <PageHead eyebrow={workspace ? 'Workspace' : 'Step 7 of 8'} title="Would the forecast have worked?">
+      <PageHead eyebrow={eyebrow} title="Would the forecast have worked?">
         We pretend it’s an earlier date, forecast using only the data available then, and compare with what really happened.
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />

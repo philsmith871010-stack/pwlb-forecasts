@@ -455,6 +455,7 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
   if (overrideMap.size) for (let i = 0; i < n; i++) { const o = overrideMap.get(rowKey(ds, i, signatures[sig[i]])); if (o && (o.dealFlag || o.categoryId)) userDecidedDeal[i] = 1; }
   for (let i = 0; i < n; i++) {
     if (deal[i] !== DEAL_NO || cat[i] === internalIdx || userDecidedDeal[i]) continue;
+    if (rule[i] >= 0 && conf[i] === CONF_HIGH) continue; // confidently sorted by a specific rule
     if (rule[i] >= 0 && ruleList[rule[i]].source !== 'starter' && ruleList[rule[i]].dealFlag === 'not_deal') continue;
     const f = flags[i];
     if ((f & (F_LOAN_PAIR | F_INTEREST_LIKE)) || ((f & F_ROUND) && Math.abs(ds.amount[i]) >= 1e6) || ((f & F_COUNCIL) && Math.abs(ds.amount[i]) >= 1e6)) flags[i] |= F_DEAL_LIKE_OP;

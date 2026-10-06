@@ -85,16 +85,16 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
     }
   };
   const keyPoints: ReactNode[] = [
-    <>The everyday cash position is projected to reach a low of <strong>{money(fc.low.amount)}</strong> on <strong>{fmtDay(fc.low.day)}</strong>.</>,
+    <>Everyday cash is expected to reach its lowest point of <strong>{money(fc.low.amount)}</strong> on <strong>{fmtDay(fc.low.day)}</strong>.</>,
     fc.borrowingRequirement > 0
-      ? <>To stay above the <strong>{money(fc.buffer)}</strong> minimum cash buffer, the council would need to arrange around <strong>{money(fc.borrowingRequirement)}</strong> of borrowing (or equivalent liquidity) by then.</>
-      : <>The position stays above the <strong>{money(fc.buffer)}</strong> buffer throughout — no new borrowing is needed for liquidity.</>,
-    firstBreach ? <>The position first falls below the buffer on <strong>{fmtDay(firstBreach.from)}</strong>{fc.breaches.length > 1 ? `, and does so ${fc.breaches.length} times over the period` : ''}.</> : null,
-    <>The highest point is <strong>{money(fc.high.amount)}</strong> on {fmtDay(fc.high.day)} — the best window for investing surplus cash.</>,
-    fc.drivers.length ? <>The main drivers of the fall to the low point are {fc.drivers.map((d) => d.name.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}.</> : null,
+      ? <>To keep at least <strong>{money(fc.buffer)}</strong> in the bank, the council may need to borrow about <strong>{money(fc.borrowingRequirement)}</strong> by then.</>
+      : <>Cash stays above the <strong>{money(fc.buffer)}</strong> minimum throughout, so no new borrowing should be needed.</>,
+    firstBreach ? <>Cash first falls below that minimum on <strong>{fmtDay(firstBreach.from)}</strong>{fc.breaches.length > 1 ? `, and does so ${fc.breaches.length} times over the period` : ''}.</> : null,
+    <>The highest point is <strong>{money(fc.high.amount)}</strong> on {fmtDay(fc.high.day)} — the best time to invest any spare cash.</>,
+    fc.drivers.length ? <>The biggest reasons for the fall are {fc.drivers.map((d) => d.name.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}.</> : null,
     fc.treasuryDaily.some((v) => v) ? <>After known treasury commitments the position at {fmtDay(horizonEnd)} is <strong>{money(fc.cumulativeAfterTreasury[fc.H - 1])}</strong>.</> : null,
   ].filter(Boolean);
-  const common = { total: 6, head: `${team.authorityName} · ${sc.name} scenario`, foot: `Prepared ${prepared}${s.user ? ` by ${s.user}` : ''}` };
+  const common = { total: 6, head: s.advanced ? `${team.authorityName} · ${sc.name} scenario` : team.authorityName, foot: `Prepared ${prepared}${s.user ? ` by ${s.user}` : ''}` };
   return (
     <div className="r-doc">
       {/* 1 ---------------------------------------------------------------- cover */}
@@ -103,12 +103,12 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           <div className="r-cover-brand"><span>PWLB<b>today</b></span> · {APP_NAME}</div>
           <div className="r-cover-kicker">Cash flow forecast</div>
           <h1>{team.authorityName}</h1>
-          <div className="r-cover-meta">{sc.name} scenario · {fmtDay(fc.start)} to {fmtDay(horizonEnd)}</div>
+          <div className="r-cover-meta">{s.advanced ? `${sc.name} scenario · ` : ''}{fmtDay(fc.start)} to {fmtDay(horizonEnd)}</div>
         </div>
         <div className="r-cover-kpis">
-          <div><div className="l">Projected low point</div><div className="v">{money(fc.low.amount)}</div><div className="s">{fmtDay(fc.low.day)}</div></div>
-          <div className="hl"><div className="l">Borrowing requirement</div><div className="v">{money(fc.borrowingRequirement)}</div><div className="s">above a {money(fc.buffer)} buffer</div></div>
-          <div><div className="l">Projected high point</div><div className="v">{money(fc.high.amount)}</div><div className="s">{fmtDay(fc.high.day)}</div></div>
+          <div><div className="l">Lowest point</div><div className="v">{money(fc.low.amount)}</div><div className="s">{fmtDay(fc.low.day)}</div></div>
+          <div className="hl"><div className="l">May need to borrow</div><div className="v">{money(fc.borrowingRequirement)}</div><div className="s">to keep {money(fc.buffer)} in the bank</div></div>
+          <div><div className="l">Highest point</div><div className="v">{money(fc.high.amount)}</div><div className="s">{fmtDay(fc.high.day)}</div></div>
           <div><div className="l">Position at end</div><div className="v">{money(fc.cumulative[fc.H - 1])}</div><div className="s">{fmtDay(horizonEnd)}</div></div>
         </div>
         <div className="r-cover-summary">
@@ -127,14 +127,14 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
 
       {/* 2 ---------------------------------------------------------------- executive summary */}
       <RPage {...common} n={2} title="1. Executive summary">
-        <p className="r-intro">This forecast projects the council’s <strong>underlying operational cash position</strong> — everyday income and spending, excluding borrowing and investment flows — to show when the council may need to borrow and when it will have cash to invest.</p>
+        <p className="r-intro">This forecast shows the council’s <strong>everyday cash</strong> — normal income and spending, leaving out borrowing and investments — so you can see when the council may need to borrow and when it will have spare cash to invest.</p>
         <div className="r-callout">
           <div className="r-label">Key points</div>
           <ul>{keyPoints.map((k, i) => <li key={i}>{k}</li>)}</ul>
         </div>
         <h3>Cash position: history and forecast</h3>
         <ReportChart b={b} height={300} showHistory />
-        <p className="r-caption">Solid line: actual everyday cash position (rebased to today’s opening position). Dashed line: forecast. Shaded band: 90% likely range, based on how much each category has varied month to month. Red dashed line: minimum cash buffer.</p>
+        <p className="r-caption">Solid line: the past. Dashed line: the forecast. Shaded area: the likely range, which widens further ahead. Red dashed line: the minimum cash you want to keep.</p>
         {compare.length > 1 && (
           <>
             <h3>Scenarios compared</h3>
@@ -148,7 +148,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
 
       {/* 3 ---------------------------------------------------------------- monthly profile */}
       <RPage {...common} n={3} title="2. Month by month">
-        <p className="r-intro">Forecast operational receipts and payments each month, with the position at month end and the lowest point within the month. Months where the position dips below the {money(fc.buffer)} buffer are highlighted.</p>
+        <p className="r-intro">Expected money in and out each month, with the cash position at the end of the month and the lowest point during it. Months where cash dips below the {money(fc.buffer)} minimum are highlighted.</p>
         <EChart height={190} option={{
           animation: false, grid: { left: 58, right: 10, top: 10, bottom: 24 },
           xAxis: { type: 'category', data: monthly.labels, axisLabel: { fontSize: 9 } },
@@ -156,7 +156,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           series: [{ type: 'bar', data: monthly.net.map((v) => ({ value: v, itemStyle: { color: v >= 0 ? '#2caffe' : '#fd7e14' } })) }],
         }} />
         <table className="r-tbl r-tbl-tight">
-          <thead><tr><th>Month</th><th className="n">Receipts</th><th className="n">Payments</th><th className="n">Net</th><th className="n">Month-end position</th><th className="n">Lowest in month</th><th className="n">Likely range</th></tr></thead>
+          <thead><tr><th>Month</th><th className="n">Money in</th><th className="n">Money out</th><th className="n">Difference</th><th className="n">Cash at month end</th><th className="n">Lowest in month</th><th className="n">Likely range</th></tr></thead>
           <tbody>{monthly.labels.slice(0, 24).map((l, k) => (
             <tr key={l} className={monthly.minIn[k] < fc.buffer ? 'warn' : ''}>
               <td>{l}</td><td className="n">{money(monthly.inflow[k])}</td><td className="n">{money(monthly.outflow[k])}</td><td className="n">{money(monthly.net[k], { sign: true })}</td>
@@ -169,12 +169,12 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
 
       {/* 4 ---------------------------------------------------------------- drivers & assumptions */}
       <RPage {...common} n={4} title="3. What drives the forecast">
-        <p className="r-intro">Forecast operational flows by category and financial year, with how each is projected. Receipts are positive, payments negative.</p>
+        <p className="r-intro">The forecast for each category by financial year (April to March), and how each is worked out. Money in is positive, money out negative.</p>
         <table className="r-tbl r-tbl-tight">
-          <thead><tr><th>Category</th><th>Method</th><th className="n">Growth</th>{fyLabels.map((l) => <th key={l} className="n">{l}</th>)}</tr></thead>
+          <thead><tr><th>Category</th><th>Worked out from</th><th className="n">Growth</th>{fyLabels.map((l) => <th key={l} className="n">{l}</th>)}</tr></thead>
           <tbody>
-            {catRows.map(({ e, per }) => <tr key={e.id}><td><span className="r-sw" style={{ background: catColour(e.id) }} />{e.name}</td><td className="r-muted">{({ seasonal: 'Seasonal pattern', series: 'Regular schedule', flat: 'Average', manual: 'Manual', exclude: 'Excluded' } as Record<string, string>)[e.method]}</td><td className="n">{pct(e.growthPct / 100, 1, true)}</td>{per.map((v, k) => <td key={k} className="n">{money(v)}</td>)}</tr>)}
-            <tr className="tot"><td>Net operational flow</td><td /><td />{fyNet.map((v, k) => <td key={k} className="n">{money(v, { sign: true })}</td>)}</tr>
+            {catRows.map(({ e, per }) => <tr key={e.id}><td><span className="r-sw" style={{ background: catColour(e.id) }} />{e.name}</td><td className="r-muted">{({ seasonal: 'Past monthly pattern', series: 'Regular payments', flat: 'Past average', manual: 'Your schedule', exclude: 'Left out' } as Record<string, string>)[e.method]}</td><td className="n">{pct(e.growthPct / 100, 1, true)}</td>{per.map((v, k) => <td key={k} className="n">{money(v)}</td>)}</tr>)}
+            <tr className="tot"><td>Difference (in minus out)</td><td /><td />{fyNet.map((v, k) => <td key={k} className="n">{money(v, { sign: true })}</td>)}</tr>
           </tbody>
         </table>
         <h3>Assumptions and known items</h3>
@@ -196,7 +196,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
 
       {/* 5 ---------------------------------------------------------------- history */}
       <RPage {...common} n={5} title="4. The history behind it">
-        <p className="r-intro">The forecast is built from the council’s own transaction history. Net operational cash flow by financial year shows the underlying trend the forecast continues.</p>
+        <p className="r-intro">The forecast is built from the council’s own bank history. The difference between money in and money out each year shows the trend the forecast continues.</p>
         {hist ? (
           <>
             <EChart height={230} option={{
@@ -205,10 +205,10 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
               yAxis: { type: 'value', axisLabel: { formatter: axisMoney, fontSize: 9 } },
               series: [{ type: 'bar', barWidth: '45%', data: hist.net.map((v) => ({ value: v, itemStyle: { color: v >= 0 ? '#28a745' : '#b04632', borderRadius: [3, 3, 0, 0] } })), label: { show: true, position: 'top', formatter: (p: { value: number }) => axisMoney(p.value), fontSize: 9, color: '#243240' } }],
             }} />
-            <p className="r-caption">* part year. Net operational flow excludes borrowing, investment and transfers between the council’s own accounts.</p>
+            <p className="r-caption">* part year. Leaves out borrowing, investments and transfers between the council’s own accounts.</p>
             <h3>Biggest movers</h3>
             <table className="r-tbl">
-              <thead><tr><th>Category</th><th className="n">First full year</th><th className="n">Latest year</th><th className="n">Average growth a year</th></tr></thead>
+              <thead><tr><th>Category</th><th className="n">First full year</th><th className="n">Latest year</th><th className="n">Average growth each year</th></tr></thead>
               <tbody>{hist.movers.map((m) => <tr key={m.id}><td><span className="r-sw" style={{ background: catColour(m.id) }} />{catName(m.id)}</td><td className="n">{money(m.first)}</td><td className="n">{money(m.last)}</td><td className="n">{m.g === null ? '–' : pct(m.g, 1, true)}</td></tr>)}</tbody>
             </table>
           </>
@@ -301,7 +301,7 @@ function ReportChart({ b, height, showHistory }: { b: ForecastBundle; height: nu
         { type: 'line', data: w, stack: 'b', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, areaStyle: { color: 'rgba(253,126,20,.16)' } },
         { type: 'line', data: h, showSymbol: false, lineStyle: { color: '#0a2540', width: 2 } },
         { type: 'line', data: f, showSymbol: false, lineStyle: { color: '#fd7e14', width: 2.4, type: 'dashed' },
-          markLine: { silent: true, symbol: 'none', data: [{ yAxis: fc.buffer }], lineStyle: { color: '#b04632', type: 'dashed' }, label: { formatter: 'buffer', fontSize: 9, color: '#b04632', position: 'insideStartTop' } },
+          markLine: { silent: true, symbol: 'none', data: [{ yAxis: fc.buffer }], lineStyle: { color: '#b04632', type: 'dashed' }, label: { formatter: 'minimum cash', fontSize: 9, color: '#b04632', position: 'insideStartTop' } },
           markPoint: { symbol: 'circle', symbolSize: 9, data: [{ coord: [x[Math.min(x.length - 1, Math.round((fc.low.day - from) / 3))], fc.low.amount], itemStyle: { color: '#b04632', borderColor: '#fff', borderWidth: 2 }, label: { show: true, formatter: `Low ${money(fc.low.amount)}`, position: (fc.low.day - fc.start) / fc.H > 0.8 ? 'left' : 'bottom', fontSize: 10, fontWeight: 700, color: '#b04632' } }] } },
       ],
     };

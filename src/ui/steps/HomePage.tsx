@@ -3,12 +3,11 @@ import { APP_NAME_PARTS } from '../../config';
 import { ago } from '../../lib/format';
 
 const STAGES = [
-  { icon: 'bi-cloud-arrow-up', title: 'Load', text: 'Open your team file and drop in three to five years of bank statement exports (CSV). Any bank, several accounts — they’re merged.' },
-  { icon: 'bi-tags', title: 'Sort', text: 'Every line is sorted automatically — council tax, payroll, suppliers, grants — and loans and investments are picked out and set aside.' },
-  { icon: 'bi-ui-checks', title: 'Confirm', text: 'A short review of anything uncertain, biggest money first. Each confirmation becomes a rule, so next time is quicker.' },
-  { icon: 'bi-bar-chart-line', title: 'Look back', text: 'See how your cash really behaves: yearly trends, seasonal dips, payday patterns, what changed and why.' },
-  { icon: 'bi-graph-up-arrow', title: 'Look ahead', text: 'The pattern is projected forward. Add what you know — pay awards, grants ending, land sales — and watch the low point move.' },
-  { icon: 'bi-bullseye', title: 'Test & share', text: 'Check how it would have performed in the past, then save for your team and export to Excel or a PDF report.' },
+  { icon: 'bi-cloud-arrow-up', title: 'Add your data', text: 'Drop in the bank statement files (CSV) from your online banking — or try the example data.' },
+  { icon: 'bi-ui-checks', title: 'Check the sorting', text: 'Almost everything is sorted for you. Confirm the handful of items we weren’t sure about.' },
+  { icon: 'bi-bar-chart-line', title: 'Look back', text: 'See how your cash has behaved: year by year, and through the seasons.' },
+  { icon: 'bi-graph-up-arrow', title: 'Look ahead', text: 'Get your forecast. Add what you know — a pay award, a land sale — and watch it update.' },
+  { icon: 'bi-box-arrow-down', title: 'Save & share', text: 'Download a ready-made report or Excel file, and save your work for next time.' },
 ];
 
 const BENEFITS = [
@@ -40,7 +39,7 @@ export function HomePage() {
           <p className="home-lead">Turn your bank statements into a clear, explainable <strong>cash flow forecast</strong> — and see when your council will need to borrow, how much, and when it will have cash to invest.</p>
           <div className="row" style={{ gap: 12, marginTop: 24 }}>
             <button className="btn primary lg" onClick={start}><i className="bi bi-play-fill" /> Get started</button>
-            <button className="btn lg on-dark" onClick={demo}><i className="bi bi-magic" /> Try it with demo data</button>
+            <button className="btn lg on-dark" onClick={demo}><i className="bi bi-stars" /> Try it with example data</button>
             {ingest && <button className="btn lg on-dark" onClick={() => goto('forecast')}>Continue where I was <i className="bi bi-arrow-right" /></button>}
           </div>
           <div className="home-trust">
@@ -52,15 +51,22 @@ export function HomePage() {
         </div>
       </section>
 
+      <nav className="home-nav" aria-label="On this page">
+        {[['what', 'What it is'], ['how', 'How it works'], ['benefits', 'What you get'], ['security', 'Your data is safe'], ['start', 'What you need']].map(([id, l]) => (
+          <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{l}</a>
+        ))}
+        <span className="spacer" />
+        <button className="btn primary sm" onClick={start}>Get started <i className="bi bi-arrow-right" /></button>
+      </nav>
       <div className="page" style={{ paddingTop: 36 }}>
-        <section className="home-section">
+        <section className="home-section" id="what">
           <div className="eyebrow">What it is</div>
           <h2>Your everyday cash, projected forward</h2>
           <div className="grid g2" style={{ alignItems: 'center' }}>
             <div className="small" style={{ fontSize: 15, lineHeight: 1.65 }}>
-              <p>Treasury teams usually forecast by exporting bank statements into Excel and grouping thousands of lines by hand. {APP_NAME_PARTS.join('')} takes that tedious middle out.</p>
-              <p>It sorts your transactions, sets aside borrowing and investment flows, learns the rhythm of your <strong>operational</strong> cash — when council tax arrives, when payroll and precepts go out, the February–March dip — and projects it forward.</p>
-              <p style={{ marginBottom: 0 }}>The result is your <strong>underlying cash position</strong>: what you’d hold from everyday income and spending alone. Its low point is your borrowing need; its peaks are your opportunities to invest.</p>
+              <p>Most councils forecast cash by downloading bank statements into Excel and sorting thousands of lines by hand. {APP_NAME_PARTS.join('')} takes that tedious middle out.</p>
+              <p>This tool does the sorting for you. It sets aside loans and investments, learns the rhythm of your <strong>everyday cash</strong> — when council tax arrives, when salaries go out, the dip every February and March — and carries that pattern forward.</p>
+              <p style={{ marginBottom: 0 }}>The result shows the cash you’d have from everyday income and spending alone. Where it dips lowest is how much you may need to <strong>borrow</strong>; where it peaks is your chance to <strong>invest</strong>.</p>
             </div>
             <div className="home-illus" aria-hidden="true">
               <svg viewBox="0 0 440 210" width="100%">
@@ -81,10 +87,10 @@ export function HomePage() {
           </div>
         </section>
 
-        <section className="home-section">
+        <section className="home-section" id="how">
           <div className="eyebrow">How it works</div>
-          <h2>Six stages, guided all the way</h2>
-          <p className="muted">Every screen tells you what you’re looking at, why it matters and what to do. Most of the work is automatic — you mostly confirm.</p>
+          <h2>Five simple steps</h2>
+          <p className="muted">Each screen tells you what you’re looking at, why it matters and what to do next. You don’t need any treasury or spreadsheet experience — most of the work is automatic.</p>
           <div className="home-steps">
             {STAGES.map((s, i) => (
               <div key={s.title} className="home-step">
@@ -97,7 +103,7 @@ export function HomePage() {
           </div>
         </section>
 
-        <section className="home-section">
+        <section className="home-section" id="benefits">
           <div className="eyebrow">Why use it</div>
           <h2>What you get</h2>
           <div className="grid g3">
@@ -107,14 +113,14 @@ export function HomePage() {
           </div>
         </section>
 
-        <section className="home-section home-security">
+        <section className="home-section home-security" id="security">
           <div className="grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)', gap: 32, alignItems: 'start' }}>
             <div>
               <div className="eyebrow" style={{ color: 'var(--pt-mint)' }}>Data security</div>
               <h2 style={{ color: '#fff' }}>Your bank data stays on this computer</h2>
-              <p style={{ color: 'rgba(255,255,255,.8)' }}>This was the first design rule, not an afterthought. It’s built so that sending your data anywhere is not just avoided — it’s technically blocked.</p>
+              <p style={{ color: 'rgba(255,255,255,.8)' }}>This was the first rule when the tool was designed. Sending your data anywhere isn’t just avoided — the tool is built so that it can’t.</p>
               <div className="callout" style={{ background: 'rgba(255,255,255,.06)', borderColor: 'var(--pt-mint)', color: 'rgba(255,255,255,.88)' }}>
-                <strong style={{ color: '#fff' }}>Your IT team can check this.</strong> Open the browser’s developer tools, Network tab, and use the tool: after the page loads, there are no requests at all. The README explains the full five-minute check.
+                <strong style={{ color: '#fff' }}>Your IT team can check this for themselves</strong> in a few minutes — the instructions come with the tool. In short: once the page has opened, it makes no further contact with the internet at all.
               </div>
             </div>
             <div className="grid g2">
@@ -125,17 +131,17 @@ export function HomePage() {
           </div>
         </section>
 
-        <section className="home-section">
+        <section className="home-section" id="start">
           <div className="eyebrow">Before you start</div>
           <h2>What you need</h2>
           <div className="grid g3">
-            <div className="home-card"><i className="bi bi-filetype-csv" /><h4>Bank statement exports</h4><p>CSV files from your bank’s online banking — ideally three to five years, for each account you want included. Any layout works.</p></div>
-            <div className="home-card"><i className="bi bi-folder2-open" /><h4>Your team file (if you have one)</h4><p>The shared JSON file from your team drive. First time? You’ll create one at the end.</p></div>
-            <div className="home-card"><i className="bi bi-hourglass-split" /><h4>About 20 minutes the first time</h4><p>Mostly the review step. After that, with your team file, a refresh takes a few minutes.</p></div>
+            <div className="home-card"><i className="bi bi-filetype-csv" /><h4>Bank statement exports</h4><p>CSV files downloaded from online banking — ideally three to five years. Any bank, any layout. Or use our example data.</p></div>
+            <div className="home-card"><i className="bi bi-folder2-open" /><h4>A team file (only if you have one)</h4><p>A small file a colleague may have saved last time. First time? You’ll create one at the end — nothing to prepare.</p></div>
+            <div className="home-card"><i className="bi bi-hourglass-split" /><h4>About 15 minutes</h4><p>The first time, most of it is checking a few items. Next time, with your team file, it takes a few minutes.</p></div>
           </div>
           <div className="home-cta">
-            <div><h3 style={{ margin: 0 }}>Ready?</h3><div className="muted">Start with your own files, or explore with a realistic demo council first.</div></div>
-            <div className="row"><button className="btn primary lg" onClick={start}><i className="bi bi-play-fill" /> Get started</button><button className="btn lg" onClick={demo}><i className="bi bi-magic" /> Try the demo</button></div>
+            <div><h3 style={{ margin: 0 }}>Ready?</h3><div className="muted">Start with your own bank files, or explore with a realistic example council first.</div></div>
+            <div className="row"><button className="btn primary lg" onClick={start}><i className="bi bi-play-fill" /> Get started</button><button className="btn lg" onClick={demo}><i className="bi bi-stars" /> Try the example data</button></div>
           </div>
         </section>
       </div>

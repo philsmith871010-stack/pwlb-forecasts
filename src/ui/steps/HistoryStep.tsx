@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { useStore } from '../../state/store';
+import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Panel, StepFooter, Seg, Empty, CatBadge, Money, Kpi, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { TxnTable } from '../components/TxnTable';
@@ -44,36 +44,47 @@ const HISTORY_TABS: TabDef[] = [
 ];
 
 const HISTORY_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
+  'simple-years': { what: 'Each financial year (April to March): how much everyday money came in, how much went out, and the difference.', why: 'When more goes out than comes in, the gap has to be covered by borrowing or by savings. This shows how big that gap is and whether it’s growing.', todo: 'Read the summary sentence, then glance across the years.' },
   years: { what: 'Each financial year at a glance: money in, money out, the net result, how much treasury activity there was, and the lowest and highest cash position.', why: 'A quick health check — is the council spending more than it receives each year, and how deep do the low points get?', todo: 'Read across the years. A growing negative net flow means a growing need to borrow.' },
-  position: { what: <>Your <strong>operational</strong> cash position day by day — what you’d hold from everyday income and spending alone, before any borrowing or investing. The orange line is the actual bank position, including loans and deposits.</>, why: 'The gap between the two lines is what treasury activity has been doing: borrowing to cover the dips, investing the peaks.', todo: 'Drag the slider under the chart to zoom into a period.' },
+  position: { what: <>The navy line is your <strong>everyday cash</strong>: what you’d have from normal income and spending alone, without any borrowing or investing. The orange line is your actual bank balance.</>, why: 'The gap between them is your borrowing and investing: borrowing fills the dips in everyday cash; spare cash is invested.', todo: 'Notice whether the navy line trends down — that is the need to borrow building up. Drag the slider under the chart to zoom in.' },
   yoy: { what: 'Every category, every year, with the change on the year before and the average yearly growth (CAGR).', why: 'Growth rates drive the forecast. Green means good for cash (income up or spending down); red means the reverse.', todo: 'Sort by a column or filter to find the biggest movers. Download to Excel-friendly CSV if needed.' },
   drivers: { what: 'Small charts of each category’s yearly total, and a waterfall explaining what moved the net cash flow between two years.', why: 'Shows at a glance what is growing, shrinking or jumping about — and what is really behind a change in the bottom line.', todo: 'Pick two years above the waterfall to compare.' },
-  season: { what: 'How a category behaves through the year and through the month — e.g. council tax arriving in ten instalments with a February–March lull.', why: 'The forecast repeats these seasonal patterns into the future, so this is where you can sanity-check them.', todo: 'Choose a category, then flip between the four views.' },
+  season: { what: 'How one type of money behaves through the year. For example, council tax arrives in ten monthly instalments from April to January, then almost stops in February and March.', why: 'The forecast repeats these patterns, so the dips in your cash usually happen at the same time each year.', todo: 'Pick a category from the list to see its pattern. Each faint line is one year; the bold line is a typical year.' },
   category: { what: 'Everything about one category: its history, the regular payments inside it, one-off items, who it’s paid to or from, and every transaction.', why: 'For when you want to understand or explain a particular line of the forecast.', todo: 'Pick a category on the left. Click a description to filter the transactions.' },
   recurring: { what: 'Regular payments the tool found (monthly payroll, quarterly rents…) and whether each is treated as regular or one-off.', why: 'Only regular flows are projected forward. A one-off treated as regular would be wrongly repeated in the forecast.', todo: 'Switch any series that won’t happen again to One-off.' },
   quality: { what: 'Checks on the data itself: gaps in dates, balance checks, skipped rows and possible duplicates.', why: 'Good data in, good forecast out — this is where to look if a number seems off.', todo: 'Nothing, unless something is flagged in red.' },
 };
 
+const SIMPLE_HISTORY_TABS: TabDef[] = [
+  { id: 'simple-years', label: 'Year by year' },
+  { id: 'position', label: 'Your cash over time' },
+  { id: 'season', label: 'Through the year' },
+];
+
 export function HistoryStep() {
+  const advanced = useStore((s) => s.advanced);
   const agg = useStore((s) => s.agg);
   const hasSummary = useStore((s) => !!s.team.historySummary);
-  const workspace = useStore((s) => s.workspace);
-  const [tab, setTab] = useStepTab('history', HISTORY_TABS);
+  const workspace = false;
+  const eyebrow = useEyebrow('history');
+  const TABS = advanced ? HISTORY_TABS : SIMPLE_HISTORY_TABS;
+  const [tab, setTab] = useStepTab(advanced ? 'history' : 'history-simple', TABS);
   const [mode, setMode] = useState<YearMode>('fy');
   const h = useHistoryData(mode);
   if (!agg) {
     return <div className="page">{hasSummary ? <HistorySnapshotView /> : <Empty icon="bi-bar-chart-line" title="No history yet">Load and categorise bank data first.</Empty>}</div>;
   }
   const help = HISTORY_HELP[tab];
-  const idx = HISTORY_TABS.findIndex((t) => t.id === tab);
+  const idx = TABS.findIndex((t) => t.id === tab);
   return (
     <div className="page">
-      <PageHead eyebrow={workspace ? 'Workspace' : 'Step 5 of 8'} title="How your cash has behaved"
-        actions={<Seg value={mode} onChange={setMode} options={[{ v: 'fy', label: 'Financial years' }, { v: 'calendar', label: 'Calendar years' }]} />}>
-        A look back at your everyday cash — the patterns the forecast will build on. Loans and investments are shown separately.
+      <PageHead eyebrow={eyebrow} title="Look back: how your cash has behaved"
+        actions={advanced ? <Seg value={mode} onChange={setMode} options={[{ v: 'fy', label: 'Financial years' }, { v: 'calendar', label: 'Calendar years' }]} /> : undefined}>
+        The patterns in your past cash that the forecast will build on. Years run April to March.
       </PageHead>
-      <StepTabs tabs={HISTORY_TABS} value={tab} onChange={setTab} />
+      <StepTabs tabs={TABS} value={tab} onChange={setTab} />
       <Explain compact what={help.what} why={help.why} todo={help.todo} />
+      {h && tab === 'simple-years' && <SimpleYears h={h} />}
       {h && tab === 'years' && <Overview h={h} part="years" />}
       {h && tab === 'position' && <Overview h={h} part="position" />}
       {h && tab === 'yoy' && <YoY h={h} part="table" />}
@@ -82,9 +93,8 @@ export function HistoryStep() {
       {h && tab === 'category' && <CategoryDeepDive h={h} />}
       {h && tab === 'recurring' && <RecurringView h={h} />}
       {h && tab === 'quality' && <DataQuality />}
-      {idx < HISTORY_TABS.length - 1 ? <NextTab label={`Next: ${HISTORY_TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(HISTORY_TABS[idx + 1].id)} />
-        : !workspace && <StepFooter nextLabel="Build the forecast" />}
-      {!workspace && idx < HISTORY_TABS.length - 1 && <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}><button className="btn ghost sm" onClick={() => useStore.getState().goto('forecast')}>Skip ahead to the forecast <i className="bi bi-skip-forward" /></button></div>}
+      {idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={<button className="link-btn" onClick={() => useStore.getState().goto('forecast')}>or skip to the forecast</button>} />
+        : !workspace && <StepFooter nextLabel="Next: look ahead" />}
     </div>
   );
 }
@@ -124,22 +134,27 @@ function Overview({ h, part }: { h: H; part: 'years' | 'position' }) {
           </div>
         ))}
       </div>}
-      {part === 'position' && <Panel title="Cumulative operational cash position" sub={`from an opening balance of ${money(agg.openingBalance)}${agg.openingKnown ? ' (from balance columns)' : ' (assumed)'}`}
-        right={<label className="check" style={{ color: '#fff', fontSize: 12.5 }}><input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> show actual position incl. treasury</label>}>
+      {part === 'position' && (() => {
+        const first = pos.operational[0], lastV = pos.operational[pos.operational.length - 1];
+        const change = lastV - first;
+        return <div className="summary-box"><div className="eyebrow">In a sentence</div>Over these {years.filter((y) => y.complete).length || years.length} years your everyday cash {change < 0 ? <>fell by <strong>{money(-change)}</strong>. That gap was covered by borrowing and by using savings — it’s the underlying need to borrow.</> : <>grew by <strong>{money(change)}</strong>, leaving spare cash to invest.</>}</div>;
+      })()}
+      {part === 'position' && <Panel title="Your everyday cash over time" sub={`starting from your bank balance of ${money(agg.openingBalance)}`}
+        right={<label className="check" style={{ color: '#fff', fontSize: 12.5 }}><input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> also show actual bank balance</label>}>
         <EChart height={360} ariaLabel="Cumulative operational cash position over the full history" option={{
           tooltip: { trigger: 'axis', valueFormatter: (v: number) => money(v) },
           legend: { top: 0, right: 0 },
           grid: { left: 70, right: 20, top: 36, bottom: 60 },
-          xAxis: { type: 'category', data: dates, axisLabel: { formatter: (v: string) => v.slice(0, 7) } },
+          xAxis: { type: 'category', data: dates, axisLabel: { formatter: (v: string) => { const [y, m] = v.split('-'); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m - 1]} ${y.slice(2)}`; } } },
           yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
           dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 10, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }],
           series: [
-            { name: 'Operational position', type: 'line', data: Array.from(pos.operational), showSymbol: false, lineStyle: { width: 2, color: '#0a2540' }, areaStyle: { color: 'rgba(10,37,64,.06)' }, sampling: 'lttb',
+            { name: 'Everyday cash', type: 'line', data: Array.from(pos.operational), showSymbol: false, lineStyle: { width: 2, color: '#0a2540' }, areaStyle: { color: 'rgba(10,37,64,.06)' }, sampling: 'lttb',
               markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0 }], lineStyle: { color: '#adb5bd', type: 'dashed' }, label: { show: false } } },
-            ...(overlay ? [{ name: 'Actual position incl. treasury', type: 'line', data: Array.from(pos.actual), showSymbol: false, lineStyle: { width: 1.5, color: '#fd7e14' }, sampling: 'lttb' }] : []),
+            ...(overlay ? [{ name: 'Actual bank balance', type: 'line', data: Array.from(pos.actual), showSymbol: false, lineStyle: { width: 1.5, color: '#fd7e14' }, sampling: 'lttb' }] : []),
           ],
         }} />
-        <div className="small muted">The gap between the lines is cumulative net treasury activity: borrowing taken (raises actual cash) less investments placed and loans repaid.</div>
+        <div className="small muted">The gap between the two lines is borrowing and investing: when everyday cash falls, borrowing keeps the actual bank balance topped up.</div>
       </Panel>}
       {part === 'years' && <Panel title="Annual receipts and payments by category" sub="operational, stacked">
         <EChart height={400} option={{
@@ -174,7 +189,7 @@ function YoY({ h, part }: { h: H; part: 'table' | 'drivers' }) {
     if (sort.k === 'name') return name(a.i).localeCompare(name(b.i)) * sort.dir;
     return (va - vb) * sort.dir;
   });
-  const th = (k: string, label: string) => <th className={`num sortable`} onClick={() => setSort({ k, dir: sort.k === k ? (-sort.dir as 1 | -1) : -1 })}>{label}{sort.k === k ? (sort.dir < 0 ? ' ↓' : ' ↑') : ''}</th>;
+  const th = (k: string, label: string) => <th key={k} className={`num sortable`} onClick={() => setSort({ k, dir: sort.k === k ? (-sort.dir as 1 | -1) : -1 })}>{label}{sort.k === k ? (sort.dir < 0 ? ' ↓' : ' ↑') : ''}</th>;
   const tint = (x: number | null, flowSign: number) => {
     if (x === null || !isFinite(x)) return undefined;
     // growth in a payment line is "bad" for cash: colour by effect on cash
@@ -281,6 +296,7 @@ function useSeries() {
 }
 
 function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
+  const advanced = useStore((s) => s.advanced);
   const [view, setView] = useState<'shape' | 'days' | 'heat' | 'breaks'>('shape');
   const [c, setC] = useState(h.opCats.find(({ c }) => c?.id === 'council_tax')?.i ?? h.opCats[0]?.i ?? 0);
   const series = useSeries();
@@ -292,8 +308,15 @@ function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
   const sign = prof.typical.reduce((s, v) => s + v, 0) >= 0 ? 1 : -1;
   return (
     <div className="stack">
-      <div className="row"><strong className="navy">Category</strong><CategoryPicker h={h} value={c} onChange={setC} /><span className="small muted">Recurring flows only — one-offs and treasury are left out so the shape is clear.</span></div>
-      <div className="row"><Seg value={view} onChange={setView} options={[{ v: 'shape', label: 'Shape of the year' }, { v: 'days', label: 'Days of the month' }, { v: 'heat', label: 'Year-by-year heatmap' }, { v: 'breaks', label: `Changes over time${breaks.length ? ` (${breaks.length})` : ''}` }]} /></div>
+      <div className="row"><strong className="navy">Show me</strong><CategoryPicker h={h} value={c} onChange={setC} /><span className="small muted">Regular money only — one-off items are left out so the pattern is clear.</span></div>
+      {(() => {
+        const t = prof.typical.map((v) => Math.abs(v));
+        const hi = t.indexOf(Math.max(...t)), lo = t.indexOf(Math.min(...t));
+        const avg = t.reduce((a, b) => a + b, 0) / 12;
+        const flat = Math.max(...t) < avg * 1.25 && Math.min(...t) > avg * 0.75;
+        return <div className="callout navy small" style={{ marginTop: 0 }}><strong>{h.name(c)}:</strong> {flat ? <>fairly steady through the year, around <strong>{money(avg)}</strong> a month.</> : <>busiest in <strong>{prof.months[hi]}</strong> (about {money(t[hi])}) and quietest in <strong>{prof.months[lo]}</strong> (about {money(t[lo])}). {prof.typical.reduce((a, b) => a + b, 0) >= 0 ? 'Months with less coming in are when cash runs lowest.' : 'Months with more going out are when cash runs lowest.'}</>}</div>;
+      })()}
+      {advanced && <div className="row"><Seg value={view} onChange={setView} options={[{ v: 'shape', label: 'Shape of the year' }, { v: 'days', label: 'Days of the month' }, { v: 'heat', label: 'Year-by-year heatmap' }, { v: 'breaks', label: `Changes over time${breaks.length ? ` (${breaks.length})` : ''}` }]} /></div>}
       <div>
         {view === 'shape' && <Panel title="The shape of a typical year" sub="each past year faint · typical year bold · range shaded">
           <EChart height={400} option={{
@@ -524,3 +547,49 @@ export function DataQuality() {
 }
 
 export type { Day };
+
+/** Beginner view: in vs out per year, with a sentence that says what it means. */
+function SimpleYears({ h }: { h: H }) {
+  const { agg, years, annual, pos, opCats } = h;
+  const rows = years.map((y, yi) => {
+    let inn = 0, out = 0;
+    for (const { c, i } of opCats) { const v = annual.op[i][yi]; if (c?.group === 'receipts_operational' || (!c && v > 0)) inn += v; else out += v; }
+    const ex = extremes(pos.operational, agg.startDay, Math.max(y.start, agg.startDay), Math.min(y.end, agg.startDay + agg.D - 1));
+    return { y, inn, out, net: inn + out, low: ex };
+  });
+  const full = rows.filter((r) => r.y.complete);
+  const deficits = full.filter((r) => r.net < 0).length;
+  const first = full[0], last = full[full.length - 1];
+  const sentence = full.length >= 2
+    ? <>In <strong>{deficits} of the last {full.length} full years</strong> the council spent more everyday cash than it received.{' '}
+        {first && last && <>In {first.y.label} <strong>{first.net >= 0 ? `${money(first.net)} more came in` : `${money(-first.net)} more went out`}</strong> than {first.net >= 0 ? 'went out' : 'came in'}; by {last.y.label} it was <strong>{last.net >= 0 ? `${money(last.net)} more in` : `${money(-last.net)} more out`}</strong>{Math.abs(last.net) > Math.abs(first.net) && last.net < 0 ? ' — so the need to borrow is growing' : ''}.</>}</>
+    : <>Here is how much everyday money came in and went out each year.</>;
+  return (
+    <div className="stack">
+      <div className="summary-box"><div className="eyebrow">In a sentence</div>{sentence}</div>
+      <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(rows.length, 6)}, minmax(0,1fr))` }}>
+        {rows.map((r) => (
+          <div key={r.y.key} className="year-card">
+            <div className="yc-year">{r.y.label}{!r.y.complete && <span className="badge soft" style={{ marginLeft: 6 }}>part year</span>}</div>
+            <div className="yc-row"><span>Money in</span><strong className="pos">{money(r.inn)}</strong></div>
+            <div className="yc-row"><span>Money out</span><strong className="neg">{money(-r.out)}</strong></div>
+            <div className={`yc-net ${r.net < 0 ? 'neg' : 'pos'}`}>{r.net < 0 ? `${money(-r.net)} more out` : `${money(r.net)} more in`}</div>
+          </div>
+        ))}
+      </div>
+      <Panel title="Money in and money out each year" sub="everyday money only — loans and investments are left out">
+        <EChart height={320} ariaLabel="Money in and out by year" option={{
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: number) => money(v) },
+          legend: { top: 0, right: 0 },
+          grid: { left: 70, right: 16, top: 34, bottom: 30 },
+          xAxis: { type: 'category', data: rows.map((r) => r.y.label + (r.y.complete ? '' : ' (part)')) },
+          yAxis: { type: 'value', min: 0, axisLabel: { formatter: axisMoney } },
+          series: [
+            { name: 'Money in', type: 'bar', data: rows.map((r) => r.inn), itemStyle: { color: '#2caffe', borderRadius: [4, 4, 0, 0] } },
+            { name: 'Money out', type: 'bar', data: rows.map((r) => -r.out), itemStyle: { color: '#fd7e14', borderRadius: [4, 4, 0, 0] } },
+          ],
+        }} />
+      </Panel>
+    </div>
+  );
+}

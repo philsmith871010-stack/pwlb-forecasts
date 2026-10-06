@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
-import { useStore, STEPS } from '../../state/store';
+import { useStore, stepsFor } from '../../state/store';
 import type { Category } from '../../lib/categories';
 import { GROUP_LABELS, UNCATEGORISED_COLOUR } from '../../lib/categories';
 import { money } from '../../lib/format';
@@ -142,6 +142,7 @@ export function StepFooter({ backLabel, nextLabel, onNext, nextDisabled, extra }
   const step = useStore((s) => s.step);
   const goto = useStore((s) => s.goto);
   const next = useStore((s) => s.next);
+  const STEPS = stepsFor(useStore((s) => s.advanced));
   const i = STEPS.findIndex((s) => s.id === step);
   if (i < 0) return null;
   return (

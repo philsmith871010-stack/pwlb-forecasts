@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useStore } from '../../state/store';
+import { useStore, useEyebrow } from '../../state/store';
+import { SimpleReview } from './SimpleReview';
 import { PageHead, Panel, StepFooter, Modal, CategorySelect, CatBadge, catByIdx, Empty, Money, Seg, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
@@ -9,6 +10,12 @@ import type { Category } from '../../lib/categories';
 import type { DealFlag, TxnOverride } from '../../lib/model';
 
 export function ReviewStep({ embedded }: { embedded?: boolean }) {
+  const advanced = useStore((s) => s.advanced);
+  if (!advanced && !embedded) return <SimpleReview />;
+  return <AdvancedReview embedded={embedded} />;
+}
+
+function AdvancedReview({ embedded }: { embedded?: boolean }) {
   const { cat, sessionChanges, catBusy } = useStore();
   const tabs: TabDef[] = [
     { id: 'overview', label: 'Overview' },
@@ -60,7 +67,7 @@ export function ReviewStep({ embedded }: { embedded?: boolean }) {
   if (embedded) return body;
   return (
     <div className="page">
-      <PageHead eyebrow="Step 4 of 8" title="Review the lines we weren’t sure about">
+      <PageHead eyebrow={useEyebrow('review')} title="Check the sorting">
         A few quick confirmations, largest money first. You’re confirming, not doing data entry.
       </PageHead>
       {body}

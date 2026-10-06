@@ -592,21 +592,20 @@ function buildSummary(x: {
 }): string {
   const low = x.cumulative[x.lo];
   const lowDay = x.start + x.lo;
-  const { m } = ymdFromDay(lowDay);
   const parts: string[] = [];
-  const dir = low < x.cumulative[0] ? 'fall to' : 'reach';
-  parts.push(`Operational cash is projected to ${dir} a low of ${fmtMoney(low)} on ${fmtDay(lowDay)}`);
+  const falls = low < x.cumulative[0];
+  parts.push(`Your everyday cash is expected to ${falls ? 'fall to' : 'be'} its lowest point of ${fmtMoney(low)} on ${fmtDay(lowDay)}.`);
   if (x.drivers.length) {
-    const d = x.drivers.map((dd) => `${dd.name.toLowerCase()} (${fmtMoney(dd.amount)})`);
-    const seasonal = m === 2 || m === 3 ? ', in the February–March council tax lull' : '';
-    parts[0] += `, driven by ${d.length > 1 ? d.slice(0, -1).join(', ') + ' and ' + d[d.length - 1] : d[0]} over the preceding ${Math.max(1, Math.round((x.lo - x.windowFrom) / 30.44))} month(s)${seasonal}.`;
-  } else parts[0] += '.';
+    const names = x.drivers.map((d) => d.name.toLowerCase());
+    parts.push(`The biggest reasons are ${names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0]}.`);
+  }
   if (x.borrowingRequirement > 0) {
-    parts.push(`This implies a borrowing requirement of approximately ${fmtMoney(x.borrowingRequirement)} to stay above your ${fmtMoney(x.buffer)} liquidity buffer.`);
-    if (x.breaches.length) parts.push(`The position first drops below the buffer on ${fmtDay(x.breaches[0].from)}${x.breaches.length > 1 ? ` and does so ${x.breaches.length} times over the horizon` : ''}.`);
-  } else parts.push(`It stays above your ${fmtMoney(x.buffer)} buffer throughout, so no new borrowing is needed for liquidity — surplus cash peaks at ${fmtMoney(x.cumulative[x.hi])} on ${fmtDay(x.start + x.hi)}.`);
-  const endPos = x.cumulative[x.H - 1];
-  parts.push(`By ${MONTH_NAMES[ymdFromDay(x.end).m - 1]} ${ymdFromDay(x.end).y} the position is ${fmtMoney(endPos)}.`);
+    parts.push(`To keep at least ${fmtMoney(x.buffer)} in the bank, you may need to borrow about ${fmtMoney(x.borrowingRequirement)} by then.`);
+    if (x.breaches.length) parts.push(`Cash first drops below ${fmtMoney(x.buffer)} on ${fmtDay(x.breaches[0].from)}.`);
+  } else {
+    parts.push(`It stays above the ${fmtMoney(x.buffer)} you want to keep, so you shouldn’t need to borrow. The most spare cash is ${fmtMoney(x.cumulative[x.hi])} on ${fmtDay(x.start + x.hi)} — a good time to invest.`);
+  }
+  if (x.lo !== x.H - 1) parts.push(`By ${MONTH_NAMES[ymdFromDay(x.end).m - 1]} ${ymdFromDay(x.end).y} it is ${fmtMoney(x.cumulative[x.H - 1])}.`);
   return parts.join(' ');
 }
 

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { ECharts } from 'echarts/core';
-import { useStore } from '../../state/store';
+import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Panel, Kpi, StepFooter, Seg, Empty, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast } from '../forecast/useForecast';
 import { ForecastChart } from '../forecast/ForecastChart';
 import { SetupSection, MethodsSection, AssumptionsSection, OneOffsSection, PasteSection } from '../forecast/Controls';
 import { StackedView, CategoryExplorer, ForecastTable, CompareView } from '../forecast/Views';
+import { SimpleStart, SimpleGrowth, SimpleItems, SimpleBreakdown } from '../forecast/SimpleControls';
 import { SnapshotForecastView } from '../forecast/SnapshotView';
 import { money, day, ago } from '../../lib/format';
 import type { Scenario } from '../../lib/model';
@@ -24,8 +25,20 @@ const FC_TABS: TabDef[] = [
   { id: 'scenarios', label: 'Scenarios' },
 ];
 
+const FC_TABS_SIMPLE: TabDef[] = [
+  { id: 'result', label: 'Your forecast' },
+  { id: 's-start', label: 'Starting cash' },
+  { id: 's-growth', label: 'Growth' },
+  { id: 's-items', label: 'Known future items' },
+  { id: 's-breakdown', label: 'What’s in it' },
+];
+
 const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
-  result: { what: <>Your everyday cash position projected forward: the solid line is history, the dashed line the forecast, the shaded band the likely range. The <strong>low point</strong> is the key number.</>, why: 'The low point, and when it happens, tells you how much you may need to borrow and by when. The red dashed line is your minimum cash buffer.', todo: <>Read the summary. Then use the tabs to the right to add what you know about the future — pay awards, grants ending, land sales.</> },
+  's-start': { what: 'Three simple settings that frame the forecast: the cash you start with, the minimum you want to keep, and how far ahead to look.', todo: 'Check each one. The figures we’ve filled in are a sensible starting point.' },
+  's-growth': { what: 'How much each kind of money is expected to grow each year. We’ve worked out the past trend for you (shown in grey).', why: 'Small changes add up: 2% more on salaries over two years is millions of pounds.', todo: <>Leave a box empty to use the past trend. Type a number to use your own — e.g. <strong>3</strong> for a 3% pay award.</> },
+  's-items': { what: 'Things you know are coming that past years can’t predict: a land sale, a grant that ends, a pay award.', why: 'These often decide whether the low point is £10m or £30m.', todo: 'Pick the kind of item, fill in the short form and click Add. Each appears on the chart as an orange diamond.' },
+  's-breakdown': { what: 'The forecast split into categories, year by year, next to the last 12 months for comparison.', why: 'Lets you sense-check it: does each line look about right?', todo: 'Look for anything that seems too high or too low, and adjust it on the Growth tab.' },
+  result: { what: <>Your everyday cash, day by day. The <strong>navy line</strong> is the past, the <strong>orange dashed line</strong> is the forecast. The red dashed line is the minimum cash you want to keep.</>, why: 'Where the orange line drops below the red line, you would need to borrow to stay safe. Its lowest point tells you how much and when.', todo: <>Read the summary below. Then use the tabs above to add what you know — e.g. a pay award or a land sale — and watch the numbers update.</> },
   setup: { what: 'When the forecast starts, how far ahead it looks, what cash you start with, and how much past history it learns from.', why: 'The starting cash shifts the whole line up or down; the buffer decides when you’d need to borrow.', todo: 'Check the start date and opening cash. The defaults are usually right.' },
   growth: { what: <>How fast each category is expected to grow each year, and how it’s projected: <strong>Seasonal</strong> repeats last years’ monthly pattern; <strong>Schedule</strong> projects regular payments on their own dates; <strong>Flat</strong> uses an average.</>, why: 'Growth compounds — a couple of percent on payroll moves the low point by millions over two years.', todo: <>The grey number is the historic trend. Type your own figure where you know better, e.g. <strong>Salaries 2</strong> for a 2% pay award.</> },
   changes: { what: 'Specific changes you know about: a pay award from a date (with backdated arrears), a payment day moving, a grant stopping, a new regular payment starting, or general inflation.', why: 'History can’t know about decisions that haven’t happened yet — you can.', todo: 'Pick the type of change, fill in the boxes, click Add. It appears on the chart as an orange diamond.' },
@@ -36,7 +49,9 @@ const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; to
 };
 
 export function ForecastStep() {
-  const { team, basis, activeScenarioId, setActiveScenario, newScenario, workspace, updateScenario } = useStore();
+  const { team, basis, activeScenarioId, setActiveScenario, newScenario, updateScenario } = useStore();
+  const workspace = false;
+  const eyebrow = useEyebrow('forecast');
   const sc = team.forecasts.find((f) => f.id === activeScenarioId) ?? team.forecasts[0];
   useEffect(() => { if (basis && !team.forecasts.length) newScenario('Base'); }, [basis, team.forecasts.length, newScenario]);
   useEffect(() => { if (sc && sc.id !== activeScenarioId) setActiveScenario(sc.id); }, [sc, activeScenarioId, setActiveScenario]);
@@ -44,7 +59,9 @@ export function ForecastStep() {
   const [gran, setGran] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [histMonths, setHistMonths] = useState(24);
   const [lower, setLower] = useState<'stacked' | 'explorer' | 'table'>('stacked');
-  const [tab, setTab] = useStepTab('forecast', FC_TABS);
+  const advanced = useStore((st) => st.advanced);
+  const TABS = advanced ? FC_TABS : FC_TABS_SIMPLE;
+  const [tab, setTab] = useStepTab(advanced ? 'forecast' : 'forecast-simple', TABS);
   const chartRef = useRef<ECharts | null>(null);
 
   // keep a results snapshot on the scenario so it can be viewed without the CSV (debounced)
@@ -68,8 +85,10 @@ export function ForecastStep() {
   const fc = b.fc;
   const endPos = fc.cumulative[fc.H - 1];
   const help = FC_HELP[tab];
-  const idx = FC_TABS.findIndex((t) => t.id === tab);
-  const tabs = FC_TABS.map((t) => ({ ...t, badge:
+  const idx = TABS.findIndex((t) => t.id === tab);
+  const tabs = TABS.map((t) => ({ ...t, badge:
+    t.id === 's-items' ? sc.oneOffs.length + sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').length || '' :
+    t.id === 's-growth' ? sc.assumptions.filter((a) => a.kind === 'growth').length || '' :
     t.id === 'changes' ? sc.assumptions.filter((a) => a.kind !== 'growth').length || '' :
     t.id === 'growth' ? sc.assumptions.filter((a) => a.kind === 'growth').length || '' :
     t.id === 'oneoffs' ? sc.oneOffs.length || '' :
@@ -77,8 +96,8 @@ export function ForecastStep() {
     t.id === 'scenarios' ? team.forecasts.length : '' }));
   return (
     <div className="page">
-      <PageHead eyebrow={workspace ? 'Workspace' : 'Step 6 of 8'} title="Forecast your cash position" actions={<ScenarioBar />}>
-        Your regular cash rhythm projected forward, plus what you know is coming. The low point answers “how much might we need to borrow, and when?”
+      <PageHead eyebrow={eyebrow} title="Look ahead: your cash forecast" actions={advanced ? <ScenarioBar /> : undefined}>
+        Your council’s regular cash pattern carried forward, plus anything you know is coming. The lowest point tells you how much you may need to borrow, and when.
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />
       {tab !== 'result' && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
@@ -87,27 +106,27 @@ export function ForecastStep() {
       {tab === 'result' && (
         <div className="stack">
           <div className="grid g4">
-            <Kpi label="Lowest point" value={money(fc.low.amount)} sub={day(fc.low.day)} />
-            <Kpi label="Borrowing need" value={money(fc.borrowingRequirement)} sub={`to stay above your ${money(fc.buffer)} buffer`} />
-            <Kpi label="Highest point" value={money(fc.high.amount)} sub={day(fc.high.day)} />
+            <Kpi label="Lowest point" value={money(fc.low.amount)} sub={`on ${day(fc.low.day)}`} />
+            <Kpi label="You may need to borrow" value={money(fc.borrowingRequirement)} sub={`to keep at least ${money(fc.buffer)} in the bank`} />
+            <Kpi label="Highest point" value={money(fc.high.amount)} sub={`on ${day(fc.high.day)} — best time to invest`} />
             <Kpi label={`Position at ${day(fc.start + fc.H - 1)}`} value={money(endPos)} sub={fc.treasuryDaily.some((v) => v) ? `after known loan repayments: ${money(fc.cumulativeAfterTreasury[fc.H - 1])}` : `starting from ${money(fc.opening)}`} />
           </div>
           <div className="summary-box" aria-live="polite">
-            <div className="eyebrow">In plain English · {sc.name}</div>
+            <div className="eyebrow">In plain English{advanced ? ` · ${sc.name}` : ''}</div>
             <SummaryText text={fc.summary} />
           </div>
-          <Panel title="Everyday cash position: history and forecast" sub={`recalculated in ${fc.ms.toFixed(0)} ms`}
-            right={<>
+          <Panel title="Your everyday cash: past and forecast" sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
+            right={advanced ? <>
               <Seg dark value={histMonths} onChange={setHistMonths} options={[{ v: 12, label: '1y' }, { v: 24, label: '2y' }, { v: 60, label: 'all' }]} ariaLabel="History shown" />
               <Seg dark value={gran} onChange={setGran} options={[{ v: 'daily', label: 'Daily' }, { v: 'weekly', label: 'Weekly' }, { v: 'monthly', label: 'Monthly' }]} ariaLabel="Granularity" />
               <button className="btn sm on-dark" title="Download chart as PNG" onClick={() => chartRef.current && void exportChart(chartRef.current, `forecast-${sc.name}`, 'png')}><i className="bi bi-image" /></button>
               <button className="btn sm on-dark" title="Download chart as SVG" onClick={() => chartRef.current && void exportChart(chartRef.current, `forecast-${sc.name}`, 'svg')}>SVG</button>
-            </>}>
+            </> : <button className="btn sm on-dark" title="Download this chart as a picture" onClick={() => chartRef.current && void exportChart(chartRef.current, `forecast-${sc.name}`, 'png')}><i className="bi bi-image" /> Save picture</button>}>
             <ForecastChart b={b} granularity={gran} historyMonths={histMonths} height={460} onReady={(c) => { chartRef.current = c; }} />
             <div className="row xs muted">
-              <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(253,126,20,.3)' }} />likely range (90%) — widens further out, based on how much each category has varied month to month</span>
+              <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(253,126,20,.3)' }} />shaded: the likely range — it widens because the further ahead, the less certain</span>
               <span className="legend-dot"><span style={{ color: 'var(--pt-orange)' }}>◆</span> a change or one-off you added</span>
-              {fc.breaches.length > 0 && <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(176,70,50,.25)' }} />below your buffer</span>}
+              {fc.breaches.length > 0 && <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(176,70,50,.25)' }} />below your minimum cash</span>}
             </div>
           </Panel>
           {fc.markers.length > 0 && (
@@ -117,6 +136,10 @@ export function ForecastStep() {
           )}
         </div>
       )}
+      {tab === 's-start' && <SimpleStart sc={sc} upd={upd} b={b} />}
+      {tab === 's-growth' && <SimpleGrowth sc={sc} upd={upd} b={b} />}
+      {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}
+      {tab === 's-breakdown' && <SimpleBreakdown b={b} />}
       {tab === 'setup' && <div style={{ maxWidth: 640 }}><SetupSection sc={sc} upd={upd} b={b} /></div>}
       {tab === 'growth' && <MethodsSection sc={sc} upd={upd} b={b} />}
       {tab === 'changes' && <div style={{ maxWidth: 860 }}><AssumptionsSection sc={sc} upd={upd} /></div>}
@@ -132,9 +155,8 @@ export function ForecastStep() {
       )}
       {tab === 'scenarios' && <div className="card card-pad"><CompareView /></div>}
 
-      {idx < FC_TABS.length - 1 ? <NextTab label={`Next: ${FC_TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(FC_TABS[idx + 1].id)} text={tab === 'result' ? 'Add what you know about the future:' : undefined} />
-        : !workspace && <StepFooter nextLabel="Check it against history (backtest)" />}
-      {!workspace && idx < FC_TABS.length - 1 && <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}><button className="btn ghost sm" onClick={() => useStore.getState().goto('backtest')}>Skip to the backtest <i className="bi bi-skip-forward" /></button></div>}
+      {idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={tab === 'result' ? 'Make it yours — add what you know about the future.' : <button className="link-btn" onClick={() => useStore.getState().goto(advanced ? 'backtest' : 'save')}>or go to {advanced ? 'the backtest' : 'save & share'}</button>} />
+        : !workspace && <StepFooter nextLabel={advanced ? 'Next: test the forecast' : 'Next: save & share'} />}
     </div>
   );
 }
@@ -152,7 +174,7 @@ function ResultsStrip({ b, onOpen }: { b: NonNullable<ReturnType<typeof useForec
     <div className="results-strip">
       <div className="mini-kpis">
         <div className="mini-kpi"><div className="l">Lowest point</div><div className="v">{money(fc.low.amount)}</div><div className="s">{day(fc.low.day)}</div></div>
-        <div className="mini-kpi"><div className="l">Borrowing need</div><div className="v">{money(fc.borrowingRequirement)}</div><div className="s">above {money(fc.buffer)} buffer</div></div>
+        <div className="mini-kpi"><div className="l">May need to borrow</div><div className="v">{money(fc.borrowingRequirement)}</div><div className="s">to keep {money(fc.buffer)}</div></div>
         <div className="mini-kpi"><div className="l">Highest point</div><div className="v">{money(fc.high.amount)}</div><div className="s">{day(fc.high.day)}</div></div>
         <div className="mini-kpi"><div className="l">At the end</div><div className="v">{money(fc.cumulative[fc.H - 1])}</div><div className="s">{day(fc.start + fc.H - 1)}</div></div>
         <button className="mini-chart" onClick={onOpen} title="Open the full chart" style={{ cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>

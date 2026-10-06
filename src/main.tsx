@@ -17,3 +17,4 @@ createRoot(document.getElementById('root')!).render(
 
 // Dev-only handle for automated UI checks; stripped from production builds.
 if (import.meta.env.DEV) void import('./state/store').then((m) => { (window as unknown as { __store: unknown }).__store = m.useStore; });
+if (import.meta.env.DEV) void import('./worker/client').then((m) => { (window as unknown as { __engine: unknown }).__engine = m.engine(); });
