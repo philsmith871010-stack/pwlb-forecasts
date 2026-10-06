@@ -84,8 +84,8 @@ function SingleResult({ r, withOneOffs }: { r: BacktestResult; withOneOffs: bool
           xAxis: { type: 'category', data: x, axisLabel: { formatter: (v: string) => v.slice(0, 7) } },
           yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
           series: [
-            { name: '_lo', type: 'line', data: r.lowerCum, stack: 'b', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
-            { name: '90% range', type: 'line', data: r.upperCum.map((u, k) => u - r.lowerCum[k]), stack: 'b', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(253,126,20,.14)' }, showSymbol: false, silent: true, itemStyle: { color: 'rgba(253,126,20,.4)' } },
+            { name: '_lo', type: 'line', data: r.lowerCum, stack: 'b', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
+            { name: '90% range', type: 'line', data: r.upperCum.map((u, k) => u - r.lowerCum[k]), stack: 'b', stackStrategy: 'all', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(253,126,20,.14)' }, showSymbol: false, silent: true, itemStyle: { color: 'rgba(253,126,20,.4)' } },
             { name: 'Forecast', type: 'line', data: r.forecastCum, showSymbol: false, lineStyle: { color: '#fd7e14', width: 2.5, type: 'dashed' }, itemStyle: { color: '#fd7e14' } },
             { name: 'Actual', type: 'line', data: r.actualCum, showSymbol: false, lineStyle: { color: '#0a2540', width: 2.2 }, itemStyle: { color: '#0a2540' } },
             { name: 'Actual — predictable core', type: 'line', data: r.actualCoreCum, showSymbol: false, lineStyle: { color: '#2caffe', width: 1.5, type: 'dotted' }, itemStyle: { color: '#2caffe' } },

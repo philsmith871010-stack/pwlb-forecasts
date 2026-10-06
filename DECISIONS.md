@@ -1,0 +1,75 @@
+# Decisions
+
+Where the spec left a detail open, this is what I chose and why. Most recent last within each section.
+
+## Architecture
+
+- **One engine worker owns the data.** Parsing, categorisation, aggregation and backtests run in a single Web Worker (`src/worker/engine.worker.ts`, Comlink RPC). The main thread only receives summaries, compact daily × category aggregates (~1.3 MB for five years) and pages of up to 200 rows for virtualised tables. Raw rows never leave the worker except in the categorised-transactions CSV the user explicitly saves.
+- **The forecast engine runs on the main thread.** It works on the aggregates only and takes 10–30 ms, so a worker round-trip would add latency without benefit. The same pure code runs inside the worker for backtests and in node for tests.
+- **Shared code runs in node.** `scripts/bench.ts` runs generate → ingest → categorise → accuracy → forecast → backtest headlessly. That is how the engine was tuned, and it is the quickest way to check a change.
+- **Compact storage.** Rows are typed arrays (day number, amount, account, file, line, narrative index). Narratives are de-duplicated into a string table. 775k rows use well under 100 MB in the worker; the main thread stays at ~50 MB.
+- **State** lives in zustand. The team file is the only thing persisted, cached in `localStorage` as a convenience (the spec allowed IndexedDB; a ~50 KB JSON fits easily in `localStorage` with less code). Transaction data is never cached.
+- **ECharts with the SVG renderer.** It is crisp, exportable as SVG directly and as PNG via a canvas, and fast enough for ~2,500-point series with LTTB sampling.
+
+## Ingest
+
+- **Mapping is detected first, then the files are read.** Step 1 parses straight away with the auto-detected (or bank-profile) mapping, so one click is enough when the layout is known. Step 2 shows the result and lets the user correct it and re-read.
+- **Day/month order** is detected per file from unambiguous values (a first number above 12 means UK order); the default is UK. On top of that, each row gets a **sequence check**: if a date jumps more than 20 days from the previous row but the swapped reading is within 7 days, the swapped reading is used and flagged. On generated data this recovers every ambiguous US-style date (`wrong dates: 0`).
+- **Debit/credit columns** are read by absolute value (debit = out, credit = in), so a stray minus sign in a debit column cannot flip a payment into a receipt.
+- **Fixed-width split narratives** (an 18-character "Narrative 1" continued in "Narrative 2") are detected and joined without a space, so `B` + `UDGET SHARE` becomes `BUDGET SHARE`.
+- **Overlapping exports of the same account:** rows of a later file that fall inside an earlier file's date range and match it one-for-one on (date, amount) are dropped and counted. Exact duplicates *within* a file are only flagged: banks really do double-post.
+- **Files with no account column** are matched to a known account by narrative overlap (≥ 35% of their three-word narrative stems), or else keep the account label the user types.
+- **Opening balance** is derived from balance columns where present. Accounts without one are assumed to open at zero.
+
+## Categorisation
+
+- **Rules match the narrative *signature*:** upper case, punctuation and encoding junk stripped, dates and reference numbers removed. Tokens with four or more digits are dropped, and slash references keep their letters (`FD/23/114` → `FD/#/#`). Rule matching is cached per signature, which is why 775k rows categorise in about 2 s. Rules that need specific digits are not supported; amount and direction conditions are.
+- **Order:** user transaction decisions → internal-transfer pairing → team rules → starter rules → treasury counterparty dictionary and "another local authority" detector → recurrence → heuristics → uncategorised. The rule that decided each line is recorded and shown on hover.
+- **Starter rules are generic.** They target real LA vocabulary: PWLB/DMO/DMADF, MMF terms, "fixed deposit", `LA/` references, council-name patterns, statutory flows. I deliberately removed patterns that only fitted my invented fund names. The demo's "ALBION CASH" fund is therefore *not* recognised out of the box; the sample team file teaches it, which is exactly what a team file is for.
+- **Suspected deals are excluded by default.** That covers round sums of £1m or more in multiples of £250k, loan-and-repayment pairs (same amount back, 0–8% more, 7–400 days later) and identical amounts repeating every six or twelve months. This is the prudent choice: a missed deal distorts the borrowing need far more than a deferred decision about a grant. The Review queue shows all of them, and "Operational wrongly excluded" is reported next to "deal value left in the model".
+- **Ambiguous council payments** (a council name, no loan words) are treated as recharges if the amount is under £1m or not round, and as suspected LA loans if round and £1m or more. Both are marked for review.
+- **Outliers:** rows inside a regular recurring series are compared with that series' typical amount (flag at more than 3× the median, or the median + 8 MAD). Other rows are compared with their category (log-amount z-score above 4, or more than 60% of a typical month's total). The category-only test misfired on categories with several amount bands, such as monthly payroll next to weekly casual pay. Outliers default to **one-off**: kept in history, left out of the profile, and listed in Review.
+- **Recurrence cadences:** daily, weekly, fortnightly, **semi-monthly** (twice a month on set dates, e.g. DSG on the 1st and 15th), four-weekly, monthly, quarterly, half-yearly and annual. Semi-monthly was added after backtests showed "fortnightly" projecting 26 payments a year instead of 24 (an 8% overstatement). A strict 14-day cycle is fortnightly; uneven 12–18-day gaps are semi-monthly.
+- **Per-transaction decisions** are stored in the team file under a one-way 32-bit hash of (account, date, amount in pence, signature) — never the narrative or amount itself.
+
+## Forecasting
+
+- **Seasonal × trend** builds a profile per calendar month from recurring operational flows over the lookback window (3 years by default). Each year's value is deflated to the data end date by the growth rate, older years get a recency weight (70% per year back by default), and months beyond median ± 3 MAD are clamped. Clamped months are listed in the Category explorer.
+- **Weekly-run categories** (supplier BACS on Tuesdays) are profiled per unit of run-day capacity, so a month with five Tuesdays gets five runs. This came out of backtesting.
+- **Default growth** is a log-linear trend through *every* rolling 12-month total in the full history, capped at ±20%. Comparing two end points proved too noisy (it gave 8% for suppliers against a true 4%). User growth assumptions replace it and can step each April (the default for new assumptions, matching council tax and pay awards) or apply continuously.
+- **Recurring series schedule** projects each *active* series on its own dates, using its recent level × growth. A series is active if seen within 1.6 cadences of the data end. Stable series use their last few payments; volatile ones (CV above 10%) use a 4× longer, growth-adjusted median. Everything in the category that is not an active series is forecast by seasonal profile. Series that stopped (Covid relief, renamed government departments) are therefore not projected, which handles structural breaks without user action.
+- **Uncategorised flows are excluded** from the forecast by default, with a clear switch to "flat". On real data they are mostly unknown treasury flows, and including them made backtests worse. The Review queue is the fix.
+- **Opening position** defaults to the **bank balance at the end of the data** (all flows, including treasury). The historical operational line is *rebased* so it ends at that opening, so the chart reads continuously from history into the forecast. "Operational position" and "enter a figure" are alternatives.
+- **Borrowing requirement** = max(0, buffer − projected low point), where the buffer is the team's liquidity buffer.
+- **Uncertainty band:** each category's robust monthly variability (1.4826 × MAD of deflated monthly totals around the profile) is combined assuming independence and accumulated as a random walk over the months, giving cumulative ± 1.645σ (90%). It is simple, explainable and stated on screen. It ignores growth-rate uncertainty and one-offs.
+- **Step changes with backdating:** the new level applies from the "paid from" date. Arrears = the % × the modelled flows between "backdated to" and "paid from", paid as a lump on the arrears date.
+- **Timing changes** move a category's whole monthly total to the chosen day. That is right for single-run flows like payroll, and stated in the UI.
+- **Pasted schedules in "instead of model" mode** replace the model only for the months the schedule covers. My first version replaced the whole horizon, which surprised in testing: a one-year grant schedule zeroed the following year.
+- **"Possible" one-offs** are weighted by their probability (default 50%) and can be switched off. "Likely" and "firm" count in full.
+- **Results snapshots** (monthly totals, cumulative position, band, low/high, summary text) are written to each scenario automatically, 600 ms after the last change, so a saved forecast can be viewed without the CSVs.
+
+## Backtesting
+
+- **Strictly no look-ahead:** series detection, outlier tests and one-off classification are *re-run* on data before the cut-off (`buildBasisAsOf`). Categories come from the current rule set. That reflects the user's knowledge of what a counterparty *is*, not future cash, so it is not treated as leakage. A test asserts the basis contains nothing on or after the cut-off.
+- **Comparisons are like-for-like:** categories the forecast excludes (by default only "uncategorised") are left out of the actuals too and listed as "not modelled".
+- **The predictable core** compares the forecast with recurring actuals only. "Include the actual one-offs as if known" adds the real one-off flows to the forecast to isolate model error.
+- **Rolling mode** uses up to about 16 start dates, evenly spaced, from 12 months after the data start.
+
+## Team file
+
+- **Merge on save:** the file is re-read before writing. If its hash differs from the one loaded, rules, aliases, bank profiles, categories, forecasts, overrides and change-log entries are unioned by id. Items with the same id but different content are shown as conflicts with a mine/theirs choice (default mine). Hit counts and snapshots are ignored when comparing.
+- **Saving** uses the File System Access API (save in place) where available, otherwise a download.
+- **The history summary** (category × month operational totals plus a monthly treasury net) is included by default and can be switched off. It is aggregates only.
+- Starter rules are code, not team-file content, so improving them reaches every team on upgrade.
+
+## Synthetic data
+
+- **The authority is fictional.** "Northbridge Council" and every company, council, fund and bank are invented. Only the public bodies councils really deal with appear by name (PWLB/DMO, HMRC, DfE/ESFA, DLUHC/MHCLG, DWP, DHSC).
+- **The treasury flows come from a simulated cash manager.** It keeps the general account between £0.5m and £3m: surpluses go to MMFs and DMADF or bank deposits, shortfalls are met by MMF redemptions and then LA-to-LA loans, and a PWLB refinancing happens each October. Deal flows are therefore *caused* by the operational flows, as in real life.
+- **Narrative styles change once per flow, not row by row,** because that is what real bank and system changes look like. Random per-row style flipping made series undetectable in an unrealistic way.
+- **Volume presets:** small (multiplier 0.5, ≈22k rows), large (13, ≈245k) and brutal (44, ≈775k).
+
+## Exports
+
+- **Excel** is SheetJS 0.20.3 from the official SheetJS CDN tarball (the npm `xlsx` package is abandoned and has open advisories). It is loaded on demand so it doesn't weigh down the first page load.
+- **The print report** is an in-app page with a print stylesheet (A4, chrome hidden, page breaks before tables). "Save as PDF" uses the browser's print dialog, as the spec allowed for v1.

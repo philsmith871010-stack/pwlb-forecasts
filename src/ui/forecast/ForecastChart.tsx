@@ -50,8 +50,8 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
       yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
       dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 12, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }],
       series: [
-        { name: '_lo', type: 'line', data: lo, stack: 'band', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
-        { name: '90% range', type: 'line', data: width, stack: 'band', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(253,126,20,.14)' }, showSymbol: false, silent: true, itemStyle: { color: 'rgba(253,126,20,.4)' } },
+        { name: '_lo', type: 'line', data: lo, stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
+        { name: '90% range', type: 'line', data: width, stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(253,126,20,.14)' }, showSymbol: false, silent: true, itemStyle: { color: 'rgba(253,126,20,.4)' } },
         {
           name: 'History (operational)', type: 'line', data: histVals, showSymbol: false, connectNulls: false, lineStyle: { width: 2.2, color: '#0a2540' }, itemStyle: { color: '#0a2540' }, sampling: 'lttb',
           markLine: { silent: true, symbol: 'none', data: [{ xAxis: nearest(fc.start - 1), lineStyle: { color: '#adb5bd', type: 'solid' }, label: { formatter: 'today', color: '#6c757d', fontSize: 10 } }] },

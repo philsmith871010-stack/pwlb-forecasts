@@ -359,10 +359,13 @@ export function runForecast(req: ForecastRequest): ForecastResult {
       distribution = catSeries.length ? 'series' : distribution;
       const LOOK: Record<string, number> = { weekly: 8, fortnightly: 6, semi_monthly: 6, four_weekly: 4, monthly: 3, quarterly: 2, half_yearly: 2, annual: 1 };
       for (const s of catSeries) {
-        const k = Math.min(LOOK[s.cadence] ?? 3, s.amounts.length);
-        const recent = Array.from(s.amounts.slice(s.amounts.length - k));
-        const level = median(recent);
+        // stable series: the last few payments; volatile ones: a longer, growth-adjusted window
+        const base = LOOK[s.cadence] ?? 3;
+        const k = Math.min(s.amountCV > 0.1 ? base * 4 : base, s.amounts.length);
         const last = s.days[s.days.length - 1];
+        const recent: number[] = [];
+        for (let j = s.amounts.length - k; j < s.amounts.length; j++) recent.push(s.amounts[j] * G(s.days[j], last));
+        const level = median(recent);
         let projected = 0, next: Day | null = null;
         if (s.active && last >= dataEnd - 400) {
           const dates = projectDates(s, last, end);

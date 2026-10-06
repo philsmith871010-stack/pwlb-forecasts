@@ -36,8 +36,8 @@ export function SnapshotForecastView() {
             xAxis: { type: 'category', data: labels },
             yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
             series: [
-              { type: 'line', data: r.lower, stack: 'b', lineStyle: { opacity: 0 }, showSymbol: false, silent: true },
-              { type: 'line', data: r.upper.map((u, k) => u - r.lower[k]), stack: 'b', lineStyle: { opacity: 0 }, showSymbol: false, areaStyle: { color: 'rgba(253,126,20,.14)' }, silent: true },
+              { type: 'line', data: r.lower, stack: 'b', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true },
+              { type: 'line', data: r.upper.map((u, k) => u - r.lower[k]), stack: 'b', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, areaStyle: { color: 'rgba(253,126,20,.14)' }, silent: true },
               { name: 'Forecast', type: 'line', data: r.cumulative, lineStyle: { color: '#fd7e14', width: 2.5, type: 'dashed' }, itemStyle: { color: '#fd7e14' } },
             ],
           }} />

@@ -276,8 +276,8 @@ function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
             xAxis: { type: 'category', data: prof.months, boundaryGap: false },
             yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
             series: [
-              { name: 'range-lo', type: 'line', data: prof.lo, stack: 'band', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
-              { name: 'Range', type: 'line', data: prof.hi.map((v, k) => v - prof.lo[k]), stack: 'band', lineStyle: { opacity: 0 }, areaStyle: { color: colour, opacity: 0.12 }, showSymbol: false, silent: true, tooltip: { show: false } },
+              { name: 'range-lo', type: 'line', data: prof.lo, stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
+              { name: 'Range', type: 'line', data: prof.hi.map((v, k) => v - prof.lo[k]), stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, areaStyle: { color: colour, opacity: 0.12 }, showSymbol: false, silent: true, tooltip: { show: false } },
               ...prof.byYear.map((y) => ({ name: y.label, type: 'line', data: y.values, showSymbol: false, lineStyle: { width: 1, opacity: 0.35, color: '#5a6b7b' }, itemStyle: { color: '#5a6b7b' } })),
               { name: 'Typical', type: 'line', data: prof.typical, lineStyle: { width: 3.5, color: colour }, itemStyle: { color: colour }, symbolSize: 6 },
             ],

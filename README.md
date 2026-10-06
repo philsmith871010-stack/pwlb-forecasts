@@ -1,0 +1,122 @@
+# Cash Flow Insight
+
+A PWLBtoday prototype that turns a council's raw bank history into a transparent, auditable **cash flow forecast**. The forecast answers a treasury team's real question: *when will we need to borrow, how much, and when will we have cash to invest?*
+
+The tool runs entirely in the browser. It categorises several years of bank CSV lines and keeps treasury deal flows out of the model. It then analyses how operational cash has behaved and projects the operational position forward. The officer adjusts the projection with assumptions, one-offs and pasted schedules, and can backtest it against history.
+
+> **Your bank data stays on this computer.** There is no server, no upload, no analytics and no AI. See [Verifying that no data leaves the browser](#verifying-that-no-data-leaves-the-browser).
+
+## Quick start
+
+Requires Node 20+.
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+Open http://localhost:5173. On step 1, click **Generate demo data** to load a synthetic five-year history (Small, Large or Brutal volume), or drop in your own bank CSVs. To start with learned rules, bank profiles and a saved forecast, open [`data/sample-team-file.json`](data/sample-team-file.json) with **Open team file**.
+
+To build a static bundle, which can be hosted on any web server or intranet:
+
+```bash
+npm run build
+```
+
+The output in `dist/` is plain static files with no backend.
+
+## Synthetic data
+
+The generator models a fictional unitary council, "Northbridge". It produces council tax, NNDR, payroll with pay-award arrears and a payday change, grants that start and stop, suppliers, schools and capital. It also simulates a treasury desk (PWLB, LOBO, LA-to-LA loans, MMFs, DMADF and fixed deposits) reacting to the cash position. The output is written in five deliberately messy bank "dialects": debit/credit or signed amounts; UK, ISO, text-month, Excel-serial and some US dates; `£`, brackets, `CR`/`DR` and mis-encoded characters; truncated narratives, cryptic references, title and footer rows, overlapping exports, reversals, duplicates and invalid dates.
+
+To write CSVs and a hidden `truth.json` to disk:
+
+```bash
+npm run generate -- --preset large --out data/large
+```
+
+Options: `--preset small|large|brutal`, `--seed`, `--years`, `--start` (first financial year), `--accounts 1-4`, `--nastiness 0-2`. Ready-made sets are in [`data/small`](data/small) (≈22k rows) and [`data/large`](data/large) (≈245k rows).
+
+When generated data is loaded, step 3 shows a developer **Accuracy** panel that scores the engine against the truth file: per-category recall and precision, a confusion matrix, % of deal value excluded, and deal value wrongly left in the model.
+
+## Headless bench and tests
+
+```bash
+npm run bench -- --preset large --forecast
+```
+
+This generates data, ingests, categorises, scores accuracy, forecasts and backtests (single date and rolling), printing timings and accuracy. Add `--team data/sample-team-file.json` to include the sample team's rules.
+
+```bash
+npm test
+```
+
+Unit and end-to-end tests cover parsing, dialect detection, paste-in, series projection, team-file round-trip and merge, YoY totals against the truth file, and the no-look-ahead guarantee for backtests.
+
+Reference numbers on a 2024-era laptop, from the bench:
+
+| Preset | Rows | Parse | Categorise | Rows correct | Deal value excluded | Operational wrongly excluded |
+|---|---|---|---|---|---|---|
+| Large | 245k | 1.1 s | 0.8 s | 99.9% | 98.5% (99.9% with sample team file) | £0 |
+| Brutal | 775k | 3.5 s | 2.2 s | 99.9% | 99.9% (with team file) | ~£1k |
+
+A forecast recomputes in 10–30 ms; changing an assumption updates the chart and summary in under 100 ms.
+
+## How it works — the eight steps
+
+1. **Load.** Open the team file, then drop in bank CSVs. Files are streamed with PapaParse in a Web Worker, with progress. Rejected rows are logged with reasons. Overlapping exports are de-duplicated, and a balance continuity check runs where there is a balance column.
+2. **Map columns.** Header row, delimiter, date format, day/month order, amount convention and column roles are auto-detected, with dropdowns to override. Save a layout as a **bank profile** and it maps itself next time.
+3. **Categorise.** A deterministic pipeline records the rule behind every line: internal transfers, team rules, starter rules, treasury counterparties and the "another council" detector, recurring-series detection, then heuristic flags (loan pairs, round sums, interest-like half-yearly amounts, outliers).
+4. **Review.** Three queues, biggest value first: uncategorised and low-confidence groups, treasury/deal flows with suspected loan pairs side by side, and outliers. Every decision becomes a rule in the team file, with undo.
+5. **History.** Overview by financial year, cumulative operational versus actual position, year-on-year with CAGR, small multiples, a waterfall, seasonal profiles, a day-of-month profile, a heatmap, structural-break detection, a category deep dive with drill-down, recurring versus one-off, and data quality.
+6. **Forecast.** Seasonal × trend, recurring-series schedules, flat average or manual. Assumptions cover growth, step changes with backdated arrears, timing changes, start/stop and an inflation overlay. One-offs carry confidence weighting, schedules can be pasted from Excel, and a known treasury schedule can be overlaid. Outputs: an uncertainty band, low/high points, threshold breaches, a plain-English summary, scenarios and comparison.
+7. **Backtest.** "Forecast as if it were…" builds profiles strictly from earlier data, then compares the result with what actually happened. It reports the predictable core versus one-off surprises, and a rolling mode shows accuracy by horizon.
+8. **Save and export.** Save the team file (save in place with merge-on-conflict, or download). Exports: an Excel workbook, a categorised transactions CSV, PNG/SVG charts and a printable report.
+
+After the first full run the sidebar becomes a **workspace** (Data, History, Forecast, Backtest, Save & export, Settings) instead of repeating the wizard.
+
+## The team file
+
+One JSON file kept on the team's shared drive holds the authority name and settings, categories, rules, aliases, bank profiles, series and transaction decisions, scenarios and a change log.
+
+Scenarios include their assumptions, one-offs, schedules and a results snapshot. An optional category × month history summary is included too. A colleague can therefore open the file and see the latest forecasts without the CSVs.
+
+It contains **no transaction lines**. Per-transaction review decisions are stored under one-way hashes, not narratives or amounts.
+
+If two people edit copies, saving merges them: rules and forecasts from both are kept, and items genuinely edited by both are offered as a mine/theirs choice.
+
+## Verifying that no data leaves the browser
+
+A council IT team can check this in a few minutes:
+
+1. **Network panel.** Open the browser's developer tools (F12), **Network** tab, tick *Preserve log*, then load a CSV and work through every step. After the initial page load you should see **no requests at all**: no XHR, fetch or WebSocket. Opening files, categorising, forecasting and exporting make no network calls. Exports are created in the page and saved by your browser.
+2. **Content Security Policy.** The built `index.html` carries a CSP of `default-src 'self'; connect-src 'self' …; form-action 'none'`. The page is technically *unable* to send data to any other host, and the browser blocks and logs any attempt. Check it under DevTools, Elements, `<head>`.
+3. **No third-party code at runtime.** Fonts (Inter), icons, charting (ECharts), CSV parsing (PapaParse) and Excel (SheetJS) are bundled into `dist/`. Nothing is loaded from a CDN. To confirm, search `dist/` for `http`: you'll find only XML namespace identifiers (used inside the Excel and SVG writers), library homepages and React error-reference links. None of them is ever requested, and the CSP would block it if it were.
+4. **Offline test.** Build the app, serve `dist/` locally, then disconnect from the network. Everything keeps working.
+5. **Storage.** Only the team file, which contains no transactions, and your initials are cached in this browser's `localStorage`. Bank data lives only in memory and disappears when the tab closes.
+
+## Project layout
+
+```
+src/
+  generator/      synthetic council cash engine + messy CSV renderer + truth file
+  lib/ingest/     date/amount parsing, dialect detection, streaming ingest
+  lib/categorise/ normaliser, starter rules, categorisation engine, accuracy scoring
+  lib/analysis/   aggregates, history analytics, snapshots
+  lib/forecast/   forecast engine, backtesting, paste-in parser
+  lib/export/     Excel workbook
+  worker/         the engine Web Worker (owns the dataset)
+  state/          app store
+  ui/             shell, steps, forecast controls and views
+  theme/          PWLBtoday design tokens and base styles
+scripts/          generate, bench, sample team file
+tests/            vitest suites
+data/             sample datasets, truth files, sample team file
+```
+
+See [`DESIGN_TOKENS.md`](DESIGN_TOKENS.md) for how the look was matched to pwlbtoday.org, and [`DECISIONS.md`](DECISIONS.md) for the choices made where the spec was open.
+
+The product name lives in [`src/config.ts`](src/config.ts).
