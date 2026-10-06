@@ -1,0 +1,83 @@
+/* Design tokens extracted from pwlbtoday.org (see DESIGN_TOKENS.md). Use these everywhere. */
+:root {
+  /* brand */
+  --pt-navy: #0a2540;
+  --pt-navy-mid: #143659;
+  --pt-navy-light: #1a4775;
+  --pt-orange: #fd7e14;
+  --pt-orange-hover: #e06b00;
+  --pt-orange-soft: #fff5e9;
+  --pt-orange-rgb: 253, 126, 20;
+  --pt-navy-rgb: 10, 37, 64;
+  --pt-mint: #2dd4a8;
+  --pt-sky: #5cc8ff;
+
+  /* neutrals */
+  --pt-text: #243240;
+  --pt-ink: #0c1826;
+  --pt-muted: #6c757d;
+  --pt-muted-2: #5a6b7b;
+  --pt-line: #e9ecef;
+  --pt-line-soft: #f1f3f5;
+  --pt-bg: #f7f8fa;
+  --pt-white: #ffffff;
+
+  /* semantic */
+  --pt-green: #28a745;
+  --pt-green-soft: #e8f6ec;
+  --pt-red: #b04632;
+  --pt-red-soft: #fbeeeb;
+  --pt-amber: #b7791f;
+  --pt-amber-soft: #fff7e0;
+
+  /* gradients */
+  --pt-navy-grad: linear-gradient(120deg, #0a2540 0%, #143659 60%, #1a4775 100%);
+  --pt-navy-grad-v: linear-gradient(180deg, #0a2540 0%, #143659 60%, #1a4775 100%);
+  --pt-navy-grad-diag: linear-gradient(135deg, #0a2540 0%, #1a4775 100%);
+
+  /* type */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --fs-display: 2.25rem;
+  --fs-h1: 1.75rem;
+  --fs-h2: 1.4rem;
+  --fs-h3: 1.15rem;
+  --fs-h4: 1rem;
+  --fs-body: 0.95rem;
+  --fs-sm: 0.82rem;
+  --fs-xs: 0.74rem;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+
+  /* spacing / shape */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-card: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+  --pt-shadow-navy: 0 6px 18px rgba(10, 37, 64, 0.10);
+  --pt-shadow-navy-strong: 0 10px 28px rgba(10, 37, 64, 0.16);
+  --lp-shadow: 0 24px 60px -28px rgba(8, 22, 40, 0.55);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* shell */
+  --shell-header-h: 60px;
+  --shell-sidebar-w: 240px;
+
+  /* charts */
+  --chart-grid: #e6e6e6;
+  --chart-axis: #adb5bd;
+  --chart-label: #6c757d;
+}

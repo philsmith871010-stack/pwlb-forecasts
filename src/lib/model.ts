@@ -99,6 +99,8 @@ export interface ForecastSettings {
   end: string;
   granularity: 'daily' | 'weekly' | 'monthly';
   openingPosition: number | null;
+  /** where the opening position comes from when openingPosition is null */
+  openingMode?: 'bank' | 'operational' | 'manual';
   lookbackYears: number;
   recencyWeight: number;
   methodByCategory: Record<string, ForecastMethod>;

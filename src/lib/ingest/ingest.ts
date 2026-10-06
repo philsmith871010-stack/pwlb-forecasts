@@ -136,6 +136,7 @@ export async function ingest(sources: IngestSource[], onProgress?: ProgressFn): 
     const width = m.columns.length;
     let bal: BalanceCheck | null = m.balance >= 0 ? { file: src.name, account: '', checked: 0, breaks: 0, firstBreaks: [], openingBalance: null, openingDay: null } : null;
     let prevBal: number | null = null;
+    let prevDay: number | null = null;
 
     await new Promise<void>((resolve, reject) => {
       Papa.parse<string[]>(src.data as never, {
@@ -156,7 +157,13 @@ export async function ingest(sources: IngestSource[], onProgress?: ProgressFn): 
             };
             if (r.length < width - 1) { rej(`Only ${r.length} of ${width} columns`); continue; }
             const dateCell = r[m.date] ?? '';
-            const dr = parseDate(dateCell, m.dateOrder);
+            let dr = parseDate(dateCell, m.dateOrder);
+            // Ambiguous day/month: if this date jumps far from its neighbour but the swapped
+            // reading sits right next to it, the swapped reading is almost certainly right.
+            if (dr && !dr.swapped && prevDay !== null && Math.abs(dr.day - prevDay) > 20) {
+              const alt = parseDate(dateCell, m.dateOrder === 'DMY' ? 'MDY' : 'DMY');
+              if (alt && alt.day !== dr.day && Math.abs(alt.day - prevDay) <= 7) dr = { day: alt.day, swapped: true };
+            }
             if (!dr) {
               const joined = r.join(' ').toUpperCase();
               rej(/TOTAL|END OF|BALANCE B\/?F|BROUGHT FORWARD|CARRIED FORWARD/.test(joined) ? 'Footer / total row' : dateCell.trim() ? `Unreadable date "${dateCell.trim().slice(0, 20)}"` : 'Missing date');
@@ -211,6 +218,7 @@ export async function ingest(sources: IngestSource[], onProgress?: ProgressFn): 
               }
             }
             G.push(dr.day, amount, ai, fi, lineNo, narrId(narr), flags, balance);
+            prevDay = dr.day;
             summary.rowsAccepted++;
             if (summary.firstDay === null || dr.day < summary.firstDay) summary.firstDay = dr.day;
             if (summary.lastDay === null || dr.day > summary.lastDay) summary.lastDay = dr.day;

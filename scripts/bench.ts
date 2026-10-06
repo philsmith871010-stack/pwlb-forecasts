@@ -77,3 +77,33 @@ if (args.includes('--examples')) {
   }
   for (const [k, v] of ex) console.log(`\n${k}\n   ${v.join('\n   ')}`);
 }
+
+if (args.includes('--forecast')) {
+  const { buildBasis } = await import('../src/lib/analysis/aggregates');
+  const { runForecast, fmtMoney } = await import('../src/lib/forecast/engine');
+  const { runBacktest, runRolling } = await import('../src/lib/forecast/backtest');
+  const { isoFromDay, addMonths, fmtDay } = await import('../src/lib/dates');
+  const cats = team?.categories ?? DEFAULT_CATEGORIES;
+  t = performance.now();
+  const basis = buildBasis(ds, res);
+  lap('basis');
+  const start = ds.maxDay + 1;
+  const settings = { start: isoFromDay(start), end: isoFromDay(addMonths(start, 24) - 1), granularity: 'monthly' as const, openingPosition: null, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: true, bandZ: 1.645 };
+  let fc = runForecast({ basis, categories: cats, settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 1.5e6 });
+  lap('forecast');
+  console.log(`\nForecast (${fc.ms.toFixed(1)} ms): ${fc.summary}`);
+  for (const e of fc.explain.filter((e) => e.forecastTotal || e.historyAnnual)) console.log(`  ${e.id.padEnd(20)} ${e.method.padEnd(9)} g=${e.growthPct.toFixed(1).padStart(5)}%  hist12=${fmtMoney(e.historyAnnual).padStart(9)}  fc=${fmtMoney(e.forecastTotal).padStart(9)}  σ=${fmtMoney(e.sigmaMonthly)} ${e.distribution} ${e.series.length ? e.series.filter((s) => s.projected).length + ' series' : ''} ${e.clamps.length ? e.clamps.length + ' clamps' : ''}`);
+  fc = runForecast({ basis, categories: cats, settings, assumptions: [{ id: 'a', kind: 'growth', categoryId: 'salaries', pct: 2, mode: 'annual_step' }], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 1.5e6 });
+  console.log(`  With salaries +2%: low ${fmtMoney(fc.low.amount)} on ${fmtDay(fc.low.day)} (${fc.ms.toFixed(1)} ms)`);
+  const cutoff = addMonths(ds.maxDay + 1, -24);
+  const bt = runBacktest(ds, res, basis.agg, { cutoff, horizonMonths: 12, categories: cats, settings, includeActualOneOffs: false, fyStartMonth: 4 });
+  console.log(`\nBacktest from ${fmtDay(cutoff)} (used data to ${fmtDay(bt.usedDataTo)}; ${bt.ms.toFixed(0)} ms)`);
+  for (const e of bt.errorAt) console.log(`  ${e.months}m: error ${fmtMoney(e.error)} (core ${fmtMoney(e.coreError)}) vs gross flow ${fmtMoney(e.actualAbsFlow)}`);
+  console.log(`  low forecast ${fmtMoney(bt.lowForecast.amount)} ${fmtDay(bt.lowForecast.day)}; actual ${fmtMoney(bt.lowActual.amount)} ${fmtDay(bt.lowActual.day)}`);
+  for (const c of bt.categories.slice(0, 6)) console.log(`  ${c.id.padEnd(20)} err ${fmtMoney(c.error).padStart(9)}  mape ${c.mape === null ? '-' : (c.mape * 100).toFixed(0) + '%'}`);
+  t = performance.now();
+  const roll = runRolling(ds, res, basis.agg, { horizonMonths: 12, categories: cats, settings, includeActualOneOffs: false, fyStartMonth: 4 });
+  lap(`rolling (${roll.cutoffs.length} runs)`);
+  console.log('  MAE by month:', roll.maeByMonth.map((x) => fmtMoney(x)).join(' '));
+  console.log('  core MAE    :', roll.coreMaeByMonth.map((x) => fmtMoney(x)).join(' '), ' gross/month', fmtMoney(roll.avgMonthlyGross));
+}
