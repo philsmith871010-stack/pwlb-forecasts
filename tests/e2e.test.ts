@@ -8,7 +8,11 @@ import { buildBasis, buildBasisAsOf } from '../src/lib/analysis/aggregates';
 import { annualTotals, yearsOf } from '../src/lib/analysis/history';
 import { runBacktest } from '../src/lib/forecast/backtest';
 import { DEFAULT_CATEGORIES } from '../src/lib/categories';
-import { fyOf, dayFromISO } from '../src/lib/dates';
+import { fyOf, dayFromISO, isoFromDay, addMonths } from '../src/lib/dates';
+import { runForecast } from '../src/lib/forecast/engine';
+import { buildWorkbook } from '../src/lib/export/xlsx';
+import { emptyTeamFile } from '../src/lib/teamfile';
+import * as XLSX from 'xlsx';
 
 describe('end to end on generated data', async () => {
   const g = generateDataset({ ...DEFAULT_GENERATOR_OPTIONS, seed: 'e2e' });
@@ -53,5 +57,14 @@ describe('end to end on generated data', async () => {
     const r = runBacktest(ds, res, basis.agg, { cutoff, horizonMonths: 12, categories: DEFAULT_CATEGORIES, settings: { lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {} }, includeActualOneOffs: false, fyStartMonth: 4 });
     expect(r.usedDataTo).toBe(cutoff - 1);
     expect(r.errorAt.find((e) => e.months === 12)).toBeTruthy();
+  });
+
+  it('exports an Excel workbook with every sheet', async () => {
+    const start = ds.maxDay + 1;
+    const settings = { start: isoFromDay(start), end: isoFromDay(addMonths(start, 12) - 1), granularity: 'monthly' as const, openingPosition: 0, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: true, bandZ: 1.645 };
+    const fc = runForecast({ basis, categories: DEFAULT_CATEGORIES, settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 1e7, defaultOpening: 0 });
+    const blob = await buildWorkbook({ team: emptyTeamFile('T'), agg: basis.agg, scenario: { id: 's', name: 'Base', updatedAt: '', settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [] }, fc, backtest: null, appName: 'CFI' });
+    const wb = XLSX.read(new Uint8Array(await blob.arrayBuffer()));
+    expect(wb.SheetNames).toEqual(expect.arrayContaining(['Summary', 'History by month', 'Year on year', 'Seasonal profiles', 'Forecast', 'Forecast daily', 'Methods & assumptions', 'Rules']));
   });
 });
