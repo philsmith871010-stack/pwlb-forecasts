@@ -55,6 +55,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'pwlb', name: 'PWLB loans', group: 'treasury', colour: '#0a2540', forecastMethod: 'exclude' },
   { id: 'lobo', name: 'LOBO loans', group: 'treasury', colour: '#143659', forecastMethod: 'exclude' },
   { id: 'la_loans', name: 'Local authority loans', group: 'treasury', colour: '#1a4775', forecastMethod: 'exclude' },
+  { id: 'other_borrowing', name: 'Other borrowing', group: 'treasury', colour: '#2e4a6b', forecastMethod: 'exclude' },
   { id: 'mmf', name: 'Money market funds', group: 'treasury', colour: '#3d5a80', forecastMethod: 'exclude' },
   { id: 'dmadf', name: 'DMADF deposits', group: 'treasury', colour: '#5a6b7b', forecastMethod: 'exclude' },
   { id: 'bank_deposits', name: 'Bank & building society deposits', group: 'treasury', colour: '#7d8fa3', forecastMethod: 'exclude' },

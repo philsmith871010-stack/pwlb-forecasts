@@ -31,11 +31,13 @@ export const DEFAULT_GENERATOR_OPTIONS: GeneratorOptions = {
 export interface GeneratedDataset {
   files: { name: string; text: string }[];
   truth: TruthFile;
+  /** the example council's deal register at the end of its history (register snapshot form) */
+  register: unknown;
   stats: { rows: number; files: number; startISO: string; endISO: string };
 }
 
 export function generateDataset(o: GeneratorOptions): GeneratedDataset {
-  const { txns, openingBalances } = runEngine({
+  const { txns, openingBalances, register } = runEngine({
     seed: o.seed,
     startFY: o.startFY,
     years: o.years,
@@ -59,6 +61,7 @@ export function generateDataset(o: GeneratorOptions): GeneratedDataset {
   return {
     files: rendered.map((f) => ({ name: f.name, text: f.text })),
     truth,
+    register,
     stats: { rows, files: rendered.length, startISO: iso(d0), endISO: iso(d1) },
   };
 }

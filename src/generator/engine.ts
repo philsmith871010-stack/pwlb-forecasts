@@ -7,6 +7,7 @@ import {
   daysInMonth, lastWorkingDayOfMonth, fyOf,
 } from '../lib/dates';
 import * as N from './names';
+import { loanLife } from '../lib/register/loanSchedule';
 
 export interface TrueTxn {
   day: Day;
@@ -37,7 +38,7 @@ export const ACCOUNT_NUMBERS = ['40118822', '40118830', '40118849', '40118857'];
 
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
-export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end: Day; openingBalances: number[] } {
+export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end: Day; openingBalances: number[]; register: unknown } {
   const rng = new Rng(o.seed);
   const start = dayFromYMD(o.startFY, 4, 1);
   const end = dayFromYMD(o.startFY + o.years, 3, 31);
@@ -506,10 +507,10 @@ export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end:
   }
 
   // ---------------- Treasury simulation ----------------
-  runTreasury(out, rng, start, end, openingBalances, o);
+  const register = runTreasury(out, rng, start, end, openingBalances, o);
 
   out.sort((a, b) => a.day - b.day || a.account - b.account);
-  return { txns: out, start, end, openingBalances };
+  return { txns: out, start, end, openingBalances, register };
 }
 
 // =====================================================================================
@@ -526,24 +527,49 @@ function bankRate(d: Day): number {
   return 0.0375;
 }
 
-interface Pos { kind: 'la_loan' | 'dmadf' | 'fd'; principal: number; start: Day; mat: Day; rate: number; cp: string; ref: string; deposit: boolean }
 
-function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: number[], o: EngineOptions) {
+interface Pos { kind: 'la_loan' | 'dmadf' | 'fd'; principal: number; start: Day; mat: Day; rate: number; cp: string; ref: string; deposit: boolean; bank?: string; cpType?: string }
+
+/** A loan with its whole life of cash on the register's conventions (see register/loanSchedule). */
+interface GLoan {
+  ref: string; type: 'PWLB fixed' | 'LOBO'; lender: string; lenderType: string; principal: number; rate: number;
+  start: Day; mat: Day; profile: 'Maturity' | 'EIP' | 'Annuity'; nextCall?: Day;
+  life: { day: Day; principal: number; interest: number }[];
+}
+
+const dateOf = (d: Day) => new Date(d * 86_400_000);
+const dayOf = (d: Date) => Math.round(d.getTime() / 86_400_000);
+const isoOf = (d: Day) => dateOf(d).toISOString().slice(0, 10);
+
+function makeLoan(o: Omit<GLoan, 'life'>): GLoan {
+  const life = loanLife(dateOf(o.start), dateOf(o.mat), o.principal, o.rate, o.profile, 2).map((x) => ({ day: dayOf(x.date), principal: x.principal, interest: x.interest }));
+  return { ...o, life };
+}
+
+/** Returns the register snapshot (the council's deal register at the end of the history). */
+function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: number[], o: EngineOptions): unknown {
   const V = o.volume;
   const add = (day: Day, amount: number, narr: string, cat: string) => {
     if (day < start || day > end) return;
     out.push({ day, amount: r2(amount), account: 0, narr, cat, deal: true, recurring: false });
   };
-  // Existing PWLB portfolio
-  interface Loan { ref: string; principal: number; rate: number; start: Day; mat: Day; type: 'maturity' | 'annuity' | 'eip'; outstanding: number }
-  const loans: Loan[] = [];
+  // Existing PWLB portfolio: start days ≤ 28, maturity on the same day and month, so the
+  // half-yearly cycle (which ends at maturity) falls on the start's anniversaries.
+  const loans: GLoan[] = [];
+  const s0 = ymdFromDay(start);
   for (let i = 0; i < 12; i++) {
-    const s = start - rng.int(365 * 2, 365 * 30);
-    const mat = i < 3 ? start + rng.int(200, 365 * 4) : s + 365 * rng.int(35, 50);
-    const p = rng.pick([5e6, 8e6, 10e6, 12.5e6, 15e6, 20e6, 25e6, 30e6]);
-    const type = i < 8 ? 'maturity' : i < 10 ? 'annuity' : 'eip';
-    loans.push({ ref: rng.digits(6), principal: p, rate: rng.range(0.018, 0.048), start: s, mat, type, outstanding: type === 'maturity' ? p : p * rng.range(0.4, 0.9) });
+    const sy = s0.y - rng.int(2, 30), sm = rng.int(1, 12), sd = rng.int(1, 28);
+    const sday = dayFromYMD(sy, sm, sd);
+    let my = sy + rng.int(25, 50);
+    if (i < 3) my = s0.y + rng.int(1, 4); // a few mature during the history
+    const profile = i < 8 ? 'Maturity' : i < 10 ? 'Annuity' : 'EIP';
+    loans.push(makeLoan({ ref: rng.digits(6), type: 'PWLB fixed', lender: 'Public Works Loan Board', lenderType: 'PWLB', principal: rng.pick([5e6, 8e6, 10e6, 12.5e6, 15e6, 20e6, 25e6, 30e6]), rate: Math.round(rng.range(0.018, 0.048) * 10000) / 10000, start: sday, mat: dayFromYMD(my, sm, sd), profile }));
   }
+  // Two LOBOs: half-yearly interest on the 1st; one has an option date after the history ends
+  const lobos = [
+    makeLoan({ ref: 'LOBO1', type: 'LOBO', lender: N.LOBO_LENDERS[0], lenderType: 'Overseas bank', principal: 10e6, rate: 0.0465, start: dayFromYMD(2005, 5, 1), mat: dayFromYMD(2055, 5, 1), profile: 'Maturity', nextCall: dayFromYMD(ymdFromDay(end).y + 1, 5, 1) }),
+    makeLoan({ ref: 'LOBO2', type: 'LOBO', lender: N.LOBO_LENDERS[1], lenderType: 'UK bank', principal: 10e6, rate: 0.0438, start: dayFromYMD(2006, 2, 1), mat: dayFromYMD(2056, 2, 1), profile: 'Maturity', nextCall: dayFromYMD(ymdFromDay(end).y + 5, 2, 1) }),
+  ];
   const pwlbNarr = (ref: string, what: 'INT' | 'PRIN' | 'ADV') => {
     const k = rng.next();
     if (k < 0.12) return `TRF ${rng.digits(5)} REF ${ref}`; // cryptic
@@ -553,55 +579,36 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
     if (k < 0.8) return `UK DEBT MGMT OFFICE ${ref}`;
     return `PWLB ${what} ${ref}`;
   };
-  const halfYear = (l: Loan, d: Day) => {
-    const a = ymdFromDay(l.start), x = ymdFromDay(d);
-    return x.d === Math.min(a.d, 28) && (x.m === a.m || x.m === ((a.m + 5) % 12) + 1);
-  };
   const positions: Pos[] = [];
+  const deals: Pos[] = [];                     // every deal ever, for the register
+  const open = (p: Pos) => { positions.push(p); deals.push(p); };
   const mmf = N.MMF_FUNDS.map(() => 0);
-  // Opening investments
   mmf[0] = 12e6; mmf[1] = 8e6; mmf[2] = 5e6;
-  positions.push({ kind: 'dmadf', principal: 10e6, start: start - 20, mat: start + 25, rate: bankRate(start), cp: 'DMADF', ref: rng.digits(6), deposit: true });
-  positions.push({ kind: 'la_loan', principal: 10e6, start: start - 100, mat: start + 60, rate: 0.002, cp: `${N.TOWNS[3].toUpperCase()} CITY COUNCIL`, ref: `LA/${rng.digits(2)}/${rng.digits(3)}`, deposit: false });
-  positions.push({ kind: 'la_loan', principal: 5e6, start: start - 50, mat: start + 120, rate: 0.002, cp: `${N.TOWNS[7].toUpperCase()} BOROUGH COUNCIL`, ref: `LA/${rng.digits(2)}/${rng.digits(3)}`, deposit: false });
+  open({ kind: 'dmadf', principal: 10e6, start: start - 20, mat: nextBusinessDay(start + 25), rate: bankRate(start), cp: 'DMADF', ref: rng.digits(6), deposit: true });
+  open({ kind: 'la_loan', principal: 10e6, start: start - 100, mat: nextBusinessDay(start + 60), rate: 0.002, cp: `${N.TOWNS[3].toUpperCase()} CITY COUNCIL`, ref: `LA/${rng.digits(2)}/${rng.digits(3)}`, deposit: false });
+  open({ kind: 'la_loan', principal: 5e6, start: start - 50, mat: nextBusinessDay(start + 120), rate: 0.002, cp: `${N.TOWNS[7].toUpperCase()} BOROUGH COUNCIL`, ref: `LA/${rng.digits(2)}/${rng.digits(3)}`, deposit: false });
 
-  // Index operational flows on General account per day (internal transfers included)
   const netByDay = new Map<Day, number>();
   for (const t of out) if (t.account === 0) netByDay.set(t.day, (netByDay.get(t.day) ?? 0) + t.amount);
 
   let bal = opening[0];
   const ambiguousDay = nextBusinessDay(start + Math.floor((end - start) * 0.3));
-  const lobos = [{ p: 10e6, rate: 0.0465, m1: 5, lender: N.LOBO_LENDERS[0] }, { p: 10e6, rate: 0.0438, m1: 2, lender: N.LOBO_LENDERS[1] }];
   for (let d = start; d <= end; d++) {
     bal += netByDay.get(d) ?? 0;
     if (!isBusinessDay(d)) continue;
     const today: [number, string, string][] = [];
     const tx = (amt: number, narr: string, cat: string) => { today.push([amt, narr, cat]); bal += amt; };
-    // PWLB servicing
-    for (const l of loans) {
-      if (l.outstanding <= 0) continue;
-      const bd = (dd: Day) => prevBusinessDay(dd) === d;
-      if (bd(l.mat) && l.type === 'maturity') { tx(-l.outstanding, pwlbNarr(l.ref, 'PRIN'), 'pwlb'); tx(-l.outstanding * l.rate / 2, pwlbNarr(l.ref, 'INT'), 'pwlb'); l.outstanding = 0; continue; }
-      // half-yearly dates (check the actual calendar day that rolls to today)
-      for (let back = 0; back < 4; back++) {
-        const cand = d + back;
-        if (back > 0 && isBusinessDay(cand)) break;
-        if (halfYear(l, cand)) {
-          tx(-l.outstanding * l.rate / 2, pwlbNarr(l.ref, 'INT'), 'pwlb');
-          if (l.type !== 'maturity') {
-            const pr = l.type === 'eip' ? l.principal / 80 : l.outstanding * 0.012;
-            tx(-pr, pwlbNarr(l.ref, 'PRIN'), 'pwlb');
-            l.outstanding -= pr;
-          }
-        }
+    // Loan servicing: each scheduled date posts on its next business day
+    for (const l of [...loans, ...lobos]) {
+      for (const x of l.life) {
+        if (nextBusinessDay(x.day) !== d) continue;
+        if (l.type === 'LOBO') { if (x.interest > 0.5) tx(-x.interest, rng.chance(0.6) ? `LOBO INT ${l.lender}` : `${l.lender.slice(0, 14)} LN INT ${rng.digits(5)}`, 'lobo'); continue; }
+        if (x.principal > 0.5) tx(-x.principal, pwlbNarr(l.ref, 'PRIN'), 'pwlb');
+        if (x.interest > 0.5) tx(-x.interest, pwlbNarr(l.ref, 'INT'), 'pwlb');
       }
     }
-    // LOBO interest half-yearly, first business day of the month
     const { y: yy, m: mm } = ymdFromDay(d);
     const firstBD = nextBusinessDay(dayFromYMD(yy, mm, 1)) === d;
-    for (const lb of lobos) if (firstBD && (mm === lb.m1 || mm === ((lb.m1 + 5) % 12) + 1)) {
-      tx(-lb.p * lb.rate / 2, rng.chance(0.6) ? `LOBO INT ${lb.lender}` : `${lb.lender.slice(0, 14)} LN INT ${rng.digits(5)}`, 'lobo');
-    }
     // Maturing positions
     for (let i = positions.length - 1; i >= 0; i--) {
       const p = positions[i];
@@ -623,7 +630,7 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
     }
     // A deliberately ambiguous £4m short loan from a neighbouring council (same day as a £4m grant)
     if (d === ambiguousDay) {
-      positions.push({ kind: 'la_loan', principal: 4e6, start: d, mat: nextBusinessDay(d + 91), rate: bankRate(d) + 0.002, cp: 'BRAMFORD BOROUGH COUNCIL', ref: `LA/${String(yy).slice(2)}/${rng.digits(3)}`, deposit: false });
+      open({ kind: 'la_loan', principal: 4e6, start: d, mat: nextBusinessDay(d + 91), rate: bankRate(d) + 0.002, cp: 'BRAMFORD BOROUGH COUNCIL', ref: `LA/${String(yy).slice(2)}/${rng.digits(3)}`, deposit: false });
       tx(4e6, 'BRAMFORD BOROUGH COUNCIL', 'la_loans');
     }
     // Annual PWLB refinancing of short-term LA borrowing
@@ -631,14 +638,14 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
     if (mm === 10 && ymdFromDay(d).d <= 7 && laBorrow > 30e6 && !loans.some((l) => l.start > d - 60)) {
       const amt = Math.round(laBorrow * 0.8 / 5e6) * 5e6;
       const ref = rng.digits(6);
-      loans.push({ ref, principal: amt, rate: bankRate(d) + 0.008, start: d, mat: d + 365 * rng.int(10, 40), type: rng.pick(['maturity', 'annuity', 'eip']), outstanding: amt });
+      const { d: dd } = ymdFromDay(d);
+      loans.push(makeLoan({ ref, type: 'PWLB fixed', lender: 'Public Works Loan Board', lenderType: 'PWLB', principal: amt, rate: Math.round((bankRate(d) + 0.008) * 10000) / 10000, start: d, mat: dayFromYMD(yy + rng.int(10, 40), mm, dd), profile: rng.pick(['Maturity', 'Annuity', 'EIP'] as const) }));
       tx(amt, pwlbNarr(ref, 'ADV'), 'pwlb');
     }
     // Cash manager: target £0.5m–£3m
     const hi = 3e6, lo = 0.5e6, target = 1.5e6;
     if (bal > hi) {
       let surplus = bal - target;
-      // Repay nothing early; invest
       if (surplus >= 5e6 && rng.chance(0.35)) {
         const amt = Math.floor(surplus / 1e6) * 1e6 - (rng.chance(0.5) ? 0 : 1e6);
         if (amt >= 2e6) {
@@ -646,7 +653,7 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
           const term = rng.pick([7, 14, 21, 28, 35, 63, 91, 182]);
           const ref = `${String(ymdFromDay(d).y).slice(2)}/${rng.digits(3)}`;
           const bank = rng.pick(N.BANKS);
-          positions.push({ kind: isD ? 'dmadf' : 'fd', principal: amt, start: d, mat: nextBusinessDay(d + term), rate: bankRate(d) - (isD ? 0.0005 : -0.001), cp: isD ? 'DMADF' : bank.short, ref, deposit: true });
+          open({ kind: isD ? 'dmadf' : 'fd', principal: amt, start: d, mat: nextBusinessDay(d + term), rate: bankRate(d) - (isD ? 0.0005 : -0.001), cp: isD ? 'DMADF' : bank.short, bank: bank.name, ref, deposit: true });
           tx(-amt, isD ? rng.pick(['DMADF DEPOSIT', `DMO DMADF DEP ${ref}`, `TRF ${rng.digits(5)} REF ${ref}`]) : rng.pick([`FIXED DEPOSIT ${bank.name}`, `FD/${ref} ${bank.short}`, `TRF ${rng.digits(5)} REF FD/${ref}`]), isD ? 'dmadf' : 'bank_deposits');
           surplus -= amt;
         }
@@ -672,12 +679,11 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
         const town = rng.pick(N.TOWNS.filter((t) => !N.NEIGHBOURS.includes(t) || rng.chance(0.3)));
         const cp = `${town.toUpperCase()} ${rng.pick(N.COUNCIL_TYPES)}`;
         const ref = `LA/${String(ymdFromDay(d).y).slice(2)}/${rng.digits(3)}`;
-        positions.push({ kind: 'la_loan', principal: amt, start: d, mat: nextBusinessDay(d + rng.pick([30, 60, 91, 182, 273, 364])), rate: bankRate(d) + 0.002, cp, ref, deposit: false });
+        open({ kind: 'la_loan', principal: amt, start: d, mat: nextBusinessDay(d + rng.pick([30, 60, 91, 182, 273, 364])), rate: bankRate(d) + 0.002, cp, ref, deposit: false });
         tx(amt, rng.chance(0.35) ? `${cp} LOAN` : rng.chance(0.5) ? `TRF ${rng.digits(5)} REF ${ref}` : cp, 'la_loans');
       }
     }
     for (const [amt, narr, cat] of today) add(d, amt, narr, cat);
-    // Extra MMF churn at higher volumes (intra-month sweeps)
     if (V > 2 && rng.chance(Math.min(0.6, V / 30))) {
       const i = rng.int(0, mmf.length - 1);
       if (mmf[i] > 2e6) {
@@ -688,4 +694,60 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
       }
     }
   }
+  return buildRegisterSnapshot({ loans, lobos, deals, mmf, end, start });
+}
+
+const title = (s: string) => s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\bBc\b/, 'BC').replace(/\bMetropolitan Bc\b/, 'Metropolitan BC');
+
+/** The example council's deal register at the end of its history, in the register's snapshot form. */
+function buildRegisterSnapshot(x: { loans: GLoan[]; lobos: GLoan[]; deals: Pos[]; mmf: number[]; end: Day; start: Day }) {
+  const asAt = x.end;
+  let row = 4;
+  const outstanding = (l: GLoan) => l.principal - l.life.filter((p) => p.day <= asAt).reduce((s, p) => s + p.principal, 0);
+  const loansRows = [...x.loans, ...x.lobos].filter((l) => l.mat > x.start - 1).map((l) => {
+    const matured = l.mat <= asAt;
+    return {
+      row: row++, type: l.type, lender: l.type === 'LOBO' ? title(l.lender) : 'Public Works Loan Board', lenderType: l.lenderType,
+      principal: Math.round(matured ? l.principal : outstanding(l)), start: isoOf(l.start), maturity: isoOf(l.mat), rate: l.rate,
+      profile: l.profile, frequency: 'Half-yearly', firstRepayment: null, fund: '', nextCall: l.nextCall ? isoOf(l.nextCall) : null,
+    };
+  });
+  for (const p of x.deals.filter((p) => !p.deposit)) {
+    loansRows.push({
+      row: row++, type: p.mat - p.start <= 364 ? 'Temporary borrowing' : 'Local authority loan', lender: title(p.cp), lenderType: 'Local authority',
+      principal: p.principal, start: isoOf(p.start), maturity: isoOf(p.mat), rate: Math.round(p.rate * 100000) / 100000, profile: 'Maturity', frequency: '', firstRepayment: null, fund: '', nextCall: null,
+    } as never);
+  }
+  row = 4;
+  const term = x.deals.filter((p) => p.deposit).map((p) => ({
+    row: row++, type: 'Fixed deposit', counterparty: p.kind === 'dmadf' ? 'UK Debt Management Office' : (p.bank ?? p.cp), cpType: p.kind === 'dmadf' ? 'UK Government' : /BUILDING SOC/.test(p.bank ?? '') ? 'Building society' : 'UK bank',
+    principal: p.principal, start: isoOf(p.start), maturity: isoOf(p.mat), rate: Math.round(p.rate * 100000) / 100000, faceValue: null, carryingValue: null, rating: p.kind === 'dmadf' ? '' : 'A',
+  }));
+  row = 4;
+  const call = N.MMF_FUNDS.map((f, i) => ({ row: row++, type: 'Money market fund', counterparty: f.name.replace(/\b[A-Z]+\b/g, (w) => w[0] + w.slice(1).toLowerCase()), cpType: 'Money market fund', balance: Math.round(x.mmf[i] / 1000) * 1000, rate: Math.max(0.0005, bankRate(asAt) - 0.001), noticeDays: null, rating: 'AAAm', avgBalance: null, avgRate: null }));
+
+  // The top-down projection (£m): CFR from the debt and resources at the as-at date,
+  // a five-year capital programme financed by borrowing, MRP at 3.5%, reserves used.
+  const extDebt = loansRows.filter((l) => l.maturity > isoOf(asAt) && !(l.start > isoOf(asAt))).reduce((s, l) => s + l.principal, 0) / 1e6;
+  const invested = (term.filter((t) => t.maturity > isoOf(asAt)).reduce((s, t) => s + t.principal, 0) + call.reduce((s, c) => s + c.balance, 0)) / 1e6;
+  const obs0 = 95;
+  const cfr0 = Math.round((extDebt - invested + obs0) * 10) / 10;
+  const fy0 = fyOf(asAt);
+  const capex = [46, 48, 41, 34, 28];
+  const rows: (string | number | null)[][] = [];
+  let cfr = cfr0;
+  for (let k = 0; k <= 30; k++) {
+    const yLabel = `${fy0 + k}/${String((fy0 + k + 1) % 100).padStart(2, '0')}`;
+    let mrp = 0, cx = 0, rec = 0;
+    if (k > 0) { cx = capex[k - 1] ?? 0; mrp = Math.round(cfr * 0.035 * 10) / 10; rec = k <= 5 ? 2 : 0; cfr = Math.round((cfr + cx - mrp - rec) * 10) / 10; }
+    const obs = Math.round(obs0 * Math.max(0.6, Math.pow(0.95, k)) * 10) / 10;
+    rows.push([yLabel, cfr, k ? mrp : Math.round(cfr0 * 0.035 * 10) / 10, k ? rec : null, obs, null, null, 10, k ? cx : null]);
+  }
+  return {
+    v: 1, name: 'Northbridge Council deal register (example)', asAt: isoOf(asAt), hra: 'None', version: 3, periodFrom: isoOf(dayFromYMD(fyOf(asAt), 4, 1)),
+    settingsIssues: [],
+    projections: { gf: { head: ['Year end', 'Capital financing requirement', 'MRP', 'Capital receipts applied', 'Other balance sheet items', 'Existing loan commitments', 'Existing investment commitments', 'Liquidity allowance', 'Capital expenditure financed by borrowing'], rows, title: 'General Fund', at: 'A5' } },
+    readiness: null,
+    term, call, loans: loansRows, funds: [],
+  };
 }

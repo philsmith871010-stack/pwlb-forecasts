@@ -29,6 +29,7 @@ export const RULE_LOAN_PAIR = -5;
 export const RULE_ROUND = -6;
 export const RULE_OVERRIDE = -7;
 export const RULE_FIXED_HALFYEARLY = -8;
+export const RULE_REGISTER = -9;
 
 export const F_LARGE = 1;
 export const F_ROUND = 2;
@@ -56,6 +57,7 @@ export const SPECIAL_RULE_LABELS: Record<number, string> = {
   [RULE_ROUND]: 'Heuristic: large round sum with no other match',
   [RULE_OVERRIDE]: 'Your decision on this transaction',
   [RULE_FIXED_HALFYEARLY]: 'Heuristic: identical amount every six months (interest-like)',
+  [RULE_REGISTER]: 'Matched to your deal register',
 };
 
 export type Cadence = 'daily' | 'weekly' | 'fortnightly' | 'semi_monthly' | 'four_weekly' | 'monthly' | 'quarterly' | 'half_yearly' | 'annual' | 'irregular';
@@ -102,7 +104,15 @@ export interface CatConfig {
   seriesOverrides: SeriesOverride[];
   txnOverrides: TxnOverride[];
   useStarterRules: boolean;
+  /** past cash events from the council's deal register, matched to bank lines before any rule */
+  registerEvents?: RegisterEventLite[];
+  /** call accounts and money market funds named in the register: every flow with them is treasury */
+  registerAccounts?: { name: string; categoryId: string }[];
 }
+
+export interface RegisterEventLite { day: number; amount: number; categoryId: string; label: string; ref: string; kind: string }
+
+export interface RegisterMatch { events: number; matched: number; matchedAbs: number; unmatched: { day: number; amount: number; label: string }[] }
 
 export interface CatResult {
   catIds: string[];
@@ -123,6 +133,7 @@ export interface CatResult {
   ruleList: Rule[];
   ruleHits: Int32Array;
   ms: Record<string, number>;
+  registerMatch: RegisterMatch | null;
 }
 
 export function rowKey(ds: Dataset, i: number, signature: string): string {
@@ -257,6 +268,55 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
   }
   lap('internal');
 
+  // ---------- 3b. The council's deal register ----------
+  let registerMatch: RegisterMatch | null = null;
+  if (cfg.registerEvents && cfg.registerEvents.length) {
+    const inWindow = cfg.registerEvents.filter((e) => e.day >= ds.minDay - 3 && e.day <= ds.maxDay + 3);
+    // a repayment or maturity is often one bank line with its interest: offer the combined amount too
+    const combined = new Map<string, number>();
+    for (const e of inWindow) if (e.kind === 'loan_interest' || e.kind === 'inv_interest') combined.set(`${e.ref}|${e.day}`, (combined.get(`${e.ref}|${e.day}`) ?? 0) + e.amount);
+    // candidates by day, so interest can match within a small tolerance
+    const byDay = new Map<number, number[]>();
+    for (let i = 0; i < n; i++) { if (done[i]) continue; let a = byDay.get(ds.day[i]); if (!a) byDay.set(ds.day[i], (a = [])); a.push(i); }
+    const words = (s: string) => new Set(s.toUpperCase().replace(/[^A-Z ]/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !['LOAN', 'PAID', 'REPAID', 'FIXED', 'DEPOSIT', 'INTEREST', 'RECEIVED', 'MATURES', 'PLACED', 'BORROWING', 'COUNCIL', 'BOROUGH', 'DISTRICT', 'COUNTY', 'TEMPORARY', 'INVESTMENT', 'OFFICE', 'MANAGEMENT', 'BANK', 'BUILDING', 'SOCIETY', 'SAVINGS', 'LIMITED', 'GOVERNMENT', 'CITY', 'CASH', 'FUND', 'AUTHORITY', 'CORPORATION', 'GROUP'].includes(w)));
+    const take = (target: number, day: number, label: string, tolerant: boolean): number => {
+      const want = words(label.split(':').slice(1).join(':'));
+      let best = -1, bestScore = -1e9;
+      for (let dd = -4; dd <= 4; dd++) {
+        for (const i of byDay.get(day + dd) ?? []) {
+          if (done[i] || Math.sign(ds.amount[i]) !== Math.sign(target)) continue;
+          const diff = Math.abs(ds.amount[i] - target);
+          if (diff > (tolerant ? Math.max(1, Math.abs(target) * 0.01) : 0.011)) continue;
+          const clean = signatures[sig[i]];
+          let shared = 0; for (const w of want) if (clean.includes(w.slice(0, 6))) shared++;
+          // an inexact amount needs the narrative to agree (the lender's or bank's name)
+          if (diff > 0.011 && !shared && !/\bINT(EREST)?\b|DIVIDEND/.test(clean) && !TREASURY_COUNTERPARTIES.some((c) => c.pattern.test(clean))) continue;
+          const score = shared * 10 - Math.abs(dd) - diff / Math.max(1, Math.abs(target)) * 100;
+          if (score > bestScore) { bestScore = score; best = i; }
+        }
+      }
+      return best;
+    };
+    const unmatched: RegisterMatch['unmatched'] = [];
+    let matched = 0, matchedAbs = 0;
+    const catOf = (id: string) => catIndex.get(id) ?? catIndex.get('la_loans') ?? -1;
+    const mark = (i: number, e: RegisterEventLite) => { done[i] = 1; cat[i] = catOf(e.categoryId); rule[i] = RULE_REGISTER; conf[i] = CONF_HIGH; deal[i] = DEAL_YES; matched++; matchedAbs += Math.abs(ds.amount[i]); };
+    const usedInterest = new Set<string>();
+    for (const e of inWindow) {
+      if ((e.kind === 'loan_interest' || e.kind === 'inv_interest') && usedInterest.has(`${e.ref}|${e.day}`)) continue;
+      const tolerant = e.kind === 'loan_interest' || e.kind === 'inv_interest';
+      let i = take(e.amount, e.day, e.label, tolerant);
+      if (i < 0 && (e.kind === 'loan_repayment' || e.kind === 'inv_maturity')) {
+        const extra = combined.get(`${e.ref}|${e.day}`);
+        if (extra) { i = take(e.amount + extra, e.day, e.label, true); if (i >= 0) usedInterest.add(`${e.ref}|${e.day}`); }
+      }
+      if (i >= 0) mark(i, e);
+      else if (e.day >= ds.minDay && e.day <= ds.maxDay && Math.abs(e.amount) >= 10_000) unmatched.push({ day: e.day, amount: e.amount, label: e.label });
+    }
+    registerMatch = { events: inWindow.length, matched, matchedAbs, unmatched };
+  }
+  lap('register');
+
   // ---------- 4. Rules ----------
   onProgress?.('Applying rules', 0.3);
   const ruleList: Rule[] = [...cfg.rules.map((r) => ({ ...r })), ...(cfg.useStarterRules ? STARTER_RULES : [])].filter((r) => catIndex.has(r.categoryId));
@@ -303,6 +363,12 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
   onProgress?.('Checking treasury counterparties', 0.45);
   const sigCp = new Int16Array(signatures.length).fill(-2); // -2 unknown, -1 none, else index
   const sigLA = new Int8Array(signatures.length).fill(-1);
+  const GENERIC = new Set(['FUND', 'FUNDS', 'CASH', 'LIQUIDITY', 'LIQ', 'MONEY', 'MARKET', 'MMF', 'GBP', 'STERLING', 'STG', 'PLC', 'LTD', 'LIMITED', 'CLASS', 'RESERVES', 'RESERVE', 'GOVT', 'GOVERNMENT', 'PUBLIC', 'SECTOR', 'ACCOUNT', 'CALL', 'NOTICE', 'DAY', 'DEPOSIT', 'INSTANT', 'ACCESS', 'BANK', 'THE', 'AND', 'INSTITUTIONAL', 'TREASURY', 'SHARES', 'SHARE', 'ACC', 'DIST']);
+  const regAccts = (cfg.registerAccounts ?? []).flatMap((a) => {
+    const w = a.name.toUpperCase().replace(/[^A-Z ]/g, ' ').split(/\s+/).filter((x) => x.length >= 3 && !GENERIC.has(x));
+    return w.length ? [{ re: new RegExp(`\\b${w[0]}\\b`), cat: catIndex.get(a.categoryId) ?? -1 }] : [];
+  }).filter((a) => a.cat >= 0);
+  const sigReg = new Int16Array(signatures.length).fill(-2);
   const isRoundBig = (a: number) => Math.abs(a) >= 1e6 && Math.round(Math.abs(a) * 100) % 25_000_000 === 0;
   for (let i = 0; i < n; i++) {
     if (done[i]) continue;
@@ -310,6 +376,11 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
     if (sigLA[s] < 0) sigLA[s] = LA_PATTERN.test(signatures[s]) ? 1 : 0;
     if (sigLA[s]) flags[i] |= F_COUNCIL;
     if (cat[i] >= 0) continue;
+    if (sigReg[s] === -2) sigReg[s] = regAccts.findIndex((a) => a.re.test(signatures[s]));
+    if (sigReg[s] >= 0) {
+      cat[i] = regAccts[sigReg[s]].cat; rule[i] = RULE_REGISTER; conf[i] = CONF_MED; deal[i] = DEAL_YES;
+      continue;
+    }
     if (sigCp[s] === -2) {
       const hit = TREASURY_COUNTERPARTIES.findIndex((c) => c.pattern.test(signatures[s]));
       sigCp[s] = hit;
@@ -463,7 +534,7 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
   lap('flags');
   onProgress?.('Done', 1);
 
-  return { catIds, signatures, sig, cat, rule, conf, deal, series, flags, oneOff, oneOffRule, classOverride, seriesList, ruleList, ruleHits, ms };
+  return { catIds, signatures, sig, cat, rule, conf, deal, series, flags, oneOff, oneOffRule, classOverride, seriesList, ruleList, ruleHits, ms, registerMatch };
 }
 
 /**

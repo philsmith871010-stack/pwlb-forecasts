@@ -25,7 +25,12 @@ const sources = ds0.files.map((f) => {
 lap('detect');
 const ds = await ingest(sources);
 lap(`ingest (${ds.n} rows kept)`);
+const { registerFromSnapshot } = await import('../src/lib/register');
+const { registerEvents, registerAccounts } = await import('../src/lib/register/cashflows');
+const regEvents = args.includes('--register') ? registerEvents(registerFromSnapshot(ds0.register).reg).filter((e) => !e.future) : undefined;
 const res = categorise(ds, {
+  registerEvents: regEvents,
+  registerAccounts: args.includes('--register') ? registerAccounts(registerFromSnapshot(ds0.register).reg) : undefined,
   categories: team?.categories ?? DEFAULT_CATEGORIES,
   rules: team?.rules ?? [],
   aliases: team?.aliases ?? [],
@@ -35,6 +40,7 @@ const res = categorise(ds, {
 });
 lap('categorise');
 console.log('  stage ms', JSON.stringify(res.ms));
+if (res.registerMatch) console.log(`  register: ${res.registerMatch.matched} of ${res.registerMatch.events} events matched (£${(res.registerMatch.matchedAbs / 1e6).toFixed(0)}m); ${res.registerMatch.unmatched.length} not found`, res.registerMatch.unmatched.slice(0, 5));
 const acc = computeAccuracy(ds, res, ds0.truth);
 lap('accuracy');
 
@@ -106,4 +112,17 @@ if (args.includes('--forecast')) {
   lap(`rolling (${roll.cutoffs.length} runs)`);
   console.log('  MAE by month:', roll.maeByMonth.map((x) => fmtMoney(x)).join(' '));
   console.log('  core MAE    :', roll.coreMaeByMonth.map((x) => fmtMoney(x)).join(' '), ' gross/month', fmtMoney(roll.avgMonthlyGross));
+}
+if (args.includes('--register-debug')) {
+  const fileIdx = new Map(ds0.truth.files.map((f, i) => [f.name, i]));
+  const lineMaps = ds0.truth.files.map((f) => new Map(f.line.map((l, k) => [l, k])));
+  let good = 0, bad = 0; const badEx: string[] = [];
+  for (let i = 0; i < ds.n; i++) {
+    if (res.rule[i] !== -9) continue;
+    const fi = fileIdx.get(ds.files[ds.file[i]].name)!; const k = lineMaps[fi].get(ds.line[i]); if (k === undefined) continue;
+    const tdeal = ds0.truth.files[fi].deal[k] === '1';
+    if (tdeal) good++; else { bad++; if (badEx.length < 12) badEx.push(`${ds.narratives[ds.narr[i]]} ${ds.amount[i]} truth=${ds0.truth.categories[ds0.truth.files[fi].cat[k]]}`); }
+  }
+  console.log('register-matched rows: deal', good, 'non-deal', bad); console.log(badEx.join('\n'));
+  console.log('unmatched sample', res.registerMatch?.unmatched.slice(0, 12).map((u) => `${new Date(u.day * 864e5).toISOString().slice(0, 10)} ${Math.round(u.amount)} ${u.label}`).join('\n'));
 }
