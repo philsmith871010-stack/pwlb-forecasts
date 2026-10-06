@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel, Modal } from '../components/common';
+import { PageHead, Panel, Modal, Explain, StepTabs, useStepTab, TabDef } from '../components/common';
 import { RulesPanel } from './CategoriseStep';
 import { GROUP_LABELS, CategoryGroup, ForecastMethod, Category } from '../../lib/categories';
 import { uid } from '../../lib/model';
@@ -14,11 +14,22 @@ export function SettingsView() {
   const [into, setInto] = useState('');
   const setCat = (id: string, patch: Partial<Category>) => updateTeam((t) => ({ ...t, categories: t.categories.map((c) => (c.id === id ? { ...c, ...patch } : c)) }), { recategorise: 'group' in patch });
   const fyStart = team.settings.financialYearStart.split('-')[0];
+  const tabs: TabDef[] = [
+    { id: 'general', label: 'General', icon: 'bi-building' },
+    { id: 'categories', label: 'Categories', icon: 'bi-tags', badge: team.categories.length },
+    { id: 'rules', label: 'Rules', icon: 'bi-signpost', badge: team.rules.length || '' },
+    { id: 'aliases', label: 'Aliases', icon: 'bi-link-45deg', badge: team.aliases.length || '' },
+    { id: 'banks', label: 'Bank layouts', icon: 'bi-bookmark', badge: team.bankProfiles.length || '' },
+  ];
+  const [tab, setTab] = useStepTab('settings', tabs);
   return (
     <div className="page">
-      <PageHead eyebrow="Workspace" title="Settings">Everything here lives in the team file: categories, rules, aliases and bank profiles.</PageHead>
-      <div className="grid g3 mb">
-        <Panel title="Authority">
+      <PageHead eyebrow="Workspace" title="Settings">Everything here is saved in the team file and shared with your colleagues.</PageHead>
+      <StepTabs tabs={tabs} value={tab} onChange={setTab} numbered={false} />
+      {tab === 'general' && <>
+        <Explain compact what="Your council’s name, when its financial year starts, and the minimum cash buffer you want to keep." why="The buffer is the red line on the forecast: falling below it is what creates a borrowing need." />
+        <div className="grid g2">
+        <Panel title="Your council">
           <div className="field mb"><label>Name</label><input className="input" value={team.authorityName} onChange={(e) => updateTeam((t) => ({ ...t, authorityName: e.target.value }))} /></div>
           <div className="field mb"><label>Financial year starts</label>
             <select className="select" value={fyStart} onChange={(e) => updateTeam((t) => ({ ...t, settings: { ...t.settings, financialYearStart: `${e.target.value}-01` } }))}>
@@ -30,15 +41,10 @@ export function SettingsView() {
           <div className="field"><label>Initials or name (recorded on rules and saves)</label><input className="input" value={user} onChange={(e) => setUser(e.target.value)} /></div>
           <p className="xs muted mt">Stored in this browser only.</p>
         </Panel>
-        <Panel title="Bank profiles" sub={`${team.bankProfiles.length}`}>
-          {team.bankProfiles.length === 0 ? <p className="small muted">Save one from the Mapping step.</p> : (
-            <ul className="list-plain small">{team.bankProfiles.map((p) => (
-              <li key={p.id} className="row tight"><i className="bi bi-bookmark orange" /><span style={{ flex: 1 }}>{p.name}<div className="xs muted mono ellipsis" style={{ maxWidth: 260 }} title={p.headerSignature}>{p.headerSignature}</div></span>
-                <button className="icon-btn" aria-label={`Delete ${p.name}`} onClick={() => updateTeam((t) => ({ ...t, bankProfiles: t.bankProfiles.filter((x) => x.id !== p.id) }))}><i className="bi bi-trash" /></button></li>
-            ))}</ul>
-          )}
-        </Panel>
-      </div>
+        </div>
+      </>}
+      {tab === 'categories' && <>
+        <Explain compact what="The categories transactions are sorted into, with their colour, type and default forecasting method." why={<>The <strong>type</strong> matters most: anything marked “Treasury / deal” is kept out of the forecast.</>} todo="Rename, recolour or merge to suit how your council reports. Changes apply everywhere at once." />
       <Panel title="Categories" sub="rename, recolour, regroup, merge — consistent on every chart" right={<button className="btn sm on-dark" onClick={() => updateTeam((t) => ({ ...t, categories: [...t.categories, { id: uid('cat'), name: 'New category', group: 'payments_operational', colour: '#6b8abc', forecastMethod: 'seasonal' }] }))}><i className="bi bi-plus-lg" /> Add</button>} flush>
         <div className="tbl-wrap tall">
           <table className="tbl">
@@ -56,9 +62,29 @@ export function SettingsView() {
           </table>
         </div>
       </Panel>
-      <div className="mt"><RulesEditor /></div>
-      <div className="mt"><RulesPanel /></div>
-      <div className="mt"><AliasesPanel /></div>
+      </>}
+      {tab === 'rules' && <>
+        <Explain compact what="Rules your team created in Review, and the built-in starter rules." why="Rules are how the tool remembers your decisions — each one sorts matching lines automatically next time." todo="Change a rule’s category or delete it if it’s wrong." />
+        <RulesEditor />
+        <div className="mt"><RulesPanel /></div>
+      </>}
+      {tab === 'aliases' && <>
+        <Explain compact what="Different spellings of the same counterparty, e.g. “P.W.L.B” and “PUBLIC WORKS LOAN” both meaning PWLB." why="Spellings are made the same before rules run, so one rule covers them all." />
+        <AliasesPanel />
+      </>}
+      {tab === 'banks' && <>
+        <Explain compact what="Saved bank file layouts. A file whose column headings match is read with no checking needed." todo="Delete a layout if your bank changed its export format." />
+        <div style={{ maxWidth: 760 }}>
+        <Panel title="Saved bank layouts" sub={`${team.bankProfiles.length}`}>
+          {team.bankProfiles.length === 0 ? <p className="small muted">Save one from the Mapping step.</p> : (
+            <ul className="list-plain small">{team.bankProfiles.map((p) => (
+              <li key={p.id} className="row tight"><i className="bi bi-bookmark orange" /><span style={{ flex: 1 }}>{p.name}<div className="xs muted mono ellipsis" style={{ maxWidth: 260 }} title={p.headerSignature}>{p.headerSignature}</div></span>
+                <button className="icon-btn" aria-label={`Delete ${p.name}`} onClick={() => updateTeam((t) => ({ ...t, bankProfiles: t.bankProfiles.filter((x) => x.id !== p.id) }))}><i className="bi bi-trash" /></button></li>
+            ))}</ul>
+          )}
+        </Panel>
+        </div>
+      </>}
       {merge && (
         <Modal title={`Merge “${merge.name}” into…`} onClose={() => setMerge(null)} footer={<><button className="btn" onClick={() => setMerge(null)}>Cancel</button>
           <button className="btn primary" disabled={!into} onClick={() => {

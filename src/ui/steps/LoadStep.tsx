@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel, Progress, Counter, StepFooter, Kpi } from '../components/common';
+import { PageHead, Panel, Progress, Counter, StepFooter, Kpi, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { openWithPicker, fsAccessSupported, downloadBlob } from '../../lib/teamfile';
 import { bytes, day, ago, int } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
@@ -8,26 +8,81 @@ import { engine } from '../../worker/client';
 
 export function LoadStep() {
   const s = useStore();
+  const tabs: TabDef[] = [
+    { id: 'team', label: 'Team file', badge: s.teamName || s.team.savedAt ? '✓' : '' },
+    { id: 'files', label: 'Bank files', badge: s.sources.filter((x) => !x.demo).length || '' },
+    { id: 'read', label: 'What we read', disabled: !s.ingest && !s.ingestBusy && !s.ingestError, badge: s.ingest ? s.ingest.rows.toLocaleString('en-GB') : '' },
+    { id: 'demo', label: 'Try demo data', badge: s.demo ? '✓' : '' },
+  ];
+  const [tab, setTab] = useStepTab('load', tabs);
+  // jump to the results as soon as reading starts
+  const busyRef = useRef(false);
+  useEffect(() => {
+    if (s.ingestBusy && !busyRef.current) setTab('read');
+    busyRef.current = !!s.ingestBusy;
+  }, [s.ingestBusy, setTab]);
   return (
     <div className="page">
-      <PageHead eyebrow="Step 1 of 8" title="Load your team file and bank history">
-        Start with your team’s shared file so your rules and bank profiles do the work, then drop in several years of bank CSVs. Everything is read here, in this browser tab.
+      <PageHead eyebrow="Step 1 of 8" title="Load your data">
+        Bring in your team’s shared file and your bank statements. Nothing leaves this computer.
       </PageHead>
-      <div className="grid g-side-l">
-        <TeamFileCard />
-        <div className="stack">
+      <StepTabs tabs={tabs} value={tab} onChange={setTab} />
+      {tab === 'team' && (
+        <>
+          <Explain
+            what={<>Your team’s shared <strong>team file</strong> — one JSON file on your shared drive holding the rules, bank layouts and forecasts your colleagues have built up.</>}
+            why="It means you don’t start from scratch: lines your team has already categorised are recognised automatically, and saved forecasts open straight away."
+            todo={<>Click <strong>Open team file</strong>. First time? Type your council’s name and click <strong>Start fresh</strong> — you’ll save a team file at the end.</>} />
+          <div className="grid g2"><TeamFileCard /><WhoCard /></div>
+          <NextTab label="Next: add bank files" onClick={() => setTab('files')} />
+        </>
+      )}
+      {tab === 'files' && (
+        <>
+          <Explain
+            what="The bank transaction exports (CSV files) for the accounts you want to forecast — ideally three to five years of history."
+            why="The forecast learns your council’s cash rhythm — when council tax arrives, when payroll goes out — from this history. More years means a better picture of the seasons."
+            todo={<>Drag all your CSV files in at once (several accounts or years is fine), then click <strong>Read files</strong>. No files to hand? Use the <strong>Try demo data</strong> tab.</>} />
           <UploadCard />
-          {(s.ingestBusy || s.ingest || s.ingestError) && <IngestResult />}
+          <NextTab label="Or try the demo data" onClick={() => setTab('demo')} text="Haven’t got exports yet?" />
+        </>
+      )}
+      {tab === 'read' && (
+        <>
+          <Explain
+            what="A check of what we found in your files: how many transactions, which dates and accounts, and any lines we couldn’t read."
+            why="It’s worth a ten-second sanity check before going further — if the date range or account count looks wrong, a file may be missing or mis-read."
+            todo={<>If it looks right, continue to <strong>Map columns</strong>. If some rows were rejected, download the log to see why (usually footer totals or blank dates — that’s fine).</>} />
+          <IngestResult />
+          {s.ingest && !s.ingestBusy && <StepFooter nextLabel="Check how we read the columns" />}
+        </>
+      )}
+      {tab === 'demo' && (
+        <>
+          <Explain
+            what="Realistic made-up bank history for a fictional council, deliberately messy — different bank formats, odd dates, loans hidden among ordinary payments."
+            why="Lets you try every step without real data, and lets us measure how accurately the tool sorts transactions (we know the right answers for this data)."
+            todo={<>Leave the settings as they are and click <strong>Generate demo data</strong>. It takes a few seconds.</>} />
           <DemoCard />
-        </div>
-      </div>
-      <StepFooter nextDisabled={!s.ingest || !!s.ingestBusy} nextLabel="Check the column mapping" />
+        </>
+      )}
     </div>
   );
 }
 
+function WhoCard() {
+  const { user, setUser } = useStore();
+  return (
+    <Panel title="Who are you?">
+      <p className="small muted">Your initials are recorded against rules you create and when you save, so colleagues can see who changed what.</p>
+      <div className="field"><label htmlFor="who">Your initials or name</label><input id="who" className="input" value={user} placeholder="e.g. PS" onChange={(e) => setUser(e.target.value)} /></div>
+      <p className="xs muted mt">Stored in this browser only.</p>
+    </Panel>
+  );
+}
+
 function TeamFileCard() {
-  const { team, teamName, loadTeamText, startFresh, toast, user, setUser } = useStore();
+  const { team, teamName, loadTeamText, startFresh, toast } = useStore();
   const input = useRef<HTMLInputElement>(null);
   const [authority, setAuthority] = useState('');
   const open = async () => {
@@ -75,7 +130,6 @@ function TeamFileCard() {
             <button className="btn" onClick={() => { startFresh(authority || 'My Council'); toast('Started a fresh team file.'); }}>Start fresh</button></div>
         </div>
       </div>
-      <div className="field mt"><label htmlFor="who">Your initials or name (recorded when you save)</label><input id="who" className="input" value={user} placeholder="e.g. PS" onChange={(e) => setUser(e.target.value)} /></div>
     </Panel>
   );
 }
@@ -171,10 +225,10 @@ function IngestResult() {
 function DemoCard() {
   const { generateDemo, ingestBusy, demo, sources } = useStore();
   const [o, setO] = useState<GeneratorOptions>({ ...DEFAULT_GENERATOR_OPTIONS });
-  const [open, setOpen] = useState(!sources.some((x) => !x.demo));
+  const open = true;
+  void sources;
   return (
-    <Panel title="No bank exports to hand?" sub="generate a realistic, deliberately messy demo"
-      right={<button className="btn sm on-dark" onClick={() => setOpen(!open)}>{open ? 'Hide' : 'Show'}</button>}>
+    <Panel title="Demo data" sub="a fictional council, five years, deliberately messy">
       {open ? (
         <>
           <p className="small muted">A synthetic mid-sized unitary council: council tax, NNDR, payroll, grants, suppliers, schools — plus PWLB, LOBO, LA-to-LA loans, MMFs and DMADF deals hidden among them. Five bank “dialects”, mixed date and amount formats, reversals, duplicates, outliers and structural breaks. A hidden truth file lets the Accuracy panel score the engine.</p>
@@ -190,7 +244,7 @@ function DemoCard() {
             <div className="field"><label>Nastiness</label><select className="select" value={o.nastiness} onChange={(e) => setO({ ...o, nastiness: +e.target.value })}><option value={0}>None</option><option value={0.5}>Mild</option><option value={1}>Full</option><option value={2}>Brutal</option></select></div>
           </div>
           <div className="row mt">
-            <button className="btn navy" disabled={!!ingestBusy} onClick={() => void generateDemo(o)}><i className="bi bi-magic" /> Generate demo data</button>
+            <button className="btn primary lg" disabled={!!ingestBusy} onClick={() => void generateDemo(o)}><i className="bi bi-magic" /> Generate demo data</button>
             {demo && <span className="small muted">Loaded {int(demo.rows)} generated rows ({demo.options.preset}).</span>}
             <div className="spacer" />
             {demo && <DemoDownloads />}

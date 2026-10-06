@@ -1,6 +1,7 @@
+import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel, StepFooter, Seg, Empty, CatBadge, Money, Kpi } from '../components/common';
+import { PageHead, Panel, StepFooter, Seg, Empty, CatBadge, Money, Kpi, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { TxnTable } from '../components/TxnTable';
 import { annualTotals, yearsOf, positions, cagr, seasonalProfile, dayOfMonthProfile, detectBreaks, monthlyTotals, extremes, YearMode } from '../../lib/analysis/history';
@@ -12,7 +13,6 @@ import type { CategoryDetail } from '../../worker/types';
 import { downloadText } from '../../lib/teamfile';
 import { HistorySnapshotView } from './HistorySnapshot';
 
-type Tab = 'overview' | 'yoy' | 'season' | 'category' | 'recurring' | 'quality';
 
 export function useHistoryData(mode: YearMode) {
   const agg = useStore((s) => s.agg);
@@ -32,34 +32,59 @@ export function useHistoryData(mode: YearMode) {
   }, [agg, mode, fyStartMonth, team.categories]);
 }
 
+const HISTORY_TABS: TabDef[] = [
+  { id: 'years', label: 'Year by year' },
+  { id: 'position', label: 'Cash position' },
+  { id: 'yoy', label: 'Growth table' },
+  { id: 'drivers', label: 'What changed' },
+  { id: 'season', label: 'Seasons & timing' },
+  { id: 'category', label: 'One category' },
+  { id: 'recurring', label: 'Regular vs one-off' },
+  { id: 'quality', label: 'Data quality' },
+];
+
+const HISTORY_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
+  years: { what: 'Each financial year at a glance: money in, money out, the net result, how much treasury activity there was, and the lowest and highest cash position.', why: 'A quick health check — is the council spending more than it receives each year, and how deep do the low points get?', todo: 'Read across the years. A growing negative net flow means a growing need to borrow.' },
+  position: { what: <>Your <strong>operational</strong> cash position day by day — what you’d hold from everyday income and spending alone, before any borrowing or investing. The orange line is the actual bank position, including loans and deposits.</>, why: 'The gap between the two lines is what treasury activity has been doing: borrowing to cover the dips, investing the peaks.', todo: 'Drag the slider under the chart to zoom into a period.' },
+  yoy: { what: 'Every category, every year, with the change on the year before and the average yearly growth (CAGR).', why: 'Growth rates drive the forecast. Green means good for cash (income up or spending down); red means the reverse.', todo: 'Sort by a column or filter to find the biggest movers. Download to Excel-friendly CSV if needed.' },
+  drivers: { what: 'Small charts of each category’s yearly total, and a waterfall explaining what moved the net cash flow between two years.', why: 'Shows at a glance what is growing, shrinking or jumping about — and what is really behind a change in the bottom line.', todo: 'Pick two years above the waterfall to compare.' },
+  season: { what: 'How a category behaves through the year and through the month — e.g. council tax arriving in ten instalments with a February–March lull.', why: 'The forecast repeats these seasonal patterns into the future, so this is where you can sanity-check them.', todo: 'Choose a category, then flip between the four views.' },
+  category: { what: 'Everything about one category: its history, the regular payments inside it, one-off items, who it’s paid to or from, and every transaction.', why: 'For when you want to understand or explain a particular line of the forecast.', todo: 'Pick a category on the left. Click a description to filter the transactions.' },
+  recurring: { what: 'Regular payments the tool found (monthly payroll, quarterly rents…) and whether each is treated as regular or one-off.', why: 'Only regular flows are projected forward. A one-off treated as regular would be wrongly repeated in the forecast.', todo: 'Switch any series that won’t happen again to One-off.' },
+  quality: { what: 'Checks on the data itself: gaps in dates, balance checks, skipped rows and possible duplicates.', why: 'Good data in, good forecast out — this is where to look if a number seems off.', todo: 'Nothing, unless something is flagged in red.' },
+};
+
 export function HistoryStep() {
   const agg = useStore((s) => s.agg);
   const hasSummary = useStore((s) => !!s.team.historySummary);
   const workspace = useStore((s) => s.workspace);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useStepTab('history', HISTORY_TABS);
   const [mode, setMode] = useState<YearMode>('fy');
   const h = useHistoryData(mode);
   if (!agg) {
     return <div className="page">{hasSummary ? <HistorySnapshotView /> : <Empty icon="bi-bar-chart-line" title="No history yet">Load and categorise bank data first.</Empty>}</div>;
   }
+  const help = HISTORY_HELP[tab];
+  const idx = HISTORY_TABS.findIndex((t) => t.id === tab);
   return (
     <div className="page">
       <PageHead eyebrow={workspace ? 'Workspace' : 'Step 5 of 8'} title="How your cash has behaved"
-        actions={<Seg value={mode} onChange={setMode} options={[{ v: 'fy', label: 'Financial year' }, { v: 'calendar', label: 'Calendar year' }]} />}>
-        Operational flows only, unless stated — treasury deals are shown as their own layer so you can compare operational cash with the actual position.
+        actions={<Seg value={mode} onChange={setMode} options={[{ v: 'fy', label: 'Financial years' }, { v: 'calendar', label: 'Calendar years' }]} />}>
+        A look back at your everyday cash — the patterns the forecast will build on. Loans and investments are shown separately.
       </PageHead>
-      <div className="tabs" role="tablist">
-        {([['overview', 'Overview', 'bi-speedometer2'], ['yoy', 'Year on year', 'bi-calendar3'], ['season', 'Seasonality', 'bi-water'], ['category', 'Category deep dive', 'bi-search'], ['recurring', 'Recurring vs one-off', 'bi-arrow-repeat'], ['quality', 'Data quality', 'bi-clipboard-check']] as [Tab, string, string][]).map(([k, l, i]) => (
-          <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}><i className={`bi ${i}`} /> {l}</button>
-        ))}
-      </div>
-      {h && tab === 'overview' && <Overview h={h} />}
-      {h && tab === 'yoy' && <YoY h={h} />}
+      <StepTabs tabs={HISTORY_TABS} value={tab} onChange={setTab} />
+      <Explain compact what={help.what} why={help.why} todo={help.todo} />
+      {h && tab === 'years' && <Overview h={h} part="years" />}
+      {h && tab === 'position' && <Overview h={h} part="position" />}
+      {h && tab === 'yoy' && <YoY h={h} part="table" />}
+      {h && tab === 'drivers' && <YoY h={h} part="drivers" />}
       {h && tab === 'season' && <Seasonality h={h} mode={mode} />}
       {h && tab === 'category' && <CategoryDeepDive h={h} />}
       {h && tab === 'recurring' && <RecurringView h={h} />}
       {h && tab === 'quality' && <DataQuality />}
-      {!workspace && <StepFooter nextLabel="Build the forecast" />}
+      {idx < HISTORY_TABS.length - 1 ? <NextTab label={`Next: ${HISTORY_TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(HISTORY_TABS[idx + 1].id)} />
+        : !workspace && <StepFooter nextLabel="Build the forecast" />}
+      {!workspace && idx < HISTORY_TABS.length - 1 && <div className="row" style={{ justifyContent: 'flex-end', marginTop: 8 }}><button className="btn ghost sm" onClick={() => useStore.getState().goto('forecast')}>Skip ahead to the forecast <i className="bi bi-skip-forward" /></button></div>}
     </div>
   );
 }
@@ -68,7 +93,7 @@ type H = NonNullable<ReturnType<typeof useHistoryData>>;
 
 // ------------------------------------------------------------------ overview
 
-function Overview({ h }: { h: H }) {
+function Overview({ h, part }: { h: H; part: 'years' | 'position' }) {
   const [overlay, setOverlay] = useState(true);
   const { agg, years, annual, pos, opCats, colour, name } = h;
   const dates = useMemo(() => Array.from({ length: agg.D }, (_, d) => isoFromDay(agg.startDay + d)), [agg]);
@@ -83,7 +108,7 @@ function Overview({ h }: { h: H }) {
   const trVol = years.map((y) => { let s = 0; for (let c = 0; c <= h.C; c++) for (let d = Math.max(0, y.start - agg.startDay); d <= Math.min(agg.D - 1, y.end - agg.startDay); d++) s += Math.abs(agg.treasury[c * agg.D + d]); return s; });
   return (
     <div className="stack">
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(cards.length, 6)}, minmax(0,1fr))` }}>
+      {part === 'years' && <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(cards.length, 6)}, minmax(0,1fr))` }}>
         {cards.map((k, i) => (
           <div key={k.y.key} className="kpi" style={{ minHeight: 0 }}>
             <div className="kpi-label">{k.y.label}{!k.y.complete && <span className="badge soft" style={{ marginLeft: 6 }}>part</span>}</div>
@@ -98,8 +123,8 @@ function Overview({ h }: { h: H }) {
             </dl>
           </div>
         ))}
-      </div>
-      <Panel title="Cumulative operational cash position" sub={`from an opening balance of ${money(agg.openingBalance)}${agg.openingKnown ? ' (from balance columns)' : ' (assumed)'}`}
+      </div>}
+      {part === 'position' && <Panel title="Cumulative operational cash position" sub={`from an opening balance of ${money(agg.openingBalance)}${agg.openingKnown ? ' (from balance columns)' : ' (assumed)'}`}
         right={<label className="check" style={{ color: '#fff', fontSize: 12.5 }}><input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> show actual position incl. treasury</label>}>
         <EChart height={360} ariaLabel="Cumulative operational cash position over the full history" option={{
           tooltip: { trigger: 'axis', valueFormatter: (v: number) => money(v) },
@@ -115,8 +140,8 @@ function Overview({ h }: { h: H }) {
           ],
         }} />
         <div className="small muted">The gap between the lines is cumulative net treasury activity: borrowing taken (raises actual cash) less investments placed and loans repaid.</div>
-      </Panel>
-      <Panel title="Annual receipts and payments by category" sub="operational, stacked">
+      </Panel>}
+      {part === 'years' && <Panel title="Annual receipts and payments by category" sub="operational, stacked">
         <EChart height={400} option={{
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: number) => money(v) },
           legend: { type: 'scroll', bottom: 0 },
@@ -126,14 +151,14 @@ function Overview({ h }: { h: H }) {
           series: opCats.map(({ i }) => ({ name: name(i), type: 'bar', stack: annual.op[i].reduce((s, v) => s + v, 0) >= 0 ? 'in' : 'out', data: annual.op[i], itemStyle: { color: colour(i) }, emphasis: { focus: 'series' } })),
         }} />
         <div className="xs muted">* part year</div>
-      </Panel>
+      </Panel>}
     </div>
   );
 }
 
 // ------------------------------------------------------------------ YoY
 
-function YoY({ h }: { h: H }) {
+function YoY({ h, part }: { h: H; part: 'table' | 'drivers' }) {
   const { years, annual, opCats, colour, name, cats } = h;
   const [sort, setSort] = useState<{ k: string; dir: 1 | -1 }>({ k: 'abs', dir: -1 });
   const [filter, setFilter] = useState('');
@@ -177,7 +202,7 @@ function YoY({ h }: { h: H }) {
   wfLabels.push(`Net ${years[yb].label}`); wfBase.push(0); wfUp.push(netB); wfDown.push('-');
   return (
     <div className="stack">
-      <Panel title="Every category, every year" sub="£ totals, change and compound annual growth" right={<><input className="input sm" style={{ width: 180 }} placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} /><button className="btn sm on-dark" onClick={exportCsv}><i className="bi bi-download" /> CSV</button></>} flush>
+      {part === 'table' && <Panel title="Every category, every year" sub="£ totals, change and compound annual growth" right={<><input className="input sm" style={{ width: 180 }} placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} /><button className="btn sm on-dark" onClick={exportCsv}><i className="bi bi-download" /> CSV</button></>} flush>
         <div className="tbl-wrap tall">
           <table className="tbl">
             <thead><tr><th className="sortable" onClick={() => setSort({ k: 'name', dir: sort.k === 'name' ? (-sort.dir as 1 | -1) : 1 })}>Category</th>
@@ -204,8 +229,8 @@ function YoY({ h }: { h: H }) {
           </table>
         </div>
         <div className="xs muted card-pad" style={{ paddingTop: 8 }}>Colour shows the effect on cash: green where receipts grow or payments shrink, red the reverse. Changes for part years are shown in £ only. CAGR uses complete years.</div>
-      </Panel>
-      <Panel title="Small multiples" sub="each category’s annual total — what is growing, shrinking or volatile">
+      </Panel>}
+      {part === 'drivers' && <Panel title="Small multiples" sub="each category’s annual total — what is growing, shrinking or volatile">
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
           {opCats.map(({ i }) => {
             const g = cagr(annual.op[i], years);
@@ -217,8 +242,8 @@ function YoY({ h }: { h: H }) {
             );
           })}
         </div>
-      </Panel>
-      <Panel title="What drove the change in net operational flow" right={<div className="row tight">
+      </Panel>}
+      {part === 'drivers' && <Panel title="What drove the change in net operational flow" right={<div className="row tight">
         <select className="select sm" value={ya} onChange={(e) => setWf([+e.target.value, yb])}>{years.map((y, k) => <option key={k} value={k}>{y.label}</option>)}</select>
         <span style={{ color: '#fff' }}>→</span>
         <select className="select sm" value={yb} onChange={(e) => setWf([ya, +e.target.value])}>{years.map((y, k) => <option key={k} value={k}>{y.label}</option>)}</select></div>}>
@@ -233,7 +258,7 @@ function YoY({ h }: { h: H }) {
             { name: 'down', type: 'bar', stack: 'w', data: wfDown, itemStyle: { color: '#b04632' } },
           ],
         }} />
-      </Panel>
+      </Panel>}
     </div>
   );
 }
@@ -256,6 +281,7 @@ function useSeries() {
 }
 
 function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
+  const [view, setView] = useState<'shape' | 'days' | 'heat' | 'breaks'>('shape');
   const [c, setC] = useState(h.opCats.find(({ c }) => c?.id === 'council_tax')?.i ?? h.opCats[0]?.i ?? 0);
   const series = useSeries();
   const prof = useMemo(() => seasonalProfile(h.agg, c, h.years, mode, h.fyStartMonth), [h, c, mode]);
@@ -267,9 +293,10 @@ function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
   return (
     <div className="stack">
       <div className="row"><strong className="navy">Category</strong><CategoryPicker h={h} value={c} onChange={setC} /><span className="small muted">Recurring flows only — one-offs and treasury are left out so the shape is clear.</span></div>
-      <div className="grid g2">
-        <Panel title="Monthly seasonal profile" sub="each year faint · typical (median) bold · range shaded">
-          <EChart height={340} option={{
+      <div className="row"><Seg value={view} onChange={setView} options={[{ v: 'shape', label: 'Shape of the year' }, { v: 'days', label: 'Days of the month' }, { v: 'heat', label: 'Year-by-year heatmap' }, { v: 'breaks', label: `Changes over time${breaks.length ? ` (${breaks.length})` : ''}` }]} /></div>
+      <div>
+        {view === 'shape' && <Panel title="The shape of a typical year" sub="each past year faint · typical year bold · range shaded">
+          <EChart height={400} option={{
             tooltip: { trigger: 'axis', valueFormatter: (v: number) => (v == null ? '–' : money(v)) },
             legend: { bottom: 0, type: 'scroll', data: [...prof.byYear.map((y) => y.label), 'Typical'] },
             grid: { left: 70, right: 16, top: 16, bottom: 50 },
@@ -282,18 +309,18 @@ function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
               { name: 'Typical', type: 'line', data: prof.typical, lineStyle: { width: 3.5, color: colour }, itemStyle: { color: colour }, symbolSize: 6 },
             ],
           }} />
-        </Panel>
-        <Panel title="Day-of-month profile" sub={dom.peakDays.length ? `peaks on the ${dom.peakDays.join(', ')}` : 'spread through the month'}>
-          <EChart height={340} option={{
+        </Panel>}
+        {view === 'days' && <Panel title="Which days of the month money moves" sub={dom.peakDays.length ? `peaks on the ${dom.peakDays.join(', ')}` : 'spread through the month'}>
+          <EChart height={400} option={{
             tooltip: { trigger: 'axis', valueFormatter: (v: number) => pct(v) },
             grid: { left: 50, right: 16, top: 16, bottom: 30 },
             xAxis: { type: 'category', data: Array.from({ length: 31 }, (_, k) => k + 1) },
             yAxis: { type: 'value', axisLabel: { formatter: (v: number) => pct(v, 0) } },
             series: [{ type: 'bar', data: dom.share, itemStyle: { color: colour, borderRadius: [3, 3, 0, 0] } }],
           }} />
-        </Panel>
+        </Panel>}
       </div>
-      <Panel title="Heatmap — month × year" sub="spot pattern shifts at a glance">
+      {view === 'heat' && <Panel title="Every month of every year" sub="darker = more money; spot pattern shifts at a glance">
         <EChart height={60 + prof.byYear.length * 34} option={{
           tooltip: { formatter: (p: { value: [number, number, number | null] }) => `${prof.byYear[p.value[1]].label} ${prof.months[p.value[0]]}: <b>${p.value[2] == null ? 'no data' : money(p.value[2])}</b>` },
           grid: { left: 70, right: 70, top: 10, bottom: 30 },
@@ -302,8 +329,8 @@ function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
           visualMap: { min: Math.min(...prof.lo) * (sign > 0 ? 1 : 1), max: Math.max(...prof.hi), calculable: false, orient: 'vertical', right: 0, top: 'center', itemHeight: 120, text: ['high', 'low'], textStyle: { fontSize: 10, color: '#6c757d' }, inRange: { color: sign > 0 ? ['#f1f3f5', '#9cc9f0', '#1f6fb2', '#0a2540'] : ['#0a2540', '#b04632', '#feb56a', '#fff5e9'] } },
           series: [{ type: 'heatmap', data: prof.byYear.flatMap((y, yi) => y.values.map((v, k) => [k, yi, v])), label: { show: true, fontSize: 10, fontWeight: 600, formatter: (p: { value: [number, number, number | null] }) => (p.value[2] == null ? '' : axisMoney(p.value[2])), color: '#fff', textBorderColor: 'rgba(10,37,64,.75)', textBorderWidth: 2 }, itemStyle: { borderColor: '#fff', borderWidth: 2, borderRadius: 4 } }],
         }} />
-      </Panel>
-      <Panel title="Structural breaks" sub="changes the model should know about">
+      </Panel>}
+      {view === 'breaks' && <Panel title="Changes over time" sub="payment days that moved, flows that started or stopped, sudden jumps">
         {breaks.length === 0 ? <p className="small muted">No date changes, starts/stops or step changes detected for this category.</p> : (
           <>
             <ul className="list-plain small">{breaks.map((b, i) => <li key={i}><span className={`badge ${b.kind === 'stop' ? 'red' : b.kind === 'start' ? 'green' : 'amber'}`}>{b.kind}</span> {b.text}</li>)}</ul>
@@ -317,7 +344,7 @@ function Seasonality({ h, mode }: { h: H; mode: YearMode }) {
             }} />
           </>
         )}
-      </Panel>
+      </Panel>}
     </div>
   );
 }

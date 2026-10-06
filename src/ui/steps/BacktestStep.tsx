@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel, Kpi, StepFooter, Seg, Empty, Money, Progress } from '../components/common';
+import { PageHead, Panel, Kpi, StepFooter, Seg, Empty, Money, Progress, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { engine, proxy } from '../../worker/client';
 import type { BacktestResult, RollingResult } from '../../lib/forecast/backtest';
@@ -23,7 +23,9 @@ export function BacktestStep() {
   const [withOneOffs, setWithOneOffs] = useState(false);
   const [r, setR] = useState<BacktestResult | null>(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<'single' | 'rolling'>('single');
+  const tabs: TabDef[] = [{ id: 'single', label: 'Forecast vs actual' }, { id: 'errors', label: 'Where the gaps came from' }, { id: 'rolling', label: 'Many start dates' }];
+  const [tab, setTab] = useStepTab('backtest', tabs);
+  const mode = tab === 'rolling' ? 'rolling' : 'single';
   const cutoff = months[Math.min(k, months.length - 1)];
   const settings = { lookbackYears: sc?.settings.lookbackYears ?? 3, recencyWeight: sc?.settings.recencyWeight ?? 0.7, methodByCategory: sc?.settings.methodByCategory ?? {} };
 
@@ -41,11 +43,17 @@ export function BacktestStep() {
   if (!cat || !ingest) return <div className="page"><Empty icon="bi-bullseye" title="Nothing to backtest yet">Load and categorise bank data first.</Empty></div>;
   return (
     <div className="page">
-      <PageHead eyebrow={workspace ? 'Workspace' : 'Step 7 of 8'} title="Backtest — would it have worked?"
-        actions={<Seg value={mode} onChange={setMode} options={[{ v: 'single', label: 'Single date' }, { v: 'rolling', label: 'Rolling' }]} />}>
-        Pretend it’s an earlier date: the model builds its profiles using only data before then — strictly no look-ahead — and we lay what actually happened on top.
+      <PageHead eyebrow={workspace ? 'Workspace' : 'Step 7 of 8'} title="Would the forecast have worked?">
+        We pretend it’s an earlier date, forecast using only the data available then, and compare with what really happened.
       </PageHead>
-      <div className="callout navy mb"><strong>This shows how well the model captures your regular cash rhythm;</strong> one-off items still need your judgement. The “predictable core” compares against recurring flows only, separating model error from surprises nobody could have known.</div>
+      <StepTabs tabs={tabs} value={tab} onChange={setTab} />
+      {tab === 'single' && <Explain compact
+        what={<>Pick a past date with the slider. The orange dashed line is what the tool would have forecast on that date; the navy line is what actually happened. The blue dotted line is what happened <em>without</em> one-off items.</>}
+        why="If the forecast tracked reality well before, you can trust it more now. It never sees data after the chosen date."
+        todo="Slide to a few different dates. The gap between orange and blue is the model’s own error; the extra gap to navy is one-offs nobody could have known." />}
+      {tab === 'errors' && <Explain compact what="Which categories the forecast over- or under-estimated, month by month, for the date chosen on the first tab." why="Shows where the forecast is weakest, so you know where your own judgement matters most." todo="Large errors in lumpy categories (land sales, one-off grants) are expected — add those as known one-offs when forecasting." />}
+      {tab === 'rolling' && <Explain compact what="Runs the backtest from many start dates and averages how far out the forecast was, one month ahead, two months ahead and so on." why="One date can be lucky or unlucky; many dates give an honest picture of accuracy at each horizon." todo={<>Click <strong>Run</strong>. It takes a few seconds.</>} />}
+      <div className="callout navy mb small"><strong>Remember:</strong> this shows how well the tool captures your regular cash rhythm; one-off items still need your judgement.</div>
       {mode === 'single' ? (
         <>
           <div className="card card-pad mb">
@@ -53,13 +61,15 @@ export function BacktestStep() {
               <strong className="navy">Forecast as if it were</strong>
               <span className="big-number" style={{ fontSize: 22 }}>{cutoff !== undefined ? day(cutoff) : '–'}</span>
               <input type="range" min={0} max={Math.max(0, months.length - 1)} value={k} onChange={(e) => setK(+e.target.value)} style={{ flex: 1, accentColor: 'var(--pt-orange)' }} aria-label="Backtest start date" />
-              <Seg value={horizon} onChange={setHorizon} options={[{ v: 6, label: '6m' }, { v: 12, label: '12m' }, { v: 24, label: '24m' }]} />
-              <label className="check"><input type="checkbox" checked={withOneOffs} onChange={(e) => setWithOneOffs(e.target.checked)} /> Include the actual one-offs as if known</label>
+              <Seg value={horizon} onChange={setHorizon} options={[{ v: 6, label: '6 months' }, { v: 12, label: '12 months' }, { v: 24, label: '24 months' }]} />
+              <label className="check"><input type="checkbox" checked={withOneOffs} onChange={(e) => setWithOneOffs(e.target.checked)} /> Pretend we knew the one-offs</label>
               {busy && <span className="spinner" />}
             </div>
-            {r && <div className="xs muted mt">Profiles built from data up to {day(r.usedDataTo)} only · ran in {r.ms.toFixed(0)} ms in the background worker · methods as in scenario “{sc?.name}”, without its forward-looking assumptions</div>}
+            {r && <div className="xs muted mt">Learned only from data up to {day(r.usedDataTo)} · methods as in scenario “{sc?.name}”, without its forward-looking changes</div>}
           </div>
-          {r && <SingleResult r={r} withOneOffs={withOneOffs} />}
+          {r && <SingleResult r={r} withOneOffs={withOneOffs} part={tab === 'errors' ? 'errors' : 'chart'} />}
+          {tab === 'single' && <NextTab label="Next: where the gaps came from" onClick={() => setTab('errors')} />}
+          {tab === 'errors' && <NextTab label="Next: many start dates" onClick={() => setTab('rolling')} />}
         </>
       ) : <Rolling horizon={horizon} setHorizon={setHorizon} settings={settings} fyStartMonth={fyStartMonth} />}
       {!workspace && <StepFooter nextLabel="Save and export" />}
@@ -67,16 +77,16 @@ export function BacktestStep() {
   );
 }
 
-function SingleResult({ r, withOneOffs }: { r: BacktestResult; withOneOffs: boolean }) {
+function SingleResult({ r, withOneOffs, part }: { r: BacktestResult; withOneOffs: boolean; part: 'chart' | 'errors' }) {
   const x = Array.from({ length: r.H }, (_, d) => isoFromDay(r.cutoff + d));
   const e12 = r.errorAt[r.errorAt.length - 1];
   return (
     <div className="stack">
-      <div className="grid g4">
-        {r.errorAt.map((e) => <Kpi key={e.months} label={`Error after ${e.months} months`} value={money(e.error, { sign: true })} sub={`${pct(Math.abs(e.error) / Math.max(1, e.actualAbsFlow), 1)} of ${money(e.actualAbsFlow)} gross flow · core ${money(e.coreError, { sign: true })}`} />)}
-        <Kpi label="Low point" value={money(r.lowForecast.amount - r.lowActual.amount, { sign: true })} sub={`forecast ${money(r.lowForecast.amount)} on ${day(r.lowForecast.day)} · actual ${money(r.lowActual.amount)} on ${day(r.lowActual.day)}`} />
-      </div>
-      <Panel title="Forecast vs what actually happened" sub="change in operational position from the start date">
+      {part === 'chart' && <div className="grid g4">
+        {r.errorAt.map((e) => <Kpi key={e.months} label={`Gap after ${e.months} months`} value={money(e.error, { sign: true })} sub={`${pct(Math.abs(e.error) / Math.max(1, e.actualAbsFlow), 1)} of ${money(e.actualAbsFlow)} gross flow · core ${money(e.coreError, { sign: true })}`} />)}
+        <Kpi label="Low point gap" value={money(r.lowForecast.amount - r.lowActual.amount, { sign: true })} sub={`forecast ${money(r.lowForecast.amount)} on ${day(r.lowForecast.day)} · actual ${money(r.lowActual.amount)} on ${day(r.lowActual.day)}`} />
+      </div>}
+      {part === 'chart' && <Panel title="Forecast vs what actually happened" sub="change in everyday cash position from the chosen date">
         <EChart height={400} option={{
           tooltip: { trigger: 'axis', valueFormatter: (v: number) => (v == null ? '–' : money(v)) },
           legend: { top: 0, right: 0, data: ['Forecast', 'Actual', 'Actual — predictable core', '90% range'] },
@@ -95,8 +105,8 @@ function SingleResult({ r, withOneOffs }: { r: BacktestResult; withOneOffs: bool
           The gap between <strong>Actual</strong> and the <strong>predictable core</strong> is one-off items ({money(r.surpriseOneOffs)} net over the period){withOneOffs ? ' — included in the forecast here as if they had been known.' : '. Tick “include the actual one-offs” to isolate model error from surprise error.'}
           {e12 && <> At {e12.months} months the core error is {money(e12.coreError, { sign: true })}.</>}
         </div>
-      </Panel>
-      <div className="grid g2">
+      </Panel>}
+      {part === 'errors' && <div className="grid g2">
         <Panel title="Monthly net flow" sub="forecast vs actual">
           <EChart height={300} option={{
             tooltip: { trigger: 'axis', valueFormatter: (v: number) => money(v) },
@@ -124,7 +134,7 @@ function SingleResult({ r, withOneOffs }: { r: BacktestResult; withOneOffs: bool
             </table>
           </div>
         </Panel>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -142,7 +152,7 @@ function Rolling({ horizon, setHorizon, settings, fyStartMonth }: { horizon: num
     <div className="stack">
       <div className="card card-pad row">
         <strong className="navy">Run from many start dates and average the error by months ahead</strong>
-        <Seg value={horizon} onChange={setHorizon} options={[{ v: 6, label: '6m' }, { v: 12, label: '12m' }, { v: 24, label: '24m' }]} />
+        <Seg value={horizon} onChange={setHorizon} options={[{ v: 6, label: '6 months' }, { v: 12, label: '12 months' }, { v: 24, label: '24 months' }]} />
         <button className="btn primary" disabled={prog !== null} onClick={() => void run()}><i className="bi bi-play-fill" /> Run rolling backtest</button>
         {prog !== null && <div style={{ flex: 1 }}><Progress frac={prog} /></div>}
       </div>

@@ -13,6 +13,7 @@ import { BacktestStep } from './steps/BacktestStep';
 import { SaveStep } from './steps/SaveStep';
 import { DataWorkspace } from './steps/DataWorkspace';
 import { SettingsView } from './steps/SettingsView';
+import { HomePage } from './steps/HomePage';
 
 function Logo() {
   return (
@@ -59,7 +60,7 @@ export function App() {
   return (
     <div className="shell">
       <header className="shell-header">
-        <a className="brand" href="#" onClick={(e) => { e.preventDefault(); goto(workspace ? 'forecast' : 'load'); }} aria-label="PWLBtoday home">
+        <a className="brand" href="#" onClick={(e) => { e.preventDefault(); goto('home'); }} aria-label="Cash Flow Insight home">
           <Logo /><span className="brand-word">PWLB<span>today</span></span>
         </a>
         <div className="product">
@@ -72,6 +73,7 @@ export function App() {
           <span><span className={`dot ${dirty ? 'warn' : 'ok'}`} /><strong>{team.authorityName}</strong></span>
           <span className="muted">{teamName ?? 'Unsaved team file'} · {dirty ? 'unsaved changes' : team.savedAt ? `saved ${ago(team.savedAt)}` : 'not saved yet'}</span>
         </div>
+        <button className="btn ghost" onClick={() => s.setShowTips(!s.showTips)} title="Show or hide the plain-English guidance on every tab"><i className={`bi ${s.showTips ? 'bi-lightbulb-fill orange' : 'bi-lightbulb'}`} /> {s.showTips ? 'Tips on' : 'Tips off'}</button>
         <button className={`btn ${dirty ? 'primary' : ''}`} onClick={() => void s.saveTeam()} title="Save the shared team file (rules, profiles, forecasts — never transactions)">
           <i className="bi bi-save" /> Save
         </button>
@@ -80,6 +82,7 @@ export function App() {
       <nav className="sidebar" aria-label="Steps">
         {workspace ? (
           <>
+            <button className={`nav-item ${step === 'home' ? 'active' : ''}`} onClick={() => goto('home')}><i className="bi bi-house" /> About this tool</button>
             <div className="nav-label">Workspace</div>
             {WORKSPACE.map((w) => (
               <button key={w.id} className={`nav-item ${step === w.id || (w.id === 'data' && ['load', 'map', 'categorise', 'review'].includes(step)) ? 'active' : ''}`} onClick={() => goto(w.id)}>
@@ -91,6 +94,7 @@ export function App() {
           </>
         ) : (
           <>
+            <button className={`nav-item ${step === 'home' ? 'active' : ''}`} onClick={() => goto('home')} style={{ marginTop: 6 }}><i className="bi bi-house" /> About this tool</button>
             <div className="nav-label">Guided steps</div>
             {STEPS.map((x, i) => (
               <button key={x.id} className={`nav-item ${x.id === step ? 'active' : ''} ${i < stepIndex || i <= reached && x.id !== step && i < reached ? 'done' : ''}`} disabled={!enabled(i)} onClick={() => goto(x.id)} aria-current={x.id === step ? 'step' : undefined}>
@@ -111,6 +115,7 @@ export function App() {
       </nav>
 
       <main className="main" id="main">
+        {step === 'home' && <HomePage />}
         {step === 'load' && <LoadStep />}
         {step === 'map' && <MappingStep />}
         {step === 'categorise' && <CategoriseStep />}

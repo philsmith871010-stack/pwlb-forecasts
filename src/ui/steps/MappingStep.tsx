@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore, Source } from '../../state/store';
-import { PageHead, Panel, StepFooter, Seg, Empty } from '../components/common';
+import { PageHead, Panel, StepFooter, Seg, Empty, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import type { ColumnMapping } from '../../lib/ingest/detect';
 import { mappingIsUsable } from '../../lib/ingest/detect';
 import { parseAmount, parseDate } from '../../lib/ingest/parseValues';
@@ -43,30 +43,79 @@ function withRole(m: ColumnMapping, j: number, role: Role): ColumnMapping {
 export function MappingStep() {
   const { sources, ingest, runIngest, ingestBusy } = useStore();
   const [sel, setSel] = useState(0);
-  const src = sources[Math.min(sel, sources.length - 1)];
   const changed = useMemo(() => sources.some((s) => JSON.stringify(s.mapping) !== JSON.stringify(s.report.mapping) && !s.profileId), [sources]);
+  const tabs: TabDef[] = [
+    { id: 'overview', label: 'All files' },
+    { id: 'preview', label: 'Preview' },
+    { id: 'layout', label: 'Dates & amounts' },
+    { id: 'checks', label: 'Checks' },
+    { id: 'profile', label: 'Save layout' },
+  ];
+  const [tab, setTab] = useStepTab('map', tabs);
   if (!sources.length) return <div className="page"><Empty icon="bi-layout-three-columns" title="No files yet">Add bank CSVs on the first step.</Empty></div>;
+  const src = sources[Math.min(sel, sources.length - 1)];
+  const reread = <button className="btn primary" disabled={!!ingestBusy || !sources.every((s) => mappingIsUsable(s.mapping))} onClick={() => void runIngest()}><i className="bi bi-arrow-repeat" /> Re-read with these settings</button>;
   return (
     <div className="page">
-      <PageHead eyebrow="Step 2 of 8" title="Confirm the column mapping"
-        actions={<button className="btn primary" disabled={!!ingestBusy || !sources.every((s) => mappingIsUsable(s.mapping))} onClick={() => void runIngest()}><i className="bi bi-arrow-repeat" /> Re-read with this mapping</button>}>
-        We detected each file’s layout automatically. Check the preview — dates, amounts and narratives should look right — and correct anything with the dropdowns. Save a layout as a bank profile and it will map itself next time.
+      <PageHead eyebrow="Step 2 of 8" title="Check how we read your files" actions={changed ? reread : undefined}>
+        Every bank lays out its export differently. We’ve worked out each file’s layout — this step lets you confirm it.
       </PageHead>
-      {changed && <div className="callout mb"><strong>Mapping changed.</strong> Re-read the files to apply it.</div>}
-      <div className="tabs">
-        {sources.map((s, i) => (
-          <button key={s.name} className={i === sel ? 'on' : ''} onClick={() => setSel(i)}>
-            <i className={`bi ${mappingIsUsable(s.mapping) ? 'bi-check-circle' : 'bi-exclamation-circle'}`} /> {s.name}
-          </button>
-        ))}
-      </div>
-      {src && <FileMapping key={src.name} src={src} />}
-      <StepFooter nextDisabled={!ingest} nextLabel="Categorise the transactions" />
+      {changed && <div className="callout mb"><strong>You changed a setting.</strong> Click <strong>Re-read with these settings</strong> (top right) to apply it.</div>}
+      <StepTabs tabs={tabs} value={tab} onChange={setTab} />
+      {tab !== 'overview' && (
+        <div className="row mb">
+          <span className="small muted">File:</span>
+          {sources.map((s, i) => (
+            <button key={s.name} className={`chip ${i === sel ? '' : 'navy'}`} style={i === sel ? { background: 'var(--pt-orange)', color: '#fff', borderColor: 'var(--pt-orange)' } : undefined} onClick={() => setSel(i)}>
+              <i className={`bi ${mappingIsUsable(s.mapping) ? 'bi-check-circle' : 'bi-exclamation-circle'}`} /> {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === 'overview' && (
+        <>
+          <Explain
+            what="One line per file: the layout we detected and whether it matched a layout your team saved before."
+            why="If a column is mis-read — say, money in and money out swapped — every number after this would be wrong. It only takes a moment to check."
+            todo={<>If every file shows a green tick, you can go straight on to <strong>Categorise</strong>. Otherwise open the <strong>Preview</strong> tab for that file.</>} />
+          <FilesOverview onOpen={(i) => { setSel(i); setTab('preview'); }} />
+          <StepFooter nextDisabled={!ingest} nextLabel="Looks right — categorise the transactions" />
+        </>
+      )}
+      {tab !== 'overview' && <FileMapping key={src.name + tab} src={src} tab={tab} />}
+      {tab !== 'overview' && <NextTab label={tab === 'profile' ? 'Back to all files' : `Next: ${tabs[tabs.findIndex((t) => t.id === tab) + 1].label}`} onClick={() => setTab(tab === 'profile' ? 'overview' : tabs[tabs.findIndex((t) => t.id === tab) + 1].id)} />}
     </div>
   );
 }
 
-function FileMapping({ src }: { src: Source }) {
+function FilesOverview({ onOpen }: { onOpen: (i: number) => void }) {
+  const { sources, ingest } = useStore();
+  return (
+    <Panel title="Your files" flush>
+      <table className="tbl">
+        <thead><tr><th>File</th><th>Status</th><th>Layout</th><th>Dates</th><th className="num">Rows read</th><th>Saved layout</th><th /></tr></thead>
+        <tbody>{sources.map((s, i) => {
+          const f = ingest?.files.find((x) => x.name === s.name);
+          const bal = ingest?.balanceChecks.find((b) => b.file === s.name);
+          const ok = mappingIsUsable(s.mapping) && s.report.confidence !== 'low';
+          return (
+            <tr key={s.name}>
+              <td><i className="bi bi-file-earmark-spreadsheet muted" /> {s.name}</td>
+              <td>{ok ? <span className="badge green"><i className="bi bi-check-lg" /> looks right</span> : <span className="badge amber">please check</span>}{bal && bal.breaks === 0 && <span className="badge green" style={{ marginLeft: 4 }} title="Opening balance + transactions = closing balance on every row">balances tie</span>}</td>
+              <td className="xs">{s.mapping.amountMode === 'debitCredit' ? 'Separate money in / out columns' : 'One amount column (+ in, − out)'}</td>
+              <td className="xs">{s.report.dateFormatLabel}{s.mapping.dateOrder === 'MDY' ? ' (US order)' : ''}</td>
+              <td className="num">{f ? int(f.rowsAccepted) : '–'}{f && f.rowsRejected ? <span className="xs muted"> ({f.rowsRejected} skipped)</span> : ''}</td>
+              <td className="xs">{s.profileName ? <span className="chip navy"><i className="bi bi-bookmark-check" /> {s.profileName}</span> : <span className="muted">new layout</span>}</td>
+              <td><button className="btn sm" onClick={() => onOpen(i)}>Check <i className="bi bi-chevron-right" /></button></td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function FileMapping({ src, tab }: { src: Source; tab: string }) {
   const { setMapping, saveProfile, ingest } = useStore();
   const m = src.mapping;
   const roles = rolesOf(m);
@@ -90,7 +139,11 @@ function FileMapping({ src }: { src: Source }) {
 
   return (
     <div className="stack">
-      <div className="grid g-side">
+      {tab === 'preview' && <>
+        <Explain
+          what={<>The first rows of <strong>{src.name}</strong> exactly as they appear in the file. Above each column is what we think it holds; the orange column on the right shows the date and amount we read.</>}
+          why="If the orange column shows the right dates and the right signs (money in positive, money out negative), the file is being read correctly."
+          todo="Check a few rows against your bank statement. If a column is wrong, change its dropdown, then click Re-read at the top." />
         <Panel title="Preview" sub={`first ${preview.length} data rows · how we read them on the right`} flush>
           <div className="tbl-wrap">
             <table className="tbl">
@@ -123,7 +176,13 @@ function FileMapping({ src }: { src: Source }) {
             </table>
           </div>
         </Panel>
-        <div className="stack">
+      </>}
+      {tab === 'layout' && <>
+        <Explain
+          what="The settings that decide how dates and amounts are read — e.g. is 03/04/2023 the 3rd of April (UK) or March 4th (US)?"
+          why="Get these wrong and payments turn into receipts or land in the wrong month."
+          todo="Usually nothing — these are detected for you. Only change them if the Preview tab looks wrong." />
+        <div className="grid g2">
           <Panel title="Layout" sub={src.report.confidence === 'high' ? 'detected with confidence' : 'please check'}>
             <div className="stack" style={{ gap: 12 }}>
               <div className="field"><label>Date order (for dates like 03/04/2023)</label>
@@ -153,11 +212,13 @@ function FileMapping({ src }: { src: Source }) {
             </div>
           </Panel>
           {src.report.notes.length > 0 && <div className="callout navy small"><ul style={{ margin: 0, paddingLeft: 18 }}>{src.report.notes.map((n, i) => <li key={i}>{n}</li>)}</ul></div>}
-          <Panel title="Bank profile">
-            <div className="field"><label>Profile name</label><input className="input" value={profileName} onChange={(e) => setProfileName(e.target.value)} /></div>
-            <div className="row mt"><button className="btn" onClick={() => saveProfile(src.name, profileName)}><i className="bi bi-bookmark-plus" /> {src.profileId ? 'Update profile' : 'Save as bank profile'}</button>
-              {src.profileName && <span className="chip navy"><i className="bi bi-bookmark-check" /> matched “{src.profileName}”</span>}</div>
-          </Panel>
+        </div>
+      </>}
+      {tab === 'checks' && <>
+        <Explain
+          what="What we actually read from this file, plus a balance check: where the file has a running balance, we confirm opening balance + transactions = closing balance on every row."
+          why="A balance that ties all the way through is strong proof nothing was missed or double-counted."
+          todo="Nothing, unless you see breaks or lots of rejected rows — then look at that part of the file." />
           {fileSummary && (
             <Panel title="What we read">
               <dl className="kv">
@@ -176,8 +237,20 @@ function FileMapping({ src }: { src: Source }) {
               )}
             </Panel>
           )}
+      </>}
+      {tab === 'profile' && <>
+        <Explain
+          what="Saves this file’s layout to your team file as a named bank profile."
+          why="Next time anyone loads an export with the same columns, it’s read correctly with no checking needed."
+          todo="Give it a recognisable name (e.g. “Lloyds main account”) and click Save." />
+        <div className="grid g2">
+          <Panel title="Bank profile">
+            <div className="field"><label>Profile name</label><input className="input" value={profileName} onChange={(e) => setProfileName(e.target.value)} /></div>
+            <div className="row mt"><button className="btn" onClick={() => saveProfile(src.name, profileName)}><i className="bi bi-bookmark-plus" /> {src.profileId ? 'Update profile' : 'Save as bank profile'}</button>
+              {src.profileName && <span className="chip navy"><i className="bi bi-bookmark-check" /> matched “{src.profileName}”</span>}</div>
+          </Panel>
         </div>
-      </div>
+      </>}
     </div>
   );
 }

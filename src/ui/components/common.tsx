@@ -164,3 +164,54 @@ export function catByIdx(categories: Category[], catIds: string[], idx: number):
   if (idx < 0 || idx >= catIds.length) return undefined;
   return categories.find((c) => c.id === catIds[idx]);
 }
+
+// ------------------------------------------------------------------ guidance pattern used on every tab
+
+/** Plain-English explainer: what you're looking at, why it matters, what to do. */
+export function Explain({ what, why, todo, compact }: { what: ReactNode; why?: ReactNode; todo?: ReactNode; compact?: boolean }) {
+  const show = useStore((s) => s.showTips);
+  const setShow = useStore((s) => s.setShowTips);
+  if (!show) return null;
+  return (
+    <div className={`explain ${compact ? 'compact' : ''}`} role="note">
+      <div className="explain-col"><div className="explain-h"><i className="bi bi-eye" /> What this is</div><div>{what}</div></div>
+      {why && <div className="explain-col"><div className="explain-h"><i className="bi bi-lightbulb" /> Why it matters</div><div>{why}</div></div>}
+      {todo && <div className="explain-col todo"><div className="explain-h"><i className="bi bi-hand-index" /> What to do</div><div>{todo}</div></div>}
+      <button className="icon-btn explain-x" title="Hide all tips (turn back on from the header)" aria-label="Hide tips" onClick={() => setShow(false)}><i className="bi bi-x" /></button>
+    </div>
+  );
+}
+
+export interface TabDef { id: string; label: string; icon?: string; badge?: ReactNode; disabled?: boolean; hint?: string }
+
+/** Numbered sub-tabs for a step. The active tab is remembered per step. */
+export function useStepTab(step: string, tabs: TabDef[], initial?: string): [string, (t: string) => void] {
+  const cur = useStore((s) => s.stepTab[step]);
+  const set = useStore((s) => s.setStepTab);
+  const valid = tabs.find((t) => t.id === cur && !t.disabled) ? cur! : initial ?? tabs[0].id;
+  return [valid, (t: string) => set(step, t)];
+}
+
+export function StepTabs({ tabs, value, onChange, numbered = true }: { tabs: TabDef[]; value: string; onChange: (id: string) => void; numbered?: boolean }) {
+  return (
+    <div className="step-tabs" role="tablist">
+      {tabs.map((t, i) => (
+        <button key={t.id} role="tab" aria-selected={value === t.id} title={t.hint} className={value === t.id ? 'on' : ''} disabled={t.disabled} onClick={() => onChange(t.id)}>
+          {numbered ? <span className="st-num">{i + 1}</span> : t.icon ? <i className={`bi ${t.icon}`} /> : null}
+          <span>{t.label}</span>
+          {t.badge !== undefined && t.badge !== null && t.badge !== '' && <span className="st-badge">{t.badge}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Footer inside a tab pointing to the next tab (or a custom action). */
+export function NextTab({ label, onClick, text }: { label: string; onClick: () => void; text?: ReactNode }) {
+  return (
+    <div className="next-tab no-print">
+      <span className="muted small">{text}</span>
+      <button className="btn navy" onClick={onClick}>{label} <i className="bi bi-arrow-right" /></button>
+    </div>
+  );
+}

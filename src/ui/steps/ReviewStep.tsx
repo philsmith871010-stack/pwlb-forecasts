@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel, StepFooter, Modal, CategorySelect, CatBadge, catByIdx, Kpi, Empty, Money } from '../components/common';
+import { PageHead, Panel, StepFooter, Modal, CategorySelect, CatBadge, catByIdx, Empty, Money, Seg, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
 import { money, pct, day, int } from '../../lib/format';
@@ -8,58 +8,117 @@ import { FLAG_LABELS, F_OUTLIER, F_SINGLE } from '../../lib/categorise/engine';
 import type { Category } from '../../lib/categories';
 import type { DealFlag, TxnOverride } from '../../lib/model';
 
-type Tab = 'uncat' | 'deal' | 'outliers';
-
 export function ReviewStep({ embedded }: { embedded?: boolean }) {
-  const { cat, sessionChanges, undoChange, catBusy } = useStore();
-  const [tab, setTab] = useState<Tab>('uncat');
+  const { cat, sessionChanges, catBusy } = useStore();
+  const tabs: TabDef[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'uncat', label: 'Not yet sorted', badge: cat ? cat.uncategorisedRows + cat.lowConfRows || '✓' : '' },
+    { id: 'deal', label: 'Loans & investments', badge: cat && cat.suspectedRows + cat.dealLikeOpRows ? cat.suspectedRows + cat.dealLikeOpRows : '' },
+    { id: 'outliers', label: 'Unusual amounts', badge: cat?.outlierRows || '' },
+    { id: 'decisions', label: 'Your decisions', badge: sessionChanges.length || '' },
+  ];
+  const [tab, setTab] = useStepTab('review', tabs);
   if (!cat) return <div className="page"><Empty icon="bi-ui-checks" title="Nothing to review yet">Load and categorise data first.</Empty></div>;
   const body = (
     <>
-      <div className="grid g4 mb">
-        <Kpi label="Value categorised" value={pct(cat.valueCategorisedPct)} sub={`${int(cat.uncategorisedRows)} lines to go`} />
-        <Kpi label="Treasury excluded" value={money(cat.treasuryAbs)} sub={`${money(cat.suspectedAbs)} suspected, not yet confirmed`} />
-        <Kpi label="Deal-like but operational" value={money(cat.dealLikeOpAbs)} sub={`${cat.dealLikeOpRows} lines to check`} />
-        <Kpi label="Outliers down-weighted" value={int(cat.outlierRows)} sub="kept in history, out of the profile" />
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}><StepTabs tabs={tabs} value={tab} onChange={setTab} /></div>
+        {catBusy && <span className="small muted row tight" style={{ marginTop: 14 }}><span className="spinner" /> updating…</span>}
       </div>
-      <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'uncat'} className={tab === 'uncat' ? 'on' : ''} onClick={() => setTab('uncat')}><i className="bi bi-question-circle" /> Uncategorised & low confidence</button>
-        <button role="tab" aria-selected={tab === 'deal'} className={tab === 'deal' ? 'on' : ''} onClick={() => setTab('deal')}><i className="bi bi-bank" /> Treasury / deal flows</button>
-        <button role="tab" aria-selected={tab === 'outliers'} className={tab === 'outliers' ? 'on' : ''} onClick={() => setTab('outliers')}><i className="bi bi-exclamation-diamond" /> Outliers</button>
-        <div className="spacer" />
-        {catBusy && <span className="small muted row tight"><span className="spinner" /> updating…</span>}
-      </div>
-      <div className="grid g-side">
-        <div>
-          {tab === 'uncat' && <UncatQueue />}
-          {tab === 'deal' && <DealQueueView />}
-          {tab === 'outliers' && <OutlierQueue />}
-        </div>
-        <Panel title="Decisions this session" sub={`${sessionChanges.length}`}>
-          {sessionChanges.length === 0 ? <p className="small muted">Every confirmation becomes a rule or decision in your team file, so the next upload is quicker. They’ll appear here with an undo.</p> : (
-            <ul className="list-plain small">
-              {sessionChanges.map((c) => (
-                <li key={c.id} className="row tight tick-in">
-                  <i className={`bi ${c.kind === 'rule' ? 'bi-signpost' : c.kind === 'alias' ? 'bi-link-45deg' : 'bi-check2-square'} orange`} />
-                  <span style={{ flex: 1 }}>{c.label}</span>
-                  <button className="btn sm ghost" onClick={() => undoChange(c.id)}><i className="bi bi-arrow-counterclockwise" /> Undo</button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
+      {tab === 'overview' && <ReviewOverview go={setTab} />}
+      {tab === 'uncat' && <>
+        <Explain
+          what="Transactions no rule recognised, grouped by their description so similar lines sit together. Biggest money first."
+          why="Unsorted money can’t be forecast properly. Because lines are grouped, one click often sorts dozens or hundreds at once."
+          todo={<>For each group, pick a category and click <strong>Assign</strong>. Not sure? <strong>Skip</strong> it — small amounts make little difference.</>} />
+        <UncatQueue />
+        <NextTab label="Next: loans & investments" onClick={() => setTab('deal')} />
+      </>}
+      {tab === 'deal' && <>
+        <Explain
+          what="Everything we think is borrowing or investment: PWLB, loans to and from other councils, money market funds, deposits — and any large lines that look similar."
+          why={<>These are <strong>left out of the forecast</strong>. The forecast shows your day-to-day cash, so you can see when you’ll <em>need</em> to borrow or can invest. A loan counted as ordinary income would hide a borrowing need.</>}
+          todo={<>Confirm the suspected ones (or say they’re not loans). Pay most attention to the <strong>“Large items to check”</strong> view.</>} />
+        <DealQueueView />
+        <NextTab label="Next: unusual amounts" onClick={() => setTab('outliers')} />
+      </>}
+      {tab === 'outliers' && <>
+        <Explain
+          what="Very large payments or receipts inside normally regular categories — e.g. a £12m one-off grant among routine £1m grants."
+          why="If a one-off spike were treated as normal, the forecast would expect it to happen again every year. We’ve set these aside as one-off: kept in history, left out of the pattern."
+          todo={<>Only change one if it <strong>will</strong> happen again — then click <strong>Recurring</strong>.</>} />
+        <OutlierQueue />
+        <NextTab label="See your decisions" onClick={() => setTab('decisions')} />
+      </>}
+      {tab === 'decisions' && <>
+        <Explain compact what="Every confirmation you made this session. Each one became a rule or decision in your team file." why="Next time anyone loads data, these are applied automatically." todo="Use Undo if you made a mistake. Remember to save the team file at the end." />
+        <Decisions />
+        {!embedded && <StepFooter nextLabel="See the historic analysis" />}
+      </>}
     </>
   );
   if (embedded) return body;
   return (
     <div className="page">
-      <PageHead eyebrow="Step 4 of 8" title="Review — confirm, don’t labour">
-        Three short queues, biggest value first, so one click can settle hundreds of lines. The treasury queue matters most: those flows are what we’re forecasting a <em>need</em> for, so they must not leak into the operational model.
+      <PageHead eyebrow="Step 4 of 8" title="Review the lines we weren’t sure about">
+        A few quick confirmations, largest money first. You’re confirming, not doing data entry.
       </PageHead>
       {body}
-      <StepFooter nextLabel="See the historic analysis" />
     </div>
+  );
+}
+
+function ReviewOverview({ go }: { go: (t: string) => void }) {
+  const { cat } = useStore();
+  if (!cat) return null;
+  const items = [
+    { id: 'uncat', icon: 'bi-question-circle', title: 'Not yet sorted', n: cat.uncategorisedRows + cat.lowConfRows, money: cat.uncategorisedAbs + cat.lowConfAbs, text: 'Lines no rule recognised, or recognised only weakly.', doneText: 'Everything is sorted.' },
+    { id: 'deal', icon: 'bi-bank', title: 'Loans & investments to confirm', n: cat.suspectedRows + cat.dealLikeOpRows, money: cat.suspectedAbs + cat.dealLikeOpAbs, text: 'Suspected borrowing/investment flows, and large lines that might be.', doneText: 'All loans and investments confirmed.' },
+    { id: 'outliers', icon: 'bi-exclamation-diamond', title: 'Unusual amounts', n: cat.outlierRows, money: 0, text: 'Large one-offs set aside from the regular pattern — just check you agree.', doneText: 'No unusual amounts.' },
+  ];
+  return (
+    <>
+      <Explain
+        what="Three short lists of things we’d like a human to confirm. Everything else has already been sorted with confidence."
+        why="This is the step that makes the forecast trustworthy — especially making sure no loans or investments are counted as everyday cash."
+        todo="Work through the three lists in order. Each shows the biggest money first, so you can stop when what’s left is small." />
+      <div className="card card-pad mb">
+        <div className="row"><strong className="navy">{pct(cat.valueCategorisedPct)} of all money is sorted</strong><span className="spacer" /><span className="small muted">{money(cat.treasuryAbs)} identified as loans & investments</span></div>
+        <div className="meter mt"><div style={{ width: `${cat.valueCategorisedPct * 100}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
+      </div>
+      <div className="stack">
+        {items.map((it, i) => (
+          <div key={it.id} className={`queue-card ${it.n ? '' : 'done'}`}>
+            <div className="qi"><i className={`bi ${it.n ? it.icon : 'bi-check-lg'}`} /></div>
+            <div style={{ flex: 1 }}>
+              <strong className="navy">{i + 1}. {it.title}</strong>
+              <div className="small muted">{it.n ? it.text : it.doneText}</div>
+            </div>
+            {it.n > 0 && <div className="num"><div className="big-number" style={{ fontSize: 22 }}>{int(it.n)}</div><div className="xs muted">lines{it.money ? ` · ${money(it.money)}` : ''}</div></div>}
+            <button className={`btn ${it.n ? 'primary' : ''}`} onClick={() => go(it.id)}>{it.n ? 'Start' : 'View'} <i className="bi bi-arrow-right" /></button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function Decisions() {
+  const { sessionChanges, undoChange } = useStore();
+  if (!sessionChanges.length) return <div className="card card-pad small muted">No decisions yet this session.</div>;
+  return (
+    <Panel title="Decisions this session" sub={`${sessionChanges.length}`}>
+      <ul className="list-plain small">
+        {sessionChanges.map((c) => (
+          <li key={c.id} className="row tight tick-in">
+            <i className={`bi ${c.kind === 'rule' ? 'bi-signpost' : c.kind === 'alias' ? 'bi-link-45deg' : 'bi-check2-square'} orange`} />
+            <span style={{ flex: 1 }}>{c.label}</span>
+            <span className="xs muted">{new Date(c.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+            <button className="btn sm ghost" onClick={() => undoChange(c.id)}><i className="bi bi-arrow-counterclockwise" /> Undo</button>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }
 
@@ -84,7 +143,7 @@ function UncatQueue() {
   return (
     <div className="stack">
       <div className="card card-pad">
-        <div className="row"><strong className="navy">{pct(pctDone)} of value categorised</strong><span className="muted small">· {groups.length} groups to look at, largest first</span></div>
+        <div className="row"><strong className="navy">{pct(pctDone)} of all money is sorted</strong><span className="muted small">· {groups.length} groups left, largest first</span></div>
         <div className="meter mt"><div style={{ width: `${pctDone * 100}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
       </div>
       {groups.length === 0 && <div className="callout green"><strong>All clear.</strong> Every line is categorised with at least medium confidence.</div>}
@@ -127,15 +186,15 @@ function GroupCard({ g, onIgnore, dealMode }: { g: ReviewGroup; onIgnore?: () =>
         <div style={{ width: 240 }}><CategorySelect small value={catId} onChange={setCatId} categories={categories} allowNone="Choose a category…" /></div>
         {dealMode ? (
           <>
-            <button className="btn sm navy" disabled={!catId} onClick={() => assign(catId, 'deal')}><i className="bi bi-check2" /> Confirm deal</button>
-            <button className="btn sm" disabled={!catId || categories.find((c) => c.id === catId)?.group === 'treasury'} onClick={() => assign(catId, 'not_deal')} title="Choose an operational category first">Not a deal</button>
+            <button className="btn sm navy" disabled={!catId} onClick={() => assign(catId, 'deal')}><i className="bi bi-check2" /> Yes, loan/investment</button>
+            <button className="btn sm" disabled={!catId || categories.find((c) => c.id === catId)?.group === 'treasury'} onClick={() => assign(catId, 'not_deal')} title="Choose an everyday category first">No — everyday cash</button>
           </>
         ) : (
           <button className="btn sm primary" disabled={!catId} onClick={() => assign(catId)}><i className="bi bi-check2" /> Assign all {g.count}</button>
         )}
-        <button className="btn sm" onClick={() => setRuleOpen(true)}><i className="bi bi-signpost" /> Create rule…</button>
-        <button className="btn sm ghost" onClick={() => setSplitOpen(true)}><i className="bi bi-scissors" /> Split</button>
-        {onIgnore && <button className="btn sm ghost" onClick={onIgnore}>Ignore</button>}
+        <button className="btn sm" onClick={() => setRuleOpen(true)}><i className="bi bi-signpost" /> Make a rule…</button>
+        <button className="btn sm ghost" onClick={() => setSplitOpen(true)}><i className="bi bi-scissors" /> Different categories…</button>
+        {onIgnore && <button className="btn sm ghost" onClick={onIgnore} title="Hide this group for now; it stays uncategorised">Skip</button>}
       </div>
       {ruleOpen && <RuleModal g={g} onClose={() => setRuleOpen(false)} initialCat={catId} />}
       {splitOpen && <SplitModal g={g} onClose={() => setSplitOpen(false)} />}
@@ -202,17 +261,32 @@ function SplitModal({ g, onClose }: { g: ReviewGroup; onClose: () => void }) {
 function DealQueueView() {
   const data = useQueue<DealQueue>(() => engine().dealQueue(300));
   const [shown, setShown] = useState(20);
+  const [view, setView] = useState<'check' | 'pairs' | 'groups'>('check');
   if (!data) return <div className="card card-pad"><span className="spinner" /> Loading…</div>;
   return (
     <div className="stack">
-      <div className="callout navy">
-        <strong>These are your borrowing and investment flows.</strong> PWLB, LOBO and council-to-council loans, money market funds, DMADF and bank deposits — principal and interest. They are excluded from the forecast because they are not repeatable operating cash; the forecast exists to show when you’ll need them. Currently excluded: <strong>{money(data.excludedAbs)}</strong> gross, of which <strong>{money(data.suspectedAbs)}</strong> is only suspected.
+      <div className="row">
+        <Seg value={view} onChange={setView} options={[
+          { v: 'check', label: `Large items to check (${data.dealLike.length})` },
+          { v: 'pairs', label: `Loan patterns (${data.pairs.length})` },
+          { v: 'groups', label: `All loans & investments (${data.groups.length})` },
+        ]} />
+        <span className="spacer" />
+        <span className="small muted">Kept out of the forecast: <strong className="navy">{money(data.excludedAbs)}</strong>, of which <strong className="navy">{money(data.suspectedAbs)}</strong> only suspected</span>
       </div>
-      {data.pairs.length > 0 && <LoanPairs pairs={data.pairs} />}
-      <h3 className="mt">Grouped deal lines</h3>
-      {data.groups.slice(0, shown).map((g) => <GroupCard key={g.sigIdx} g={g} dealMode />)}
-      {data.groups.length > shown && <button className="btn" onClick={() => setShown(shown + 20)}>Show more ({data.groups.length - shown})</button>}
-      <DealLike rows={data.dealLike} />
+      {view === 'check' && <>
+        <p className="small muted" style={{ margin: 0 }}>Large or irregular lines currently counted as everyday cash. If any is really a loan, deposit or investment, choose its type and click <strong>Loan/investment</strong>; otherwise click <strong>Everyday cash</strong>.</p>
+        {data.dealLike.length ? <DealLike rows={data.dealLike} /> : <div className="callout green">Nothing large and loan-like is left in the everyday figures.</div>}
+      </>}
+      {view === 'pairs' && <>
+        <p className="small muted" style={{ margin: 0 }}>Money that arrived and went back out later (or the reverse) for the same amount plus a little interest — the classic shape of a loan or deposit. Tick and confirm them in bulk.</p>
+        {data.pairs.length ? <LoanPairs pairs={data.pairs} /> : <div className="callout green">No unconfirmed loan patterns.</div>}
+      </>}
+      {view === 'groups' && <>
+        <p className="small muted" style={{ margin: 0 }}>Everything currently kept out of the forecast, grouped by description. Confirm a group to make it a permanent rule, or mark it as not a loan.</p>
+        {data.groups.slice(0, shown).map((g) => <GroupCard key={g.sigIdx} g={g} dealMode />)}
+        {data.groups.length > shown && <button className="btn" onClick={() => setShown(shown + 20)}>Show more ({data.groups.length - shown})</button>}
+      </>}
     </div>
   );
 }
@@ -257,7 +331,7 @@ function DealLike({ rows }: { rows: TxnRow[] }) {
   const [choice, setChoice] = useState<Record<string, string>>({});
   if (!rows.length) return null;
   return (
-    <Panel title="Large or irregular items still in the operational model" sub="check none of these are really deals" flush>
+    <Panel title="Large items counted as everyday cash" sub="are any of these really loans or investments?" flush>
       <div className="tbl-wrap">
         <table className="tbl">
           <thead><tr><th>Date</th><th>Narrative</th><th>Category</th><th className="num">Amount</th><th>Why</th><th>Decision</th></tr></thead>
@@ -269,9 +343,9 @@ function DealLike({ rows }: { rows: TxnRow[] }) {
               <td className="xs muted">{FLAG_LABELS.filter(([f]) => r.flags & f).map(([, l]) => l).join(', ')}</td>
               <td className="nowrap">
                 <div className="row tight" style={{ flexWrap: 'nowrap' }}>
-                  <div style={{ width: 170 }}><CategorySelect small value={choice[r.key] ?? ''} onChange={(v) => setChoice({ ...choice, [r.key]: v })} categories={team.categories} groups={['treasury']} allowNone="Treasury category…" /></div>
-                  <button className="btn sm navy" disabled={!choice[r.key]} onClick={() => addTxnOverrides([{ key: r.key, categoryId: choice[r.key], dealFlag: 'deal' }], `${r.narrative.slice(0, 30)} → deal`)}>Deal</button>
-                  <button className="btn sm" onClick={() => addTxnOverrides([{ key: r.key, dealFlag: 'not_deal' }], `${r.narrative.slice(0, 30)} confirmed operational`)}>Operational</button>
+                  <div style={{ width: 170 }}><CategorySelect small value={choice[r.key] ?? ''} onChange={(v) => setChoice({ ...choice, [r.key]: v })} categories={team.categories} groups={['treasury']} allowNone="Which type?" /></div>
+                  <button className="btn sm navy" disabled={!choice[r.key]} onClick={() => addTxnOverrides([{ key: r.key, categoryId: choice[r.key], dealFlag: 'deal' }], `${r.narrative.slice(0, 30)} → deal`)}>Loan/investment</button>
+                  <button className="btn sm" onClick={() => addTxnOverrides([{ key: r.key, dealFlag: 'not_deal' }], `${r.narrative.slice(0, 30)} confirmed as everyday cash`)}>Everyday cash</button>
                 </div>
               </td>
             </tr>

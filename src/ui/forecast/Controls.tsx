@@ -9,17 +9,14 @@ import { addMonths, dayFromISO, isoFromDay } from '../../lib/dates';
 import type { ForecastMethod } from '../../lib/categories';
 import { parsePaste, resolvePaste, Spread, PasteParse } from '../../lib/forecast/paste';
 
-export function Section({ title, icon, children, defaultOpen = true, count }: { title: string; icon: string; children: ReactNode; defaultOpen?: boolean; count?: number }) {
-  const [open, setOpen] = useState(defaultOpen);
+export function Section({ title, icon, children, count }: { title: string; icon: string; children: ReactNode; defaultOpen?: boolean; count?: number }) {
   return (
     <section className="card" style={{ overflow: 'hidden' }}>
-      <button className="row" onClick={() => setOpen(!open)} aria-expanded={open}
-        style={{ width: '100%', border: 0, background: 'var(--pt-navy-grad)', color: '#fff', padding: '10px 14px', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
+      <div className="row" style={{ background: 'var(--pt-navy-grad)', color: '#fff', padding: '10px 14px' }}>
         <i className={`bi ${icon}`} style={{ color: 'var(--pt-orange)' }} /><strong style={{ color: 'var(--pt-orange)', fontWeight: 600, fontSize: 14.5 }}>{title}</strong>
         {count !== undefined && count > 0 && <span className="badge orange">{count}</span>}
-        <span className="spacer" /><i className={`bi bi-chevron-${open ? 'up' : 'down'}`} />
-      </button>
-      {open && <div style={{ padding: '14px 16px' }}>{children}</div>}
+      </div>
+      <div style={{ padding: '14px 16px' }}>{children}</div>
     </section>
   );
 }
@@ -38,7 +35,7 @@ export function SetupSection({ sc, upd, b }: { sc: Scenario; upd: Upd; b: Foreca
   const months = Math.round((dayFromISO(st.end) - start + 1) / 30.44);
   const mode = st.openingMode ?? 'bank';
   return (
-    <Section title="Set-up" icon="bi-sliders">
+    <Section title="Starting point" icon="bi-sliders">
       <div className="stack" style={{ gap: 12 }}>
         <div className="grid g2" style={{ gap: 10 }}>
           <div className="field"><label>Forecast start</label><input className="input" type="date" value={st.start} onChange={(e) => e.target.value && set({ start: e.target.value, end: isoFromDay(addMonths(dayFromISO(e.target.value), months) - 1) })} /></div>
@@ -82,11 +79,11 @@ export function MethodsSection({ sc, upd, b }: { sc: Scenario; upd: Upd; b: Fore
   });
   const rows = b.fc.explain.filter((e) => e.historyAnnual || e.forecastTotal || e.method !== 'exclude' || e.id === 'uncategorised');
   return (
-    <Section title="Methods & growth" icon="bi-diagram-3" count={sc.assumptions.filter((a) => a.kind === 'growth').length}>
-      <p className="xs muted" style={{ marginTop: 0 }}>Default growth is each category’s historic trend (shown). Type a % to override, e.g. salaries 2.</p>
-      <div className="tbl-wrap" style={{ maxHeight: 460 }}>
+    <Section title="Growth and method for each category" icon="bi-diagram-3" count={sc.assumptions.filter((a) => a.kind === 'growth').length}>
+      <p className="small muted" style={{ marginTop: 0 }}>Leave a box empty to use the historic trend (shown in grey). Type a number to set your own growth, e.g. <strong>2</strong> for 2% a year. The small icon next to your figure switches between “jumps each April” and “grows steadily”.</p>
+      <div className="tbl-wrap" style={{ maxHeight: 640 }}>
         <table className="tbl">
-          <thead><tr><th>Category</th><th>Method</th><th className="num">Hist.</th><th className="num">Growth % p.a.</th></tr></thead>
+          <thead><tr><th>Category</th><th>How it’s projected</th><th className="num">Past trend</th><th className="num">Your growth % a year</th></tr></thead>
           <tbody>{rows.map((e) => {
             const g = growthFor(e.id);
             const cat = categories.find((c) => c.id === e.id);
@@ -147,15 +144,15 @@ export function AssumptionsSection({ sc, upd }: { sc: Scenario; upd: Upd }) {
     }
   };
   return (
-    <Section title="Assumptions" icon="bi-lightbulb" count={sc.assumptions.length}>
+    <Section title="Planned changes" icon="bi-lightbulb" count={sc.assumptions.length}>
       {sc.assumptions.length > 0 && (
         <ul className="list-plain small mb">{sc.assumptions.map((a) => (
           <li key={a.id} className="row tight"><span className="badge navy">{a.kind}</span><span style={{ flex: 1 }}>{describe(a)}{a.note ? <span className="muted"> — {a.note}</span> : ''}</span>
             <button className="icon-btn" aria-label="Remove assumption" onClick={() => upd((x) => ({ ...x, assumptions: x.assumptions.filter((y) => y.id !== a.id) }))}><i className="bi bi-trash" /></button></li>
         ))}</ul>
       )}
-      <div className="field"><label>Add</label>
-        <Seg value={kind} onChange={setKind} options={[{ v: 'step', label: 'Step change' }, { v: 'timing', label: 'Timing' }, { v: 'stop', label: 'Stop' }, { v: 'start', label: 'New item' }, { v: 'inflation', label: 'Inflation' }]} />
+      <div className="field"><label>What kind of change?</label>
+        <Seg value={kind} onChange={setKind} options={[{ v: 'step', label: 'Change from a date' }, { v: 'timing', label: 'Payment day moves' }, { v: 'stop', label: 'Something stops' }, { v: 'start', label: 'Something new starts' }, { v: 'inflation', label: 'Inflation' }]} />
       </div>
       <div className="stack mt" style={{ gap: 8 }}>
         {kind !== 'inflation' && <div className="field"><label>Category</label><CategorySelect value={f.categoryId} onChange={(v) => setF({ ...f, categoryId: v })} categories={categories} groups={['receipts_operational', 'payments_operational']} /></div>}
@@ -187,7 +184,7 @@ export function AssumptionsSection({ sc, upd }: { sc: Scenario; upd: Upd }) {
           </div>
         </>}
         <div className="field"><label>Note (optional)</label><input className="input" value={f.note} onChange={s('note')} placeholder="why — shown on the chart and report" /></div>
-        <div className="row"><span className="spacer" /><button className="btn primary sm" onClick={add}><i className="bi bi-plus-lg" /> Add assumption</button></div>
+        <div className="row"><span className="spacer" /><button className="btn primary sm" onClick={add}><i className="bi bi-plus-lg" /> Add this change</button></div>
       </div>
     </Section>
   );

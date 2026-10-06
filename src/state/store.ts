@@ -11,16 +11,16 @@ import type { GeneratorOptions } from '../generator';
 import { isoFromDay, addMonths } from '../lib/dates';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
-export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings';
+export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home';
 export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] = [
-  { id: 'load', label: 'Load data', sub: 'Team file & bank CSVs', icon: 'bi-cloud-arrow-up' },
-  { id: 'map', label: 'Map columns', sub: 'Confirm what each column is', icon: 'bi-layout-three-columns' },
-  { id: 'categorise', label: 'Categorise', sub: 'Rules, series & flags', icon: 'bi-tags' },
-  { id: 'review', label: 'Review', sub: 'Confirm the tricky lines', icon: 'bi-ui-checks' },
-  { id: 'history', label: 'History', sub: 'How cash has behaved', icon: 'bi-bar-chart-line' },
-  { id: 'forecast', label: 'Forecast', sub: 'Build & adjust', icon: 'bi-graph-up-arrow' },
-  { id: 'backtest', label: 'Backtest', sub: 'Prove it', icon: 'bi-bullseye' },
-  { id: 'save', label: 'Save & export', sub: 'Team file, Excel, report', icon: 'bi-box-arrow-down' },
+  { id: 'load', label: 'Load data', sub: 'Team file & bank statements', icon: 'bi-cloud-arrow-up' },
+  { id: 'map', label: 'Check the files', sub: 'Is each column read right?', icon: 'bi-layout-three-columns' },
+  { id: 'categorise', label: 'Sort transactions', sub: 'Into categories, automatically', icon: 'bi-tags' },
+  { id: 'review', label: 'Review', sub: 'Confirm the unsure ones', icon: 'bi-ui-checks' },
+  { id: 'history', label: 'Look back', sub: 'How cash has behaved', icon: 'bi-bar-chart-line' },
+  { id: 'forecast', label: 'Look ahead', sub: 'The forecast', icon: 'bi-graph-up-arrow' },
+  { id: 'backtest', label: 'Test it', sub: 'Would it have worked?', icon: 'bi-bullseye' },
+  { id: 'save', label: 'Save & share', sub: 'Team file, Excel, report', icon: 'bi-box-arrow-down' },
 ];
 
 export interface Source {
@@ -66,12 +66,16 @@ interface State {
   activeScenarioId: string | null;
   compareIds: string[];
   toasts: Toast[];
+  showTips: boolean;
+  stepTab: Record<string, string>;
   mergeState: { theirs: TeamFile; conflicts: MergeConflict[]; summary: string[]; resolve: Record<string, 'mine' | 'theirs'> } | null;
 }
 
 interface Actions {
   toast: (text: string, kind?: 'ok' | 'err', action?: Toast['action']) => void;
   dismissToast: (id: string) => void;
+  setShowTips: (v: boolean) => void;
+  setStepTab: (step: string, tab: string) => void;
   setUser: (u: string) => void;
   goto: (s: StepId) => void;
   next: () => void;
@@ -139,14 +143,18 @@ export const useStore = create<State & Actions>((set, get) => ({
   basis: null,
   hasTruth: false,
   demo: null,
-  step: 'load',
+  step: 'home',
   reached: 0,
   workspace: false,
   activeScenarioId: null,
   compareIds: [],
   toasts: [],
+  showTips: lsGet('cfi.tips') !== '0',
+  stepTab: {},
   mergeState: null,
 
+  setShowTips: (v) => { lsSet('cfi.tips', v ? '1' : '0'); set({ showTips: v }); },
+  setStepTab: (step, tab) => { set((s) => ({ stepTab: { ...s.stepTab, [step]: tab } })); document.querySelector('.main')?.scrollTo({ top: 0 }); },
   toast: (text, kind = 'ok', action) => {
     const id = uid('t');
     set((s) => ({ toasts: [...s.toasts, { id, text, kind, action }] }));

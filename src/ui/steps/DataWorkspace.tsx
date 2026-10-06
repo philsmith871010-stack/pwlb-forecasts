@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel, CategorySelect, Seg } from '../components/common';
+import { PageHead, Panel, CategorySelect, Seg, StepTabs } from '../components/common';
 import { TxnTable } from '../components/TxnTable';
 import { LoadStep } from './LoadStep';
 import { MappingStep } from './MappingStep';
@@ -21,12 +21,8 @@ export function DataWorkspace() {
   return (
     <div>
       <div className="page" style={{ paddingBottom: 0 }}>
-        <PageHead eyebrow="Workspace" title="Data">Files, mapping, categorisation and review — everything that turns bank lines into clean, categorised cash flows.</PageHead>
-        <div className="tabs" role="tablist">
-          {([['files', 'Files', 'bi-cloud-arrow-up'], ['mapping', 'Mapping', 'bi-layout-three-columns'], ['categorise', 'Categorisation', 'bi-tags'], ['review', 'Review', 'bi-ui-checks'], ['transactions', 'Transactions', 'bi-list-ul'], ['quality', 'Data quality', 'bi-clipboard-check']] as [Tab, string, string][]).map(([k, l, i]) => (
-            <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} disabled={!cat && k !== 'files'} onClick={() => setTab(k)}><i className={`bi ${i}`} /> {l}</button>
-          ))}
-        </div>
+        <PageHead eyebrow="Workspace" title="Data">Your bank files and how every transaction has been sorted. Come here to add new statements or review what’s been categorised.</PageHead>
+        <StepTabs numbered={false} value={tab} onChange={(t) => setTab(t as Tab)} tabs={([['files', 'Files', 'bi-cloud-arrow-up'], ['mapping', 'Column check', 'bi-layout-three-columns'], ['categorise', 'Sorting', 'bi-tags'], ['review', 'Review', 'bi-ui-checks'], ['transactions', 'All transactions', 'bi-list-ul'], ['quality', 'Data quality', 'bi-clipboard-check']] as [Tab, string, string][]).map(([id, label, icon]) => ({ id, label, icon, disabled: !cat && id !== 'files' }))} />
       </div>
       <div className="ws-embed">
         {tab === 'files' && <LoadStep />}
