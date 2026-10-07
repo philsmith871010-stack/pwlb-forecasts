@@ -105,7 +105,7 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - weekly, fortnightly and four-weekly payments: a weekday (Monday to Friday), re-anchored on the nearest such weekday to the last payment, so the rhythm is kept. Timing without a signature still moves the whole category, as before.
 - **Checks belong to the data they were made on** (`reviewFor` = the data end date). Loading newer bank data asks for the lines to be checked again, because the proposal has changed.
 - **Removing a regular payment.** A stop assumption may also name one series (`signature`): that payment is taken out from the date, and the rest of the category stays. It can be restored.
-- **The month-by-month grid.** Each line can be opened as a grid:
+- **The grid, by month or by day.** Each line can be opened as a grid:
   - **Rows:** one per regular payment, "Everything else (usual pattern)", and rows the user adds (`custom:<name>`, e.g. a grant they've been told about).
   - **Read-only rows** (greyed) show money from Known future items, pasted schedules and one-offs, so the grid adds up to the forecast line.
   - **Entry:** type over a cell, or paste a block from Excel (rows × months, from the cell clicked). £, commas, k/m and (brackets) are understood.
@@ -113,3 +113,9 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - **Days are kept.** A typed month keeps the row's usual payment days (spread in proportion to the model's amounts that month). A row with no payments that month puts the figure on the 15th, rolled to a working day.
   - **Getting back:** emptying a cell restores our figure, "Undo edits" clears a row, and an added row can be deleted.
   - The engine keeps each payment's projection separately (`seriesRows`) and tracks how changes scale the model day by day (`mult`), so rows always add up to the line. Tests check this, and that typed figures are final.
+- **By day.** The grid also has a day view: dates down the page, one month at a time; payments across; weekends and bank holidays greyed.
+  - **Day overrides** (`GridOverride.date`) set a row's amount on that day exactly. They are applied after month totals.
+  - **Day and month edits together:**
+    - a new month total clears that row's day figures for the month;
+    - a day figure in a month that had a total turns the month's other days into day figures at their current values (`applyCells`), so nothing else moves.
+  - **Pasting:** a block runs down the days (carrying on into later months) and across the columns. A list whose first column is dates (or months) goes into the clicked row or column on its own dates, and anything outside the forecast is reported.

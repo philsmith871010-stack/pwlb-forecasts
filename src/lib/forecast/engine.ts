@@ -35,12 +35,19 @@ export interface GridRow {
   label: string;
   kind: 'series' | 'pattern' | 'custom' | 'added' | 'schedule' | 'oneoff';
   editable: boolean;
+  /** per month */
   values: number[];
+  /** the month has a figure of the user's (a month total or any day) */
   overridden: boolean[];
+  /** the month has figures typed for single days */
+  byDay: boolean[];
+  /** per day of the forecast (index 0 = start) */
+  daily: Float64Array;
+  dayOverridden: Uint8Array;
   /** a regular payment the user removed */
   removed?: boolean;
 }
-export interface CategoryGrid { months: string[]; rows: GridRow[] }
+export interface CategoryGrid { months: string[]; start: Day; rows: GridRow[] }
 
 export interface Clamp { year: number; month: number; value: number; clampedTo: number }
 
@@ -529,28 +536,53 @@ export function runForecast(req: ForecastRequest): ForecastResult {
     if (key === 'pattern') { if (!patternCache.has(c)) patternCache.set(c, rowBase(c, 'pattern')!); return patternCache.get(c)!; }
     return rowBase(c, key);
   };
-  const overrideAt = new Map<string, number>(); // `${c}|${row}|${mk}` → amount
-  for (const o of req.overrides ?? []) {
+  // each row's amount per day as it stands (the model, scaled by changes, then the user's figures)
+  const effCache = new Map<string, Float64Array>();
+  const eff = (c: number, key: string) => {
+    const k = `${c}|${key}`;
+    let arr = effCache.get(k);
+    if (!arr) {
+      arr = new Float64Array(H);
+      const rb = rowOf(c, key);
+      if (rb) for (let d = 0; d < H; d++) arr[d] = rb[d] * mult[c * H + d];
+      effCache.set(k, arr);
+    }
+    return arr;
+  };
+  const overrideAt = new Map<string, number>(); // `${c}|${row}|${mk}` → month total
+  const dayOverride = new Set<string>();         // `${c}|${row}|${d}`
+  const ovs = req.overrides ?? [];
+  // month totals first…
+  for (const o of ovs) {
+    if (o.date) continue;
     const c = ci(o.categoryId);
     const mk = mkOf(o.month);
     if (c < 0 || mk < mk0 || mk > mk1) continue;
     overrideAt.set(`${c}|${o.row}|${mk}`, o.amount);
     const [d0, d1] = monthDays(mk);
+    const arr = eff(c, o.row);
     const rb = rowOf(c, o.row);
-    // take the row's modelled amount out of the month…
-    let old = 0, wsum = 0;
-    if (rb) for (let d = d0; d <= d1; d++) { const v = rb[d] * mult[c * H + d]; daily[c * H + d] -= v; old += v; wsum += Math.abs(v); }
-    // …and put the user's figure in, on the row's usual days where it has them
-    if (rb && wsum > 0) {
-      for (let d = d0; d <= d1; d++) { const v = Math.abs(rb[d] * mult[c * H + d]); if (v) daily[c * H + d] += o.amount * v / wsum; }
-    } else if (rb && rb.subarray(d0, d1 + 1).some((v) => v)) {
-      const w = rb.subarray(d0, d1 + 1).reduce((t, v) => t + Math.abs(v), 0);
-      for (let d = d0; d <= d1; d++) if (rb[d]) daily[c * H + d] += o.amount * Math.abs(rb[d]) / w;
-    } else {
+    // where the row usually pays: this month's days as they stand, else the model's days ignoring changes, else the 15th
+    const shape = (src: Float64Array) => { const w = Array.from({ length: d1 - d0 + 1 }, (_, k) => Math.abs(src[d0 + k])); const t = w.reduce((a, b) => a + b, 0); return t > 0 ? w.map((x) => x / t) : null; };
+    const weights = shape(arr) ?? (rb ? shape(rb) : null);
+    for (let d = d0; d <= d1; d++) { daily[c * H + d] -= arr[d]; arr[d] = 0; }
+    if (weights) for (let d = d0; d <= d1; d++) { const v = o.amount * weights[d - d0]; arr[d] = v; daily[c * H + d] += v; }
+    else {
       const y = Math.floor(mk / 12), m = (mk % 12) + 1;
-      put(c, Math.min(end, Math.max(start, rollFor(dayFromYMD(y, m, 15), o.amount))), o.amount);
+      const d = Math.min(end, Math.max(start, rollFor(dayFromYMD(y, m, 15), o.amount))) - start;
+      arr[d] += o.amount; daily[c * H + d] += o.amount;
     }
-    void old;
+  }
+  // …then single days, exactly as typed
+  for (const o of ovs) {
+    if (!o.date) continue;
+    const c = ci(o.categoryId);
+    const d = dayFromISO(o.date) - start;
+    if (c < 0 || d < 0 || d >= H) continue;
+    const arr = eff(c, o.row);
+    daily[c * H + d] += o.amount - arr[d];
+    arr[d] = o.amount;
+    dayOverride.add(`${c}|${o.row}|${d}`);
   }
 
   const oneOffByCat = new Float64Array((C + 1) * H);
@@ -572,37 +604,43 @@ export function runForecast(req: ForecastRequest): ForecastResult {
   // the rows shown in each category's grid
   const grid: Record<string, CategoryGrid> = {};
   const months = Array.from({ length: nM }, (_, k) => mkLabel(mk0 + k));
-  const byMonth = (arr: Float64Array, c: number, scale: boolean) => {
+  /** monthly sums of a per-day array: a row's own (length H) or a category slice of a (C+1)×H array */
+  const byMonth = (arr: Float64Array, c: number, _scale: boolean, own = false) => {
     const out = new Array(nM).fill(0);
-    for (let k = 0; k < nM; k++) { const [d0, d1] = monthDays(mk0 + k); for (let d = d0; d <= d1; d++) out[k] += arr[(scale ? 0 : c * H) + d] * (scale ? mult[c * H + d] : 1); }
+    for (let k = 0; k < nM; k++) { const [d0, d1] = monthDays(mk0 + k); for (let d = d0; d <= d1; d++) out[k] += arr[(own ? 0 : c * H) + d]; }
     return out;
   };
   for (const e of explain) {
     if (e.method === 'exclude') continue;
     const c = e.catIdx;
     const rows: GridRow[] = [];
-    const editableRow = (key: string, label: string, kind: GridRow['kind'], arr: Float64Array | null, removed = false) => {
-      const values = arr ? byMonth(arr, c, true) : new Array(nM).fill(0);
-      const overridden = values.map((_, k) => overrideAt.has(`${c}|${key}|${mk0 + k}`));
-      overridden.forEach((o, k) => { if (o) values[k] = overrideAt.get(`${c}|${key}|${mk0 + k}`)!; });
-      rows.push({ key, label, kind, editable: true, values, overridden, removed });
+    const editableRow = (key: string, label: string, kind: GridRow['kind'], removed = false) => {
+      const arr = eff(c, key);
+      const values = byMonth(arr, c, false, true);
+      const dayOv = new Uint8Array(H);
+      for (let d = 0; d < H; d++) if (dayOverride.has(`${c}|${key}|${d}`)) dayOv[d] = 1;
+      const byDay = values.map((_, k) => { const [d0, d1] = monthDays(mk0 + k); for (let d = d0; d <= d1; d++) if (dayOv[d]) return true; return false; });
+      const overridden = values.map((_, k) => overrideAt.has(`${c}|${key}|${mk0 + k}`) || byDay[k]);
+      // a month total the user typed is shown exactly as typed
+      values.forEach((_, k) => { if (!byDay[k] && overrideAt.has(`${c}|${key}|${mk0 + k}`)) values[k] = overrideAt.get(`${c}|${key}|${mk0 + k}`)!; });
+      rows.push({ key, label, kind, editable: true, values, overridden, byDay, removed, daily: arr, dayOverridden: dayOv });
     };
     for (const sx of e.series) {
       if (!sx.active) continue;
       const removed = req.assumptions.some((a) => a.kind === 'stop' && a.signature === sx.signature && a.categoryId === e.id);
-      editableRow(`series:${sx.signature}`, sx.signature, 'series', seriesRows.get(c)?.get(sx.signature) ?? null, removed);
+      editableRow(`series:${sx.signature}`, sx.signature, 'series', removed);
     }
-    editableRow('pattern', e.series.length ? 'Everything else (usual pattern)' : 'Usual pattern', 'pattern', rowOf(c, 'pattern'));
+    editableRow('pattern', e.series.length ? 'Everything else (usual pattern)' : 'Usual pattern', 'pattern');
     const customs = [...new Set((req.overrides ?? []).filter((o) => o.categoryId === e.id && o.row.startsWith('custom:')).map((o) => o.row))];
-    for (const key of customs) editableRow(key, key.slice(7), 'custom', null);
+    for (const key of customs) editableRow(key, key.slice(7), 'custom');
     const ro = (key: string, label: string, kind: GridRow['kind'], arr: Float64Array) => {
       const values = byMonth(arr, c, false);
-      if (values.some((v) => Math.abs(v) >= 0.5)) rows.push({ key, label, kind, editable: false, values, overridden: values.map(() => false) });
+      if (values.some((v) => Math.abs(v) >= 0.5)) rows.push({ key, label, kind, editable: false, values, overridden: values.map(() => false), byDay: values.map(() => false), daily: arr.slice(c * H, (c + 1) * H), dayOverridden: new Uint8Array(H) });
     };
     ro('added', 'Changes from Known future items', 'added', added);
     ro('schedule', 'Pasted schedules', 'schedule', scheduled);
     ro('oneoff', 'One-offs', 'oneoff', oneOffByCat);
-    grid[e.id] = { months, rows };
+    grid[e.id] = { months, start, rows };
   }
 
   // ---------- treasury schedule (separate layer) ----------

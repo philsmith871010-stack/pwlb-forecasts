@@ -618,3 +618,18 @@ textarea.input { min-height: 120px; font-family: var(--font-mono); font-size: 12
 .link-btn.xs { font-size: 11.5px; }
 .line-card .lc-gridbar { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .line-card .lc-series tr.removed td:not(:last-child) { text-decoration: line-through; color: var(--pt-muted-2); }
+.grid-editor .ge-top { gap: 12px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 6px; }
+.grid-editor .ge-top .ge-help { flex: 1; min-width: 280px; margin: 0; }
+.grid-editor .ge-monthbar { gap: 8px; margin: 4px 0 8px; flex-wrap: wrap; }
+.ge-days { max-height: 520px; overflow: auto; }
+.ge-days .ge-table th { white-space: normal; min-width: 104px; max-width: 140px; font-size: 11.5px; line-height: 1.25; text-align: right; vertical-align: bottom; }
+.ge-days .ge-table th.ge-name { min-width: 150px; text-align: left; }
+.ge-days .ge-table th.ro { background: #5a6b7b; }
+.ge-days .ge-table tr.off td { background: #f4f5f7; }
+.ge-days .ge-table tr.off td.ge-name { color: var(--pt-muted); font-weight: 500; }
+.ge-days .ge-table tr.off td.ov { background: var(--pt-orange-soft); }
+.ge-table td.byday { background-image: linear-gradient(135deg, transparent 0 82%, var(--pt-orange) 82% 100%); }
+.ge-table th { z-index: 2; }
+.ge-table th.ge-name { z-index: 3; }
+.ge-table td.ovm { background: #fff7ef; }
+.ge-swatch.light { background: #fff7ef; border-color: #f7c79a; }

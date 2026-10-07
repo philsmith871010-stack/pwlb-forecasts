@@ -202,6 +202,44 @@ describe('month-by-month grid', async () => {
     expect(fc1.grid.grants_general.rows.find((r) => r.kind === 'oneoff')!.values.some((v) => Math.abs(v - 3e6) < 1)).toBe(true);
   });
 
+  it('a figure typed for one day lands on that day, exactly', () => {
+    const fc0 = runForecast(req);
+    const gr = fc0.grid.salaries;
+    const sRow = gr.rows.find((r) => r.kind === 'series')!;
+    // the day the payment is usually made in the second month, moved to a figure of our own
+    const [d0] = [...sRow.daily.keys()].filter((d) => sRow.daily[d] !== 0 && d > 31);
+    const day = isoFromDay(fc0.start + d0);
+    const quiet = isoFromDay(fc0.start + d0 + 2);
+    const fc1 = runForecast({ ...req, overrides: [
+      { categoryId: 'salaries', row: sRow.key, month: day.slice(0, 7), date: day, amount: -42 },
+      { categoryId: 'salaries', row: sRow.key, month: quiet.slice(0, 7), date: quiet, amount: -1_000_000 },
+    ] });
+    const r1 = fc1.grid.salaries.rows.find((r) => r.key === sRow.key)!;
+    expect(r1.daily[d0]).toBe(-42);
+    expect(r1.daily[d0 + 2]).toBe(-1_000_000);
+    expect(r1.dayOverridden[d0]).toBe(1);
+    const c = fc1.explain.find((e) => e.id === 'salaries')!.catIdx;
+    expect(fc1.daily[c * fc1.H + d0] - fc0.daily[c * fc0.H + d0]).toBeCloseTo(-42 - sRow.daily[d0], 4);
+    const k = fc1.grid.salaries.months.indexOf(day.slice(0, 7));
+    expect(r1.byDay[k]).toBe(true);
+    // rows still add up to the line
+    const a = monthly(fc1, 'salaries'), b = colSum(fc1, 'salaries');
+    a.forEach((v, j) => expect(b[j]).toBeCloseTo(v, 0));
+  });
+
+  it('day figures sit on top of a month total for the same row', () => {
+    const fc0 = runForecast(req);
+    const m = fc0.grid.salaries.months[3];
+    const mStart = dayFromISO(`${m}-01`) - fc0.start;
+    const fc1 = runForecast({ ...req, overrides: [
+      { categoryId: 'salaries', row: 'pattern', month: m, amount: -500_000 },
+      { categoryId: 'salaries', row: 'pattern', month: m, date: isoFromDay(fc0.start + mStart + 9), amount: -77_000 },
+    ] });
+    const r = fc1.grid.salaries.rows.find((x) => x.key === 'pattern')!;
+    expect(r.daily[mStart + 9]).toBe(-77_000);
+    expect(r.overridden[3]).toBe(true);
+  });
+
   it('removing one regular payment removes only that payment', () => {
     const fc0 = runForecast(req);
     const sRow = fc0.grid.salaries.rows.find((r) => r.kind === 'series')!;
@@ -212,5 +250,43 @@ describe('month-by-month grid', async () => {
     expect(r1.values.every((v) => v === 0)).toBe(true);
     const drop = monthly(fc0, 'salaries').reduce((t, v) => t + v, 0) - monthly(fc1, 'salaries').reduce((t, v) => t + v, 0);
     expect(drop).toBeCloseTo(sRow.values.reduce((t, v) => t + v, 0), 0);
+  });
+});
+
+describe('grid edits: days and months together', async () => {
+  const { applyCells } = await import('../src/ui/forecast/GridEditor');
+  const g = generateDataset({ ...DEFAULT_GENERATOR_OPTIONS, seed: 'e2e-grid2' });
+  const ds = await ingest(g.files.map((f) => ({ name: f.name, data: f.text, size: f.text.length, mapping: detectMapping(f.text.slice(0, 96000), f.name).mapping })));
+  const res = categorise(ds, { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true });
+  const basis = buildBasis(ds, res);
+  const start = basis.dataEnd + 1;
+  const settings = { start: isoFromDay(start), end: isoFromDay(addMonths(start, 6) - 1), granularity: 'monthly' as const, openingPosition: null, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: true, bandZ: 1.645 };
+  const req = { basis, categories: DEFAULT_CATEGORIES, settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 0 };
+
+  it('a day edit inside a typed month total keeps the rest of that month where it was', () => {
+    const fc0 = runForecast(req);
+    const row = fc0.grid.grants_general.rows.find((r) => r.kind === 'pattern')!;
+    const m = fc0.grid.grants_general.months[1];
+    const dayIso = Array.from({ length: fc0.H }, (_, d) => isoFromDay(fc0.start + d));
+    const ctx = (fc: typeof fc0) => ({ catId: 'grants_general', sign: 1, grid: fc.grid.grants_general, dayIso });
+    // 1. a month total
+    let ov = applyCells([], [{ row: 'pattern', month: m, shown: 900_000 }], ctx(fc0));
+    const fc1 = runForecast({ ...req, overrides: ov });
+    const r1 = fc1.grid.grants_general.rows.find((r) => r.key === 'pattern')!;
+    const monthDays = dayIso.map((iso, d) => ({ iso, d })).filter((x) => x.iso.slice(0, 7) === m);
+    const before = monthDays.map((x) => r1.daily[x.d]);
+    // 2. one day in that month changed
+    const target = monthDays.find((x) => r1.daily[x.d] === 0)!;
+    ov = applyCells(ov, [{ row: 'pattern', month: m, date: target.iso, shown: 50_000 }], ctx(fc1));
+    expect(ov.some((o) => !o.date && o.month === m)).toBe(false);
+    const fc2 = runForecast({ ...req, overrides: ov });
+    const r2 = fc2.grid.grants_general.rows.find((r) => r.key === 'pattern')!;
+    monthDays.forEach((x, k) => expect(r2.daily[x.d]).toBeCloseTo(x.d === target.d ? 50_000 : before[k], 2));
+    expect(r2.values[1]).toBeCloseTo(950_000, 0);
+    // 3. a new month total wipes that month's day figures
+    ov = applyCells(ov, [{ row: 'pattern', month: m, shown: 1_000_000 }], ctx(fc2));
+    expect(ov.filter((o) => o.month === m && o.date)).toHaveLength(0);
+    expect(runForecast({ ...req, overrides: ov }).grid.grants_general.rows.find((r) => r.key === 'pattern')!.values[1]).toBe(1_000_000);
+    void row;
   });
 });

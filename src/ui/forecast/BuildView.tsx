@@ -261,9 +261,9 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
 
           <div className="lc-gridbar">
             <button className="btn sm" onClick={() => setShowGrid(!showGrid)} aria-expanded={showGrid}>
-              <i className="bi bi-grid-3x3" /> {showGrid ? 'Hide month by month' : 'Edit month by month'}{overridesHere.length ? ` (${overridesHere.length} figure${overridesHere.length > 1 ? 's' : ''} yours)` : ''}
+              <i className="bi bi-grid-3x3" /> {showGrid ? 'Hide the grid' : 'Edit by month or by day'}{overridesHere.length ? ` (${overridesHere.length} figure${overridesHere.length > 1 ? 's' : ''} yours)` : ''}
             </button>
-            <span className="xs muted">See every payment month by month, type over any figure, or paste a schedule from Excel (e.g. grant allocations you’ve been told about).</span>
+            <span className="xs muted">See every payment month by month or day by day, type over any figure, or paste a schedule from Excel (e.g. grant payment dates you’ve been told about).</span>
           </div>
           {showGrid && grid && <GridEditor sc={sc} upd={upd} catId={e.id} grid={grid} inflow={inflow} start={sc.settings.start} />}
 

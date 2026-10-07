@@ -74,8 +74,10 @@ export type Assumption =
 export interface GridOverride {
   categoryId: string;
   row: string;
-  /** YYYY-MM */
+  /** YYYY-MM: the row's total for that month */
   month: string;
+  /** YYYY-MM-DD: the row's amount on that day (applied after month totals) */
+  date?: string;
   /** signed: + in, − out */
   amount: number;
 }
