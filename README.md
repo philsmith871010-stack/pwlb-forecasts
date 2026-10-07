@@ -78,6 +78,13 @@ A forecast recomputes in 10–30 ms; changing an assumption updates the chart an
 
 After the first full run the sidebar becomes a **workspace** (Data, History, Forecast, Backtest, Save & export, Settings) instead of repeating the wizard.
 
+## Day to day, or a periodic review
+
+The team file can keep a **cash history**: daily totals by category for each bank account, and the dates and amounts of regular payments (never individual bank lines). With it:
+
+- **Day to day:** open the team file and add today's statement. You see the day sorted by category, sort anything new, and the day joins the history.
+- **Periodic review:** add the latest month, quarter or year (nothing is counted twice; gaps are pointed out), or go straight to Look back and Look ahead from the saved history without loading any files.
+
 ## Deal register (optional, recommended)
 
 On step 1 you can add your PWLBtoday **deal register** (the Excel workbook of loans and investments). The example data comes with one. With it:

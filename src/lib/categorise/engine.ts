@@ -554,6 +554,61 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
  * Recurrence detection: rows grouped by signature × direction, tested for a regular cadence.
  * Only rows on or before `maxDay` are used (so backtests never see the future).
  */
+/** What a run of payment days says: how often, which day, how steady, trending how, still going?
+ *  (days ascending, amounts as absolute per-day totals). Used on bank lines and on saved history. */
+export function describeDays(days: number[], amounts: number[], maxDay: Day) {
+  const iv: number[] = [];
+  for (let k = 1; k < days.length; k++) iv.push(days[k] - days[k - 1]);
+  const med = median(iv);
+  // candidate cadences whose band contains the median interval; best regularity wins,
+  // ties go to the narrower band (a strict 28-day cycle is four-weekly, not monthly)
+  let cadence: Cadence = 'irregular';
+  let regularity = 0, bestWidth = Infinity;
+  for (const [cd, [, lo, hi]] of Object.entries(CADENCE_DAYS) as [Exclude<Cadence, 'irregular'>, [number, number, number]][]) {
+    if (med < lo || med > hi) continue;
+    const reg = iv.filter((x) => x >= lo && x <= hi).length / iv.length;
+    if (reg > regularity + 1e-9 || (Math.abs(reg - regularity) < 1e-9 && hi - lo < bestWidth)) { cadence = cd; regularity = reg; bestWidth = hi - lo; }
+  }
+  // twice a month on set dates (1st & 15th) vs. a strict 14-day cycle
+  if (cadence === 'fortnightly' || cadence === 'semi_monthly') {
+    const exact14 = iv.filter((x) => x === 14).length / iv.length;
+    cadence = exact14 >= 0.6 ? 'fortnightly' : 'semi_monthly';
+    const [, lo, hi] = CADENCE_DAYS[cadence];
+    regularity = iv.filter((x) => x >= lo && x <= hi).length / iv.length;
+  }
+  const medAmt = median(amounts);
+  const mad = median(amounts.map((x) => Math.abs(x - medAmt)));
+  const cv = medAmt ? (1.4826 * mad) / medAmt : 0;
+  // modal day of month & last-working-day pattern
+  const domCount = new Map<number, number>();
+  let lwd = 0;
+  for (const d of days) {
+    const { y, m, d: dd } = ymdFromDay(d);
+    domCount.set(dd, (domCount.get(dd) ?? 0) + 1);
+    // last business day of month?
+    let k = d + 1;
+    while (!isBusinessDay(k) && ymdFromDay(k).m === m) k++;
+    if (ymdFromDay(k).m !== m || (ymdFromDay(k).y !== y)) lwd++;
+  }
+  const dom = [...domCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const modeIn = (f: (d: number) => boolean) => [...domCount.entries()].filter(([d]) => f(d)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
+  const dom1 = modeIn((d) => d <= 14), dom2 = modeIn((d) => d >= 15);
+  // trend: log-linear regression of amounts on years
+  let trend = 0;
+  if (days.length >= 6 && amounts.every((x) => x > 0)) {
+    const xs = days.map((d) => (d - days[0]) / 365.25);
+    const ys = amounts.map((x) => Math.log(x));
+    const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    let sxy = 0, sxx = 0;
+    for (let k = 0; k < xs.length; k++) { sxy += (xs[k] - mx) * (ys[k] - my); sxx += (xs[k] - mx) ** 2; }
+    if (sxx > 0.05) trend = Math.exp(sxy / sxx) - 1;
+  }
+  const recurring = cadence !== 'irregular' && regularity >= 0.6;
+  const period = cadence === 'irregular' ? 30 : CADENCE_DAYS[cadence][0];
+  const active = maxDay - days[days.length - 1] <= period * 1.6 + 7;
+  return { cadence, regularity, medAmt, cv, dom, dom1, dom2, lwdShare: lwd / days.length, trend, recurring, active };
+}
+
 export function detectSeries(
   ds: Dataset,
   r: { sig: Int32Array; signatures: string[]; cat: Int16Array; internalIdx: number },
@@ -582,67 +637,21 @@ export function detectSeries(
       for (const i of rows) dayTot.set(ds.day[i], (dayTot.get(ds.day[i]) ?? 0) + ds.amount[i]);
       const days = [...dayTot.keys()].sort((a, b) => a - b);
       if (days.length < 3) continue;
-      const iv: number[] = [];
-      for (let k = 1; k < days.length; k++) iv.push(days[k] - days[k - 1]);
-      const med = median(iv);
-      // candidate cadences whose band contains the median interval; best regularity wins,
-      // ties go to the narrower band (a strict 28-day cycle is four-weekly, not monthly)
-      let cadence: Cadence = 'irregular';
-      let regularity = 0, bestWidth = Infinity;
-      for (const [cd, [, lo, hi]] of Object.entries(CADENCE_DAYS) as [Exclude<Cadence, 'irregular'>, [number, number, number]][]) {
-        if (med < lo || med > hi) continue;
-        const reg = iv.filter((x) => x >= lo && x <= hi).length / iv.length;
-        if (reg > regularity + 1e-9 || (Math.abs(reg - regularity) < 1e-9 && hi - lo < bestWidth)) { cadence = cd; regularity = reg; bestWidth = hi - lo; }
-      }
-      // twice a month on set dates (1st & 15th) vs. a strict 14-day cycle
-      if (cadence === 'fortnightly' || cadence === 'semi_monthly') {
-        const exact14 = iv.filter((x) => x === 14).length / iv.length;
-        cadence = exact14 >= 0.6 ? 'fortnightly' : 'semi_monthly';
-        const [, lo, hi] = CADENCE_DAYS[cadence];
-        regularity = iv.filter((x) => x >= lo && x <= hi).length / iv.length;
-      }
       const amounts = days.map((d) => Math.abs(dayTot.get(d)!));
-      const medAmt = median(amounts);
-      const mad = median(amounts.map((x) => Math.abs(x - medAmt)));
-      const cv = medAmt ? (1.4826 * mad) / medAmt : 0;
-      // modal day of month & last-working-day pattern
-      const domCount = new Map<number, number>();
-      let lwd = 0;
-      for (const d of days) {
-        const { y, m, d: dd } = ymdFromDay(d);
-        domCount.set(dd, (domCount.get(dd) ?? 0) + 1);
-        // last business day of month?
-        let k = d + 1;
-        while (!isBusinessDay(k) && ymdFromDay(k).m === m) k++;
-        if (ymdFromDay(k).m !== m || (ymdFromDay(k).y !== y)) lwd++;
-      }
-      const dom = [...domCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
-      const modeIn = (f: (d: number) => boolean) => [...domCount.entries()].filter(([d]) => f(d)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
-      const dom1 = modeIn((d) => d <= 14), dom2 = modeIn((d) => d >= 15);
-      // trend: log-linear regression of amounts on years
-      let trend = 0;
-      if (days.length >= 6 && amounts.every((x) => x > 0)) {
-        const xs = days.map((d) => (d - days[0]) / 365.25);
-        const ys = amounts.map((x) => Math.log(x));
-        const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
-        let sxy = 0, sxx = 0;
-        for (let k = 0; k < xs.length; k++) { sxy += (xs[k] - mx) * (ys[k] - my); sxx += (xs[k] - mx) ** 2; }
-        if (sxx > 0.05) trend = Math.exp(sxy / sxx) - 1;
-      }
-      const recurring = cadence !== 'irregular' && regularity >= 0.6;
+      const dd = describeDays(days, amounts, maxDay);
+      const { cadence, regularity, medAmt, cv, dom, dom1, dom2, lwdShare, recurring } = dd;
+      const trend = dd.trend;
       if (!recurring && cadence !== 'daily') continue;
       const s = key >> 1;
       const catVotes = new Map<number, number>();
       for (const i of rows) catVotes.set(cat[i], (catVotes.get(cat[i]) ?? 0) + 1);
       const catMajor = [...catVotes.entries()].sort((a, b) => b[1] - a[1])[0][0];
-      const spanEnd = maxDay;
-      const period = cadence === 'irregular' ? 30 : CADENCE_DAYS[cadence][0];
       const total = rows.reduce((t, i) => t + ds.amount[i], 0);
       const ser: Series = {
         id: seriesList.length, signature: signatures[s], categoryIdx: catMajor, direction: key & 1 ? -1 : 1,
         cadence, regularity, occurrences: days.length, firstDay: days[0], lastDay: days[days.length - 1],
-        typicalAmount: medAmt * (key & 1 ? -1 : 1), amountCV: cv, dayOfMonth: cadence === 'semi_monthly' ? dom1 : dom, dayOfMonth2: cadence === 'semi_monthly' ? dom2 : undefined, lastWorkingDay: lwd / days.length > 0.7 && cadence === 'monthly',
-        trendPct: trend, active: spanEnd - days[days.length - 1] <= period * 1.6 + 7, total,
+        typicalAmount: medAmt * (key & 1 ? -1 : 1), amountCV: cv, dayOfMonth: cadence === 'semi_monthly' ? dom1 : dom, dayOfMonth2: cadence === 'semi_monthly' ? dom2 : undefined, lastWorkingDay: lwdShare > 0.7 && cadence === 'monthly',
+        trendPct: trend, active: dd.active, total,
         classification: overrideBySig.get(signatures[s]) ?? 'recurring', recurring: recurring || cadence === 'daily',
       };
       seriesList.push(ser);

@@ -5,6 +5,7 @@ import type { TeamFile, Rule, Scenario, TxnOverride, SeriesOverride, ForecastSet
 import { uid } from '../lib/model';
 import { emptyTeamFile, parseTeamFile, serialiseTeamFile, teamHash, fsAccessSupported, readHandle, writeHandle, saveAsWithPicker, downloadText, mergeTeamFiles, MergeConflict } from '../lib/teamfile';
 import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
+import { mergeHistory, basisFromHistory, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
 import type { GeneratorOptions } from '../generator';
@@ -78,6 +79,12 @@ interface State {
   demo: { rows: number; options: GeneratorOptions } | null;
   /** the council's deal register, read in this browser for this session only (never saved to the team file) */
   register: RegisterInfo | null;
+  /** the cash history as it was before this session's files (from the team file) */
+  historyBase: CashHistory | null;
+  /** what adding this session's files to the history did */
+  historyReport: MergeReport | null;
+  /** looking at the saved history alone, without loading bank files */
+  historyOnly: boolean;
   registerBusy: boolean;
   registerError: string | null;
   step: StepId;
@@ -120,6 +127,8 @@ interface Actions {
   clearRegister: () => Promise<void>;
   runIngest: () => Promise<boolean>;
   runCategorise: () => Promise<void>;
+  useSavedHistory: () => void;
+  forgetHistory: () => void;
   saveTeam: (mode?: 'save' | 'saveAs' | 'download') => Promise<void>;
   resolveMerge: (apply: boolean) => Promise<void>;
   setMergeChoice: (key: string, v: 'mine' | 'theirs') => void;
@@ -169,6 +178,9 @@ export const useStore = create<State & Actions>((set, get) => ({
   hasTruth: false,
   demo: null,
   register: null,
+  historyBase: null,
+  historyReport: null,
+  historyOnly: false,
   registerBusy: false,
   registerError: null,
   step: 'home',
@@ -209,7 +221,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   loadTeamText: (text, name, handle = null) => {
     const r = parseTeamFile(text);
     if (!r.ok || !r.team) return { ok: false, message: r.errors.join(' ') };
-    set({ team: r.team, teamName: name, teamHandle: handle, teamLoadedHash: teamHash(text), teamLoadedSavedAt: r.team.savedAt, dirty: false, sessionChanges: [], activeScenarioId: r.team.forecasts[0]?.id ?? null });
+    set({ team: r.team, teamName: name, teamHandle: handle, teamLoadedHash: teamHash(text), teamLoadedSavedAt: r.team.savedAt, dirty: false, sessionChanges: [], activeScenarioId: r.team.forecasts[0]?.id ?? null, historyBase: r.team.cashHistory ?? null, historyReport: null, historyOnly: false });
     lsSet(LS_TEAM, text);
     // re-match bank profiles for sources already added
     set((s) => ({ sources: s.sources.map((src) => applyProfile(src, r.team!)) }));
@@ -218,7 +230,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
   startFresh: (authority) => {
     const t = emptyTeamFile(authority);
-    set({ team: t, teamName: null, teamHandle: null, teamLoadedHash: null, teamLoadedSavedAt: null, dirty: true, sessionChanges: [], activeScenarioId: null });
+    set({ team: t, teamName: null, teamHandle: null, teamLoadedHash: null, teamLoadedSavedAt: null, dirty: true, sessionChanges: [], activeScenarioId: null, historyBase: null, historyReport: null, historyOnly: false });
   },
 
   updateTeam: (fn, opts) => {
@@ -301,7 +313,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       const r = await engine().generateDemo(o);
       const sources: Source[] = r.files.map((f) => applyProfile({ name: f.name, size: f.size, demo: true, report: f.report, mapping: f.report.mapping }, get().team));
       if (get().team.authorityName === 'My Council') set((st) => ({ team: { ...st.team, authorityName: 'Northbridge Council (example)' } }));
-      set({ sources, demo: { rows: r.rows, options: o }, hasTruth: true });
+      set({ sources, demo: { rows: r.rows, options: o }, hasTruth: true, historyBase: null });
       // the example council comes with its deal register, so the whole tool can be tried
       if (!get().register || get().register!.example) set({ register: await engine().useExampleRegister(), registerError: null });
       await get().runIngest();
@@ -343,10 +355,13 @@ export const useStore = create<State & Actions>((set, get) => ({
     if (!sources.length) return false;
     set({ ingestBusy: { phase: 'Starting…', frac: 0 }, ingestError: null, cat: null, agg: null, basis: null });
     try {
+      // progress messages can arrive after the result (small files): ignore any once it's done
+      let live = true;
       const summary = await engine().ingest(
         sources.map((s) => ({ name: s.name, file: s.file, mapping: s.mapping })),
-        proxy((p: Busy) => set({ ingestBusy: p })),
+        proxy((p: Busy) => { if (live) set({ ingestBusy: p }); }),
       );
+      live = false;
       set({ ingest: summary, ingestBusy: null });
       set({ hasTruth: await engine().hasTruth() });
       await get().runCategorise();
@@ -361,17 +376,31 @@ export const useStore = create<State & Actions>((set, get) => ({
     const t = get().team;
     set({ catBusy: { phase: 'Categorising…', frac: 0 } });
     try {
+      let live = true;
       const summary = await engine().categorise(
         { categories: t.categories, rules: t.rules, aliases: t.aliases, seriesOverrides: t.seriesOverrides, txnOverrides: t.txnOverrides, useStarterRules: true },
-        proxy((p: Busy) => set({ catBusy: p })),
+        proxy((p: Busy) => { if (live) set({ catBusy: p }); }),
       );
-      const basis = await engine().getBasis();
+      live = false;
+      let basis = await engine().getBasis();
+      // add this session's files to the cash history (example data never mixes with a real council's)
+      const isDemo = !!get().demo;
+      const hb = get().historyBase;
+      const accts = get().ingest?.accounts ?? [];
+      // an example history only takes more of its own example accounts; a real one never takes example data
+      const base = hb && (hb.example ? accts.length > 0 && accts.every((a) => hb.accounts.some((x) => x.key === a)) : !isDemo) ? hb : null;
+      const session = await engine().sessionHistory(base?.series.map(({ sig, cat, dir }) => ({ sig, cat, dir })) ?? []);
+      const example = isDemo || !!base?.example;
+      const { history, report } = mergeHistory(base, { ...session, example: example || undefined });
+      history.example = example || undefined;
+      if (base) basis = basisFromHistory(history, summary.catIds) ?? basis;
       // record rule hit counts on team rules
       const hits = new Map(summary.ruleHits.map((h) => [h.id, h.hits]));
       set((s) => ({
-        cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1,
-        team: { ...s.team, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
+        cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1, historyReport: report, historyOnly: false,
+        team: { ...s.team, cashHistory: history, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
       }));
+      lsSet(LS_TEAM, JSON.stringify(get().team));
       if (!get().activeScenarioId && !get().team.forecasts.length) {
         const wasDirty = get().dirty;
         const id = get().newScenario('Base');
@@ -381,6 +410,20 @@ export const useStore = create<State & Actions>((set, get) => ({
       set({ catBusy: null });
       get().toast(`Categorisation failed: ${(e as Error).message}`, 'err');
     }
+  },
+
+  useSavedHistory: () => {
+    const h = get().historyBase;
+    if (!h) return;
+    const basis = basisFromHistory(h, get().team.categories.map((c) => c.id));
+    if (!basis) return;
+    set({ basis, agg: basis.agg, historyOnly: true, catVersion: get().catVersion + 1 });
+    if (!get().activeScenarioId && !get().team.forecasts.length) set({ activeScenarioId: get().newScenario('Base') });
+  },
+
+  forgetHistory: () => {
+    set((s) => ({ historyBase: null, historyReport: null, historyOnly: false, team: { ...s.team, cashHistory: undefined }, dirty: true }));
+    lsSet(LS_TEAM, JSON.stringify(get().team));
   },
 
   saveTeam: async (mode = 'save') => {
@@ -487,3 +530,6 @@ function summariseChanges(s: State): string {
   if (fc) parts.push(`saved forecast “${fc.name}”`);
   return parts.length ? parts.join(', ').replace(/^./, (c) => c.toUpperCase()) : 'Saved';
 }
+
+// the cash history from the cached team file is the base for this browser session
+useStore.setState({ historyBase: useStore.getState().team.cashHistory ?? null });

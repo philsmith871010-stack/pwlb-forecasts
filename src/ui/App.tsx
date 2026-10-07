@@ -44,7 +44,7 @@ export function App() {
     if (id === 'load') return true;
     if (id === 'map') return s.sources.length > 0;
     if (id === 'save') return true;
-    if ((id === 'history' || id === 'forecast') && !cat) return team.forecasts.some((f) => f.resultsSnapshot) || !!team.historySummary;
+    if ((id === 'history' || id === 'forecast') && !cat) return !!s.basis || team.forecasts.some((f) => f.resultsSnapshot) || !!team.historySummary;
     return !!cat || (id === 'categorise' && !!ingest);
   };
   const doneStep = (i: number) => i < reached && i !== stepIndex && enabled(steps[i].id);

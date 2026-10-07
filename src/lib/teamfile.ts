@@ -1,3 +1,4 @@
+import { mergeHistory, type CashHistory } from './history/cashHistory';
 // The shared team JSON file: everything the team needs except transaction data.
 import { DEFAULT_CATEGORIES } from './categories';
 import type { TeamFile, Rule, Scenario, BankProfile, Alias, SeriesOverride, TxnOverride } from './model';
@@ -48,6 +49,7 @@ export function parseTeamFile(text: string): ValidationResult {
     seriesOverrides: arr<SeriesOverride>('seriesOverrides'),
     txnOverrides: arr<TxnOverride>('txnOverrides'),
     historySummary: (o.historySummary as TeamFile['historySummary']) ?? undefined,
+    cashHistory: validHistory(o.cashHistory) ? (o.cashHistory as CashHistory) : undefined,
     forecasts: arr<Scenario>('forecasts').filter((f) => f && f.id && f.settings),
     changeLog: arr<TeamFile['changeLog'][number]>('changeLog'),
   };
@@ -68,9 +70,14 @@ export function serialiseTeamFile(team: TeamFile, savedBy: string, summary: stri
     savedBy,
     rules: team.rules.map(({ source: _s, ...r }) => r as Rule),
     historySummary: team.settings.includeHistorySummary ? team.historySummary : undefined,
+    cashHistory: team.settings.keepCashHistory === false ? undefined : team.cashHistory,
     changeLog: [...team.changeLog, { at: now, by: savedBy, summary }].slice(-200),
   };
-  return { json: JSON.stringify(out, null, 2), team: out };
+  // readable, except the cash history's long number lists, which stay on single lines
+  const { cashHistory, ...rest } = out;
+  let json = JSON.stringify(cashHistory ? { ...rest, cashHistory: '__CASH_HISTORY__' } : rest, null, 2);
+  if (cashHistory) json = json.replace('"__CASH_HISTORY__"', JSON.stringify(cashHistory));
+  return { json, team: out };
 }
 
 export function teamHash(text: string): string {
@@ -119,8 +126,16 @@ export function mergeTeamFiles(mine: TeamFile, theirs: TeamFile): MergeResult {
     seriesOverrides: unionByKey(mine.seriesOverrides, theirs.seriesOverrides, (s) => s.signature),
     txnOverrides: unionByKey(mine.txnOverrides, theirs.txnOverrides, (t) => t.key),
     changeLog: unionByKey([...theirs.changeLog, ...mine.changeLog], [], (c) => `${c.at}|${c.by}|${c.summary}`).sort((a, b) => a.at.localeCompare(b.at)),
+    // both histories kept; where they cover the same days of an account, ours (the newer load) wins
+    cashHistory: mine.cashHistory && theirs.cashHistory ? mergeHistory(theirs.cashHistory, mine.cashHistory).history : mine.cashHistory ?? theirs.cashHistory,
   };
+  if (mine.cashHistory && theirs.cashHistory && JSON.stringify(mine.cashHistory) !== JSON.stringify(theirs.cashHistory)) summary.push('cash history combined with the file on disk');
   return { merged, conflicts, summary };
+}
+
+function validHistory(h: unknown): boolean {
+  const x = h as CashHistory | undefined;
+  return !!x && x.v === 1 && Array.isArray(x.accounts) && Array.isArray(x.cells) && Array.isArray(x.cats) && Array.isArray(x.series) && x.cells.length === x.accounts.length;
 }
 
 function strip(x: unknown): unknown {

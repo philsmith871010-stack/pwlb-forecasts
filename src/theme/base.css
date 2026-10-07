@@ -657,3 +657,17 @@ textarea.input { min-height: 120px; font-family: var(--font-mono); font-size: 12
 .imp-ticks .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--pt-line); border-radius: var(--radius-pill); padding: 3px 10px; font-size: 12.5px; cursor: pointer; background: #fff; }
 .imp-ticks .chip.on { border-color: var(--pt-orange); background: var(--pt-orange-soft); font-weight: 600; }
 .warn-text { color: var(--pt-amber); }
+
+/* saved cash history and the daily view */
+.history-card { border: 1px solid #cfe0f0; background: linear-gradient(180deg, #f7fbff, #fff); margin-bottom: 14px; }
+.history-card .hc-icon { font-size: 26px; color: var(--pt-navy); margin-right: 12px; line-height: 1; }
+.history-card .hc-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.history-card .col-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; margin-left: 14px; }
+.day-card .day-tbl tr.grp td { background: #f3f6f9; font-size: 11.5px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: var(--pt-muted-2); }
+.day-card .day-tbl tr.warn td { background: var(--pt-amber-soft); }
+.day-card .day-tbl tr.lines > td { background: #fafbfc; padding: 4px 8px 8px; }
+.day-card .day-foot { margin-top: 10px; padding: 10px 12px; background: #f3f6f9; border-radius: var(--radius-md); }
+@media (max-width: 700px) { .history-card .row { flex-wrap: wrap; } .history-card .col-actions { align-items: stretch; margin: 10px 0 0; } }
+.history-choice { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; margin: 6px 0 10px; text-align: left; }
+.history-choice span { display: flex; flex-direction: column; gap: 3px; }
+.history-choice small { color: var(--pt-muted); font-size: 11.5px; }

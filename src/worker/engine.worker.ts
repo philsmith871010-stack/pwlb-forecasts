@@ -20,6 +20,7 @@ import type { IngestSummary, CatSummary, TxnRow, ReviewGroup, DealQueue, TxnFilt
 import { readRegisterWorkbook, registerFromSnapshot, LoadedRegister, REG } from '../lib/register';
 import { registerEvents, registerAccounts, liquidBalances, toDay, CashEvent } from '../lib/register/cashflows';
 import { liabilityBenchmark } from '../lib/register/benchmark';
+import { fromSession, type CashHistory } from '../lib/history/cashHistory';
 
 let ds: Dataset | null = null;
 let res: CatResult | null = null;
@@ -224,6 +225,11 @@ const api = {
       bySource: [...bySourceMap.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.abs - a.abs),
       registerMatch: r.registerMatch ?? null,
     };
+  },
+
+  /** This session's files as cash history (aggregates and regular payments only, no lines). */
+  sessionHistory(known: { sig: string; cat: string; dir: 1 | -1 }[]): CashHistory {
+    return fromSession(need(ds, 'Data'), need(res, 'Categorisation'), known);
   },
 
   getAggregates(): Aggregates {

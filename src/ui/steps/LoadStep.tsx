@@ -6,6 +6,7 @@ import { bytes, day, ago, int } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
 import { engine } from '../../worker/client';
 import { RegisterCard } from '../register/RegisterCard';
+import { SavedHistoryCard, HistoryAddedNote, DayCard } from '../history/HistoryCards';
 
 export function LoadStep() {
   const s = useStore();
@@ -13,20 +14,29 @@ export function LoadStep() {
   const realSources = s.sources.filter((x) => !x.demo);
   const busy = !!s.ingestBusy || (!!s.catBusy && !s.cat);
   const done = !!s.ingest && !!s.cat && !busy;
+  const saved = s.historyBase;
+  // a day or two of bank data added to a saved history: show the day itself
+  const daily = done && !!saved && !s.demo && s.ingest!.maxDay - s.ingest!.minDay <= 3;
   return (
     <div className="page narrow">
-      <PageHead eyebrow={eyebrow} title="Add your bank data">
-        The forecast learns from your council’s past bank transactions. Everything stays on this computer.
+      <PageHead eyebrow={eyebrow} title={saved ? 'Add new bank data' : 'Add your bank data'}>
+        {saved
+          ? <>Add today’s statement for day-to-day sorting, or the latest month, quarter or year for a review. It joins your saved history; nothing is counted twice.</>
+          : <>The forecast learns from your council’s past bank transactions. Everything stays on this computer.</>}
       </PageHead>
 
       {s.ingestError && <div className="callout red mb"><strong>We couldn’t read those files.</strong> {s.ingestError}</div>}
       {busy && <ReadingCard />}
-      {done && <DoneCard />}
+      {daily ? <DayCard /> : done && <DoneCard />}
+
+      {!busy && !done && saved && <SavedHistoryCard h={saved} />}
 
       {!busy && !done && (
         <>
           <Explain
-            what={<>Bank statement exports — the <strong>CSV files</strong> you can download from your online banking. Three to five years is ideal.</>}
+            what={saved
+              ? <>Bank statement exports (<strong>CSV files</strong>) for the days since your history ends, or any period you want to load again. One day is fine.</>
+              : <>Bank statement exports — the <strong>CSV files</strong> you can download from your online banking. Three to five years is ideal.</>}
             todo="Drag your files into the box below. Several files (different accounts or years) is fine. No files yet? Use the example data." />
           <div className="choice-grid">
             <UploadCard />
@@ -36,7 +46,7 @@ export function LoadStep() {
         </>
       )}
 
-      {!busy && <RegisterCard />}
+      {!busy && !daily && <RegisterCard />}
 
       <TeamFileLine />
     </div>
@@ -136,6 +146,7 @@ function DoneCard() {
       </div>
       <ul className="done-list">
         <li><i className="bi bi-check2" /> {(Math.floor(cat.valueCategorisedPct * 1000) / 10).toFixed(1)}% of the money has been sorted into categories such as council tax, salaries and suppliers.</li>
+        <HistoryAddedNote />
         <li><i className="bi bi-check2" /> Loans and investments have been spotted and set aside{cat.registerMatch?.matched ? <>, {int(cat.registerMatch.matched)} of them matched exactly to your deal register</> : ''}.</li>
         {ingest.rejectsTotal > 0 && <li className="muted"><i className="bi bi-info-circle" /> {int(ingest.rejectsTotal)} lines were skipped, such as totals rows or lines without a date. <button className="link-btn" onClick={async () => downloadBlob(await engine().rejectLogBlob(), 'skipped-lines.csv')}>See which</button></li>}
         {needCheck.length > 0 && <li className="warn"><i className="bi bi-exclamation-triangle" /> {needCheck.length} file{needCheck.length > 1 ? 's have' : ' has'} an unusual layout. <button className="link-btn" onClick={() => goto('map')}>Check {needCheck.length > 1 ? 'them' : 'it'}</button></li>}

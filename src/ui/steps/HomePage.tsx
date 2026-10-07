@@ -23,7 +23,7 @@ const SECURITY = [
   { icon: 'bi-pc-display', title: 'Runs on your computer', text: 'Bank files are read and processed inside this browser tab. There is no server behind this tool.' },
   { icon: 'bi-cloud-slash', title: 'Nothing is uploaded', text: 'No transaction data is sent anywhere — no uploads, no analytics, no tracking. The page is locked so it cannot contact any other website.' },
   { icon: 'bi-robot', title: 'No AI', text: 'Sorting uses clear, visible rules — never an AI service. You can see and change every rule.' },
-  { icon: 'bi-file-earmark-lock', title: 'The team file holds no transactions', text: 'Only rules, layouts, categories and your forecast (its settings, and any figures you typed or imported) are saved. Bank lines and your deal register vanish when you close the tab.' },
+  { icon: 'bi-file-earmark-lock', title: 'The team file holds no transactions', text: 'It keeps rules, layouts and your forecast, plus (if you choose) a cash history: daily totals by category, and regular payments such as payroll. Never individual bank lines. Your deal register vanishes when you close the tab.' },
 ];
 
 export function HomePage() {
@@ -138,7 +138,7 @@ export function HomePage() {
             <div className="home-card"><i className="bi bi-filetype-csv" /><h4>Bank statement exports</h4><p>CSV files downloaded from online banking — ideally three to five years. Any bank, any layout. Or use our example data.</p></div>
             <div className="home-card"><i className="bi bi-journal-text" /><h4>Your deal register (recommended)</h4><p>The PWLBtoday workbook of your loans and investments, so the forecast includes repayments, interest and maturities. Have schedules from other departments, such as grant dates? You can import those too.</p></div>
             <div className="home-card"><i className="bi bi-folder2-open" /><h4>A team file (only if you have one)</h4><p>A small file a colleague may have saved last time. First time? You’ll create one at the end — nothing to prepare.</p></div>
-            <div className="home-card"><i className="bi bi-hourglass-split" /><h4>About 15 minutes</h4><p>The first time, most of it is checking a few items. Next time, with your team file, it takes a few minutes.</p></div>
+            <div className="home-card"><i className="bi bi-hourglass-split" /><h4>About 15 minutes the first time</h4><p>Most of it is checking a few items. After that, your team file remembers your history: add just today’s statement for day-to-day sorting, or the latest quarter for a review.</p></div>
           </div>
           <div className="home-cta">
             <div><h3 style={{ margin: 0 }}>Ready?</h3><div className="muted">Start with your own bank files, or explore with a realistic example council first.</div></div>

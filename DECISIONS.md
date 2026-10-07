@@ -138,3 +138,23 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
     - add on top.
   - **Which rows it replaces** is suggested per line from shared words between the file's names and our payments. Paying departments (DWP, MHCLG…) and month words don't count as a match. If it can't tell, nothing is ticked and the user decides. A replaced row is cleared only in the months where the file has figures for that payment (or all months the file covers for the line, if the file doesn't name it).
   - **Provenance.** Imported figures are tagged with their source (`GridOverride.source`). Importing again under the same name replaces the whole earlier import, and deleting the imported row in the grid removes everything it did, including what it replaced.
+
+## Cash history: day-to-day and periodic use without re-loading everything
+
+- **What the team file keeps** (`TeamFile.cashHistory`, `lib/history/cashHistory.ts`). It never keeps bank lines. It does keep:
+  - for each bank account: the days held, its opening and closing balances where statements show them, and daily totals by category (recurring, one-off, treasury, internal) in pence;
+  - for each regular payment: its payee name, category, direction and every occurrence (day, amount, account). The user chose this level so forecasts from the file alone are as good as from the statements, timing included.
+  - It's about 340 KB for five years and four accounts on the example. It's written on single lines, so the rest of the team file stays readable, and can be switched off when saving ("Keep your cash history").
+- **Merging.** Each session's files become a history of the same shape (`fromSession`, in the worker). It's laid over the saved one account by account, and the days a new file covers replace what was held for those days of that account. So:
+  - re-loading a statement never counts it twice (a test checks totals are unchanged);
+  - a part-day file can be loaded again later;
+  - a full reload re-sorts everything with today's rules.
+  - Gaps of more than 4 days between what was held and what's added are reported.
+- **Regular payments in a short session.** Payments the saved history already knows are carried as occurrences even when one day of data is too short to show them repeating. Their cadence, day of month, trend and "still going" are re-worked from all occurrences with the same `describeDays` that detects series in bank files. A test checks that history built from a full upload forecasts exactly as the files do. Four years saved plus a year added comes within 0.5% of all five loaded together (against gross flows); the difference is a grant whose payments straddle the join.
+- **Example data never mixes with a council's.** An example history only takes more of its own example accounts, and a real history never takes example data.
+- **Step 1 with a saved history:**
+  - a card shows what's held, with "Go straight to your analysis" (Look back and Look ahead from the history alone; sorting needs files);
+  - a load of up to three days shows **Your day**: the day's lines sorted by category, each line a click away, anything unsorted, and one quiet line comparing everyday cash with what the forecast expected. Not a treasury management system: no variance analysis or re-forecasting;
+  - longer loads say what was added, what was replaced, and any gaps.
+- Rule changes apply to files loaded from then on; re-sorting older history means loading those files again.
+- **Fix found on the way:** progress messages from the worker could arrive after its result (for tiny files), leaving "Reading your files…" on screen. They are now ignored once a step is done.

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Panel, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { isReviewed } from '../forecast/BuildView';
+import { historySpan, historyBytes } from '../../lib/history/cashHistory';
 import { useForecast } from '../forecast/useForecast';
 import { engine } from '../../worker/client';
 import { downloadBlob, fsAccessSupported } from '../../lib/teamfile';
@@ -84,7 +85,8 @@ function SimpleSave() {
         <div className="save-card">
           <i className="bi bi-floppy" />
           <h3>Save your work</h3>
-          <p>Saves the sorting decisions, forecast settings and any figures you typed or imported today in a small <strong>team file</strong> (no bank transactions). Next time, open it on step 1 and everything is remembered.</p>
+          <p>Saves the sorting decisions, forecast settings and any figures you typed or imported today in a <strong>team file</strong> (no bank transactions). Next time, open it on step 1 and everything is remembered.</p>
+          <HistoryChoice />
           <div className="field"><label htmlFor="who-s">Your name or initials</label><input id="who-s" className="input" value={user} placeholder="e.g. Sam Patel" onChange={(e) => setUser(e.target.value)} /></div>
           <div className="field"><label htmlFor="auth-s">Council name</label><input id="auth-s" className="input" value={team.authorityName} onChange={(e) => updateTeam((t) => ({ ...t, authorityName: e.target.value }))} /></div>
           <button className={`btn lg ${dirty ? 'navy' : ''}`} onClick={() => void save()}><i className="bi bi-save" /> {dirty ? 'Save team file' : team.savedAt ? `Saved ${ago(team.savedAt)}` : 'Save team file'}</button>
@@ -92,6 +94,25 @@ function SimpleSave() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Whether the team file keeps the cash history, and what that means. */
+function HistoryChoice() {
+  const { team, updateTeam } = useStore();
+  const h = team.cashHistory;
+  if (!h || h.example) return null;
+  const span = historySpan(h);
+  const kb = Math.round(historyBytes(h) / 1024);
+  const on = team.settings.keepCashHistory !== false;
+  return (
+    <label className="check history-choice">
+      <input type="checkbox" checked={on} onChange={(e) => updateTeam((t) => ({ ...t, settings: { ...t.settings, keepCashHistory: e.target.checked } }))} />
+      <span>
+        <strong>Keep your cash history</strong>{span ? <> ({day(span.from)} to {day(span.to)}, about {kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`})</> : ''}, so next time you only add new bank files.
+        <small>It holds daily totals by category for each bank account, and the dates and amounts of regular payments with their payee names (e.g. payroll, grants). No individual bank lines.</small>
+      </span>
+    </label>
   );
 }
 
@@ -135,6 +156,7 @@ function AdvancedSave() {
           <p className="small">Contains <strong>{team.rules.length}</strong> rules, <strong>{team.aliases.length}</strong> aliases, <strong>{team.bankProfiles.length}</strong> bank profiles, <strong>{team.categories.length}</strong> categories and <strong>{team.forecasts.length}</strong> forecasts. <strong>No transaction lines.</strong></p>
           <label className="check mb"><input type="checkbox" checked={team.settings.includeHistorySummary} onChange={(e) => updateTeam((t) => ({ ...t, settings: { ...t.settings, includeHistorySummary: e.target.checked } }))} />
             Include a category × month history summary (aggregates only) so colleagues can view history without the CSVs</label>
+          <HistoryChoice />
           <div className="field mb"><label>Saved by</label><input className="input" value={user} placeholder="your initials" onChange={(e) => setUser(e.target.value)} /></div>
           <div className="row">
             {fsAccessSupported() && <button className="btn primary" onClick={() => void doSave('save')}><i className="bi bi-save" /> {teamName ? `Save ${teamName}` : 'Save…'}</button>}

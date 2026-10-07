@@ -1,6 +1,7 @@
 // Shared types: rules, bank profiles, forecasts and the team file.
 import type { Category, ForecastMethod } from './categories';
 import type { ColumnMapping } from './ingest/detect';
+import type { CashHistory } from './history/cashHistory';
 
 export type DealFlag = 'deal' | 'not_deal' | 'suspected';
 export type Confidence = 'high' | 'medium' | 'low';
@@ -184,7 +185,7 @@ export interface TeamFile {
   authorityName: string;
   savedAt: string;
   savedBy: string;
-  settings: { financialYearStart: string; currency: 'GBP'; liquidityBuffer: number; includeHistorySummary: boolean };
+  settings: { financialYearStart: string; currency: 'GBP'; liquidityBuffer: number; includeHistorySummary: boolean; /** keep the cash history in the team file (default yes) */ keepCashHistory?: boolean };
   bankProfiles: BankProfile[];
   categories: Category[];
   rules: Rule[];
@@ -192,6 +193,8 @@ export interface TeamFile {
   seriesOverrides: SeriesOverride[];
   txnOverrides: TxnOverride[];
   historySummary?: HistorySummary;
+  /** daily totals by category per bank account, and regular payments: never bank lines */
+  cashHistory?: CashHistory;
   forecasts: Scenario[];
   changeLog: ChangeLogEntry[];
 }
