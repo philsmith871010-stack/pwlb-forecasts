@@ -83,6 +83,8 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
     const k = all.findIndex((e) => e.id === id);
     const next = [...all.slice(k + 1), ...all.slice(0, k)].find((e) => !done.has(e.id));
     setOpen(next?.id ?? null);
+    // bring the next line into view
+    if (next) setTimeout(() => document.getElementById(`line-${next.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
   };
   const checked = all.filter((e) => done.has(e.id));
   const covered = checked.reduce((t, e) => t + Math.abs(e.historyAnnual), 0);
@@ -106,7 +108,7 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
           <div className="small muted" style={{ marginTop: 6 }}>
             {checked.length === all.length
               ? <><strong className="navy">Every line is checked.</strong> Next, add anything you know is coming (a land sale, a grant that ends), then check your starting cash.</>
-              : <>Open each line, check our proposal (worked out from your history), change anything you know better, then click <strong>Looks right</strong>. The forecast is shown once every line has been checked.</>}
+              : <>Open each line below and click <strong>Looks right</strong> when it is. Your forecast appears once every line is checked.</>}
           </div>
         </div>
       </div>
@@ -198,7 +200,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
   const summary = `${money(Math.abs(next12))} ${inflow ? 'in' : 'out'} over the next 12 months · ${e.method === 'manual' ? 'your figures only' : `${e.growthPct >= 0 ? '+' : ''}${e.growthPct.toFixed(1)}% a year${changed ? ' · changed by you' : ''}`}`;
 
   return (
-    <div className={`card line-card ${checked ? 'checked' : ''} ${open ? 'open' : ''}`}>
+    <div id={`line-${e.id}`} className={`card line-card ${checked ? 'checked' : ''} ${open ? 'open' : ''}`}>
       <button className="lc-head" onClick={onOpen} aria-expanded={open}>
         <i className={`bi ${checked ? 'bi-check-circle-fill green' : 'bi-circle'} lc-icon`} />
         <span className="swatch" style={{ background: colour }} />
@@ -273,28 +275,31 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                 </span>
                 <small>{stopA ? `Nothing after ${day(dayFromISO(stopA.from))}.` : 'For example, a grant that finishes.'}</small>
               </label>
+              <div className="lc-field">
+                <span>Every figure</span>
+                <button className="btn sm" onClick={() => setShowGrid(!showGrid)} aria-expanded={showGrid}>
+                  <i className="bi bi-grid-3x3" /> {showGrid ? 'Hide the grid' : 'Edit by month or by day'}
+                </button>
+                <small>{overridesHere.length ? `${overridesHere.length} figure${overridesHere.length > 1 ? 's are' : ' is'} yours. ` : ''}Type over figures or paste dates from Excel.</small>
+              </div>
             </div>
           </div>
 
+          {showGrid && grid && <GridEditor sc={sc} upd={upd} catId={e.id} grid={grid} inflow={inflow} start={sc.settings.start} />}
+
           <div className="lc-replace">
-            <span className="lc-label" style={{ margin: 0 }}>Or replace this line</span>
+            <span className="xs muted">Replace this line entirely:</span>
             {manual
-              ? <button className="btn sm" onClick={() => setManual(false)}><i className="bi bi-arrow-counterclockwise" /> Bring our forecast back</button>
-              : <button className="btn sm" onClick={() => { if (confirm(`Clear our forecast for ${e.name}? Only figures you add yourself will count. You can bring it back at any time.`)) setManual(true); }}><i className="bi bi-eraser" /> Clear our forecast</button>}
-            <button className="btn sm" onClick={() => setWizard('build')}><i className="bi bi-magic" /> Build it yourself</button>
-            <button className="btn sm" onClick={() => setWizard('import')}><i className="bi bi-file-earmark-arrow-up" /> Import a schedule</button>
-            <span className="xs muted">For figures another department gives you, or money our history can’t know about.</span>
+              ? <button className="link-btn small" onClick={() => setManual(false)}><i className="bi bi-arrow-counterclockwise" /> Bring our forecast back</button>
+              : <button className="link-btn small" onClick={() => { if (confirm(`Clear our forecast for ${e.name}? Only figures you add yourself will count. You can bring it back at any time.`)) setManual(true); }}>Clear our forecast</button>}
+            <span className="muted">·</span>
+            <button className="link-btn small" onClick={() => setWizard('build')}>Build it yourself</button>
+            <span className="muted">·</span>
+            <button className="link-btn small" onClick={() => setWizard('import')}>Import a schedule</button>
+            <span className="xs muted">for figures another department gives you</span>
           </div>
           {wizard === 'build' && <LineWizard e={e} b={b} upd={upd} inflow={inflow} onClose={() => { setWizard(null); setShowGrid(true); }} />}
           {wizard === 'import' && <ImportWizard b={b} upd={upd} lockCategory={e.id} onClose={() => { setWizard(null); setShowGrid(true); }} />}
-
-          <div className="lc-gridbar">
-            <button className="btn sm" onClick={() => setShowGrid(!showGrid)} aria-expanded={showGrid}>
-              <i className="bi bi-grid-3x3" /> {showGrid ? 'Hide the grid' : 'Edit by month or by day'}{overridesHere.length ? ` (${overridesHere.length} figure${overridesHere.length > 1 ? 's' : ''} yours)` : ''}
-            </button>
-            <span className="xs muted">See every payment month by month or day by day, type over any figure, or paste a schedule from Excel (e.g. grant payment dates you’ve been told about).</span>
-          </div>
-          {showGrid && grid && <GridEditor sc={sc} upd={upd} catId={e.id} grid={grid} inflow={inflow} start={sc.settings.start} />}
 
           <div className="lc-foot">
             {changed && <span className="small muted"><i className="bi bi-pencil" /> Your changes are already in the proposal above.</span>}

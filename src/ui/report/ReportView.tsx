@@ -92,7 +92,9 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
       ? <>To keep at least <strong>{money(fc.buffer)}</strong> in the bank, the council may need to borrow about <strong>{money(fc.borrowingRequirement)}</strong> by then.</>
       : <>Cash stays above the <strong>{money(fc.buffer)}</strong> minimum throughout, so no new borrowing should be needed.</>,
     firstBreach ? <>Cash first falls below that minimum on <strong>{fmtDay(firstBreach.from)}</strong>{fc.breaches.length > 1 ? `, and does so ${fc.breaches.length} times over the period` : ''}.</> : null,
-    <>The highest point is <strong>{money(fc.high.amount)}</strong> on {fmtDay(fc.high.day)} — the best time to invest any spare cash.</>,
+    fc.borrowingRequirement > 0
+      ? <>The highest point is <strong>{money(fc.high.amount)}</strong> on {fmtDay(fc.high.day)}, before cash falls.</>
+      : <>The highest point is <strong>{money(fc.high.amount)}</strong> on {fmtDay(fc.high.day)}, the best time to invest any spare cash.</>,
     fc.drivers.length ? <>The biggest reasons for the fall are {fc.drivers.map((d) => d.name.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}.</> : null,
     fc.treasuryDaily.some((v) => v) ? <>After known treasury commitments the position at {fmtDay(horizonEnd)} is <strong>{money(fc.cumulativeAfterTreasury[fc.H - 1])}</strong>.</> : null,
   ].filter(Boolean);

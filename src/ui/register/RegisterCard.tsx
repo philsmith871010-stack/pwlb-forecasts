@@ -85,8 +85,8 @@ function InterestCheck({ i }: { i: { estimated: number; found: number; within1: 
   return (
     <div className={`callout ${good ? 'green' : ''} mt small`}>
       <strong>Interest is estimated</strong> from each deal’s rate and dates (the register doesn’t record interest payments).
-      Checked against your bank history: we found <strong>{int(i.found)} of {int(i.estimated)}</strong> estimated interest payments
-      {i.found > 0 && <> ({int(i.within1)} to within £1), and they total {money(i.actualAbs)} against {money(i.estimatedAbs)} estimated</>}.
+      Checked against your bank history, we found <strong>{int(i.found)} of {int(i.estimated)}</strong> of the interest payments we estimated
+      {i.found > 0 && <>, totalling {money(i.actualAbs)} against {money(i.estimatedAbs)} estimated</>}.
       {!good && ' Some interest is paid on different dates or amounts than assumed, so treat future interest as approximate.'}
     </div>
   );

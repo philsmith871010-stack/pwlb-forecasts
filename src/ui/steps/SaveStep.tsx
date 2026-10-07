@@ -84,7 +84,7 @@ function SimpleSave() {
         <div className="save-card">
           <i className="bi bi-floppy" />
           <h3>Save your work</h3>
-          <p>Saves the sorting decisions and forecast settings you made today in a small <strong>team file</strong> (no bank transactions). Next time, open it on step 1 and everything is remembered.</p>
+          <p>Saves the sorting decisions, forecast settings and any figures you typed or imported today in a small <strong>team file</strong> (no bank transactions). Next time, open it on step 1 and everything is remembered.</p>
           <div className="field"><label htmlFor="who-s">Your name or initials</label><input id="who-s" className="input" value={user} placeholder="e.g. Sam Patel" onChange={(e) => setUser(e.target.value)} /></div>
           <div className="field"><label htmlFor="auth-s">Council name</label><input id="auth-s" className="input" value={team.authorityName} onChange={(e) => updateTeam((t) => ({ ...t, authorityName: e.target.value }))} /></div>
           <button className={`btn lg ${dirty ? 'navy' : ''}`} onClick={() => void save()}><i className="bi bi-save" /> {dirty ? 'Save team file' : team.savedAt ? `Saved ${ago(team.savedAt)}` : 'Save team file'}</button>
