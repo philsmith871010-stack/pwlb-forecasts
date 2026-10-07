@@ -630,7 +630,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
       const removed = req.assumptions.some((a) => a.kind === 'stop' && a.signature === sx.signature && a.categoryId === e.id);
       editableRow(`series:${sx.signature}`, sx.signature, 'series', removed);
     }
-    editableRow('pattern', e.series.length ? 'Everything else (usual pattern)' : 'Usual pattern', 'pattern');
+    if (e.method !== 'manual') editableRow('pattern', e.series.length ? 'Everything else (usual pattern)' : 'Usual pattern', 'pattern');
     const customs = [...new Set((req.overrides ?? []).filter((o) => o.categoryId === e.id && o.row.startsWith('custom:')).map((o) => o.row))];
     for (const key of customs) editableRow(key, key.slice(7), 'custom');
     const ro = (key: string, label: string, kind: GridRow['kind'], arr: Float64Array) => {

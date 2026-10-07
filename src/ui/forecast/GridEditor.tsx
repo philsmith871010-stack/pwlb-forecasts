@@ -148,7 +148,8 @@ export function GridEditor({ upd, catId, grid, inflow, start }: { sc: Scenario; 
     const rest = s.assumptions.filter((a) => !(a.kind === 'stop' && a.signature === sig && a.categoryId === catId));
     return { ...s, assumptions: removed ? rest : [...rest, { id: uid('as'), kind: 'stop', categoryId: catId, signature: sig, from: start } as Assumption] };
   });
-  const clearRow = (r: GridRow) => upd((s) => ({ ...s, overrides: (s.overrides ?? []).filter((o) => !(o.categoryId === catId && o.row === r.key)) }));
+  // deleting an imported row also removes what that import replaced
+  const clearRow = (r: GridRow) => upd((s) => ({ ...s, overrides: (s.overrides ?? []).filter((o) => !(o.categoryId === catId && (o.row === r.key || (r.kind === 'custom' && o.source === r.key.slice(7))))) }));
   const addRow = () => {
     const name = newName.trim();
     if (!name) return;

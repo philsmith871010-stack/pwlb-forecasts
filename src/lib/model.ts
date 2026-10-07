@@ -80,6 +80,8 @@ export interface GridOverride {
   date?: string;
   /** signed: + in, − out */
   amount: number;
+  /** the import or wizard this came from (its row name): deleting that row removes all of it */
+  source?: string;
 }
 
 export interface OneOff {

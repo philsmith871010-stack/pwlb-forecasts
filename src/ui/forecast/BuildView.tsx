@@ -10,6 +10,8 @@ import { periodise, sumByPeriod } from '../../lib/forecast/engine';
 import { monthlyTotals } from '../../lib/analysis/history';
 import { EChart, axisMoney } from '../components/EChart';
 import { GridEditor } from './GridEditor';
+import { ImportWizard } from './ImportWizard';
+import { LineWizard } from './LineWizard';
 import { money, day } from '../../lib/format';
 import { MONTH_NAMES, weekday, dayFromISO, isoFromDay } from '../../lib/dates';
 
@@ -66,6 +68,7 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
   const all = [...main, ...small];
   const firstOpen = all.find((e) => !done.has(e.id))?.id ?? null;
   const [open, setOpen] = useState<string | null>(firstOpen);
+  const [importing, setImporting] = useState(false);
   const hist = useMemo(() => (agg ? monthlyTotals(agg, 'op') : null), [agg]);
   const per = useMemo(() => periodise(b.fc.start, b.fc.H, 'monthly'), [b.fc.start, b.fc.H]);
 
@@ -108,6 +111,12 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
         </div>
       </div>
 
+      <div className="build-actions">
+        <span className="small"><strong>Had figures from another department?</strong> Import their schedule (Excel or CSV, with dates, categories and amounts) and we’ll put each figure in the right line.</span>
+        <button className="btn" onClick={() => setImporting(true)}><i className="bi bi-file-earmark-arrow-up" /> Import a schedule</button>
+      </div>
+      {importing && <ImportWizard b={b} upd={upd} onClose={() => setImporting(false)} />}
+
       {main.map(card)}
       {small.length > 0 && (
         <>
@@ -130,8 +139,15 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
   const stopA = sc.assumptions.find((a) => a.kind === 'stop' && a.categoryId === e.id && !a.signature) as Extract<Assumption, { kind: 'stop' }> | undefined;
   const overridesHere = (sc.overrides ?? []).filter((o) => o.categoryId === e.id);
   const removedSigs = new Set(sc.assumptions.filter((a) => a.kind === 'stop' && a.categoryId === e.id && a.signature).map((a) => (a as Extract<Assumption, { kind: 'stop' }>).signature!));
-  const changed = !!(growthA || levelA || stopA || overridesHere.length || removedSigs.size || e.series.some((s) => s.timing === 'user'));
+  const changed = !!(e.method === 'manual' || growthA || levelA || stopA || overridesHere.length || removedSigs.size || e.series.some((s) => s.timing === 'user'));
   const [showGrid, setShowGrid] = useState(overridesHere.length > 0);
+  const [wizard, setWizard] = useState<null | 'build' | 'import'>(null);
+  const manual = e.method === 'manual';
+  const setManual = (on: boolean) => upd((s) => {
+    const m = { ...s.settings.methodByCategory };
+    if (on) m[e.id] = 'manual'; else delete m[e.id];
+    return { ...s, settings: { ...s.settings, methodByCategory: m } };
+  });
   const grid = b.fc.grid[e.id];
   const active = e.series.filter((s) => s.active && (s.projected !== 0 || removedSigs.has(s.signature))).sort((a, z) => Math.abs(z.level) * (PER_YEAR[z.cadence] ?? 1) - Math.abs(a.level) * (PER_YEAR[a.cadence] ?? 1));
   const seriesTotal = active.reduce((s, x) => s + Math.abs(x.level) * (PER_YEAR[x.cadence] ?? 1), 0);
@@ -165,7 +181,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
       return <>Follows the <strong>pattern of past years</strong>: highest in {hi}, lowest in {MONTH_NAMES[lo.i]}. The same months are expected to be high and low again.</>;
     }
     if (e.method === 'flat') return <>Has <strong>no regular pattern</strong>, so we’ve spread the past average evenly: about {money(Math.abs(e.historyAnnual) / 12)} a month.</>;
-    return <>Worked out from your schedules and one-offs only.</>;
+    return <>You’ve <strong>cleared our forecast</strong> for this line, so only your own figures count: the rows in the grid below, and any known future items.</>;
   })();
 
   const chart = useMemo(() => hist && open ? {
@@ -179,7 +195,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
     ],
   } : null, [hist, proposal, open]);
 
-  const summary = `${money(Math.abs(next12))} ${inflow ? 'in' : 'out'} over the next 12 months · ${e.growthPct >= 0 ? '+' : ''}${e.growthPct.toFixed(1)}% a year${changed ? ' · changed by you' : ''}`;
+  const summary = `${money(Math.abs(next12))} ${inflow ? 'in' : 'out'} over the next 12 months · ${e.method === 'manual' ? 'your figures only' : `${e.growthPct >= 0 ? '+' : ''}${e.growthPct.toFixed(1)}% a year${changed ? ' · changed by you' : ''}`}`;
 
   return (
     <div className={`card line-card ${checked ? 'checked' : ''} ${open ? 'open' : ''}`}>
@@ -193,6 +209,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
       </button>
       {open && (
         <div className="lc-body fade">
+          {manual && <div className="callout navy small mt"><i className="bi bi-eraser" /> <strong>Our forecast for this line is cleared.</strong> Only your own figures count. <button className="link-btn" onClick={() => setManual(false)}>Bring ours back</button></div>}
           <div className="grid g2">
             <div>
               <div className="lc-label">What we found in your history</div>
@@ -258,6 +275,18 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
               </label>
             </div>
           </div>
+
+          <div className="lc-replace">
+            <span className="lc-label" style={{ margin: 0 }}>Or replace this line</span>
+            {manual
+              ? <button className="btn sm" onClick={() => setManual(false)}><i className="bi bi-arrow-counterclockwise" /> Bring our forecast back</button>
+              : <button className="btn sm" onClick={() => { if (confirm(`Clear our forecast for ${e.name}? Only figures you add yourself will count. You can bring it back at any time.`)) setManual(true); }}><i className="bi bi-eraser" /> Clear our forecast</button>}
+            <button className="btn sm" onClick={() => setWizard('build')}><i className="bi bi-magic" /> Build it yourself</button>
+            <button className="btn sm" onClick={() => setWizard('import')}><i className="bi bi-file-earmark-arrow-up" /> Import a schedule</button>
+            <span className="xs muted">For figures another department gives you, or money our history can’t know about.</span>
+          </div>
+          {wizard === 'build' && <LineWizard e={e} b={b} upd={upd} inflow={inflow} onClose={() => { setWizard(null); setShowGrid(true); }} />}
+          {wizard === 'import' && <ImportWizard b={b} upd={upd} lockCategory={e.id} onClose={() => { setWizard(null); setShowGrid(true); }} />}
 
           <div className="lc-gridbar">
             <button className="btn sm" onClick={() => setShowGrid(!showGrid)} aria-expanded={showGrid}>

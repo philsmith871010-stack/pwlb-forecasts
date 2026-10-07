@@ -119,3 +119,22 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
     - a new month total clears that row's day figures for the month;
     - a day figure in a month that had a total turns the month's other days into day figures at their current values (`applyCells`), so nothing else moves.
   - **Pasting:** a block runs down the days (carrying on into later months) and across the columns. A list whose first column is dates (or months) goes into the clicked row or column on its own dates, and anything outside the forecast is reported.
+
+## Replacing a line: clear it, build it, or import it
+
+- **Clear our forecast** for a line sets its method to `manual`. Only the user's own figures count (grid rows, known future items), and "Bring our forecast back" undoes it.
+- **Build it yourself** (`LineWizard`) makes a row of dated figures in the line's grid from:
+  - **a regular amount:** weekly to annual, on a date or the last working day, moved off weekends and bank holidays (earlier for payments, later for receipts);
+  - **an annual total spread across the months:** evenly or by the line's past pattern;
+  - **a list of dates and amounts:** typed or pasted.
+  - Optionally it clears our forecast for the line.
+- **Import a schedule** (`ImportWizard`, `lib/forecast/importSchedule.ts`) reads a table other departments send: .xlsx/.xls (first sheet with data), CSV/TSV, or pasted text.
+  - **Finding the columns.** It finds the header row (below any title lines) and the date, amount, category and description columns, and guesses the date order (a part over 12 settles it, otherwise UK order).
+  - **Matching names.** It matches the file's category names to ours (exact names, then synonyms, then partial), and the user confirms or chooses for anything it can't place. Grants come first in the synonyms, so "Housing Benefit subsidy" (a grant, money in) isn't taken for housing benefit paid out.
+  - **Signs.** Amounts are either all positive, with the direction taken from the category, or already signed.
+  - **Three ways to use it:**
+    - replace some of our rows for the months covered;
+    - replace the lines entirely;
+    - add on top.
+  - **Which rows it replaces** is suggested per line from shared words between the file's names and our payments. Paying departments (DWP, MHCLG…) and month words don't count as a match. If it can't tell, nothing is ticked and the user decides. A replaced row is cleared only in the months where the file has figures for that payment (or all months the file covers for the line, if the file doesn't name it).
+  - **Provenance.** Imported figures are tagged with their source (`GridOverride.source`). Importing again under the same name replaces the whole earlier import, and deleting the imported row in the grid removes everything it did, including what it replaced.

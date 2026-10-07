@@ -635,3 +635,22 @@ textarea.input { min-height: 120px; font-family: var(--font-mono); font-size: 12
 .ge-table th.ge-name { z-index: 3; }
 .ge-table td.ovm { background: #fff7ef; }
 .ge-swatch.light { background: #fff7ef; border-color: #f7c79a; }
+.build-actions { display: flex; align-items: center; gap: 14px; background: #eef3f8; border: 1px solid #d6e1ec; border-radius: var(--radius-card); padding: 10px 14px; }
+.build-actions .small { flex: 1; }
+.line-card .lc-replace { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--pt-line); }
+.imp-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+.imp-modes { display: grid; gap: 8px; }
+.imp-mode { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--pt-line); border-radius: var(--radius-md); padding: 10px 12px; cursor: pointer; }
+.imp-mode.on { border-color: var(--pt-orange); background: var(--pt-orange-soft); }
+.imp-mode input { margin-top: 3px; }
+.imp-mode span { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+.imp-mode small { color: var(--pt-muted); font-size: 12px; }
+.imp-preview { max-height: 230px; overflow: auto; border: 1px solid var(--pt-line); border-radius: var(--radius-md); }
+.imp-preview td.hl { font-weight: 600; color: var(--pt-navy); }
+.tbl tr.warn td { background: var(--pt-amber-soft); }
+@media (max-width: 700px) { .imp-cols { grid-template-columns: 1fr; } .build-actions { flex-direction: column; align-items: stretch; } }
+.imp-replace { border: 1px solid var(--pt-line); border-radius: var(--radius-md); padding: 8px 12px; }
+.imp-ticks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.imp-ticks .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--pt-line); border-radius: var(--radius-pill); padding: 3px 10px; font-size: 12.5px; cursor: pointer; background: #fff; }
+.imp-ticks .chip.on { border-color: var(--pt-orange); background: var(--pt-orange-soft); font-weight: 600; }
+.warn-text { color: var(--pt-amber); }
