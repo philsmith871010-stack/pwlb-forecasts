@@ -137,7 +137,7 @@ export function AssumptionsSection({ sc, upd }: { sc: Scenario; upd: Upd }) {
     switch (a.kind) {
       case 'growth': return `${name(a.categoryId)} ${a.pct >= 0 ? '+' : ''}${a.pct}% p.a. (${a.mode === 'annual_step' ? 'from each April' : 'continuous'})`;
       case 'step': return `${name(a.categoryId)} ${a.pct >= 0 ? '+' : ''}${a.pct}% from ${day(dayFromISO(a.effective))}${a.backdateFrom ? `, backdated to ${day(dayFromISO(a.backdateFrom))}, arrears paid ${day(dayFromISO(a.arrearsPaidOn ?? a.effective))}` : ''}`;
-      case 'timing': return `${name(a.categoryId)}${a.signature ? ` (${a.signature.replace(/\S*#\S*/g, '').trim()})` : ''} paid on ${a.rule === 'last_working_day' ? 'the last working day' : `day ${a.dayOfMonth}`} from ${day(dayFromISO(a.from))}`;
+      case 'timing': return `${name(a.categoryId)}${a.signature ? ` (${a.signature.replace(/\S*#\S*/g, '').trim()})` : ''} paid on ${a.rule === 'last_working_day' ? 'the last working day' : a.rule === 'weekday' ? `${['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][a.weekday ?? 5]}` : `day ${a.dayOfMonth}`} from ${day(dayFromISO(a.from))}`;
       case 'stop': return `${name(a.categoryId)} stops from ${day(dayFromISO(a.from))}`;
       case 'start': return `New ${a.cadence.replace('_', '-')} ${money(a.amount)} in ${name(a.categoryId)} from ${day(dayFromISO(a.from))}${a.until ? ` to ${day(dayFromISO(a.until))}` : ''}`;
       case 'inflation': return `Inflation +${a.pct}% p.a. on ${a.categoryIds.map(name).join(', ')}`;

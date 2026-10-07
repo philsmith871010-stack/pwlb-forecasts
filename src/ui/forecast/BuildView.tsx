@@ -21,6 +21,7 @@ const HOW_OFTEN: Record<string, string> = {
 };
 const PER_YEAR: Record<string, number> = { weekly: 52, fortnightly: 26, semi_monthly: 24, four_weekly: 13, monthly: 12, quarterly: 4, half_yearly: 2, annual: 1 };
 const DAY_SET = ['monthly', 'quarterly', 'half_yearly', 'annual'];
+const WEEK_SET = ['weekly', 'fortnightly', 'four_weekly'];
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; // weekday(): 0 = Sunday
 /** a signature for people: digit placeholders and stray markers removed */
 const niceName = (sig: string) => sig.replace(/\S*#\S*/g, '').replace(/\s+/g, ' ').trim() || sig;
@@ -35,7 +36,7 @@ function whenWords(s: SeriesX): string {
   return `on or near the ${ord(s.dayOfMonth)}`;
 }
 
-/** Which lines to check: everything that is forecast, biggest first; small ones are grouped. */
+/** Which lines to check: everything that is forecast, biggest first; small ones listed after (each still checked). */
 export function linesToCheck(b: ForecastBundle) {
   const all = b.fc.explain.filter((e) => e.method !== 'exclude' && e.id !== 'uncategorised' && (Math.abs(e.historyAnnual) > 0 || Math.abs(e.forecastTotal) > 0))
     .sort((a, z) => Math.abs(z.historyAnnual) - Math.abs(a.historyAnnual));
@@ -52,8 +53,8 @@ export const isReviewed = (sc: Scenario, b: ForecastBundle) => !!sc.reviewDone &
 export function reviewState(sc: Scenario, b: ForecastBundle) {
   const { main, small } = linesToCheck(b);
   const done = new Set(sc.reviewFor === dataEndIso(b) ? sc.reviewed ?? [] : []);
-  const left = main.filter((e) => !done.has(e.id));
-  return { main, small, done, left, allChecked: left.length === 0 && small.every((e) => done.has(e.id)) };
+  const left = [...main, ...small].filter((e) => !done.has(e.id));
+  return { main, small, done, left, allChecked: left.length === 0 };
 }
 
 export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastBundle }) {
@@ -61,7 +62,8 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
   const categories = useStore((s) => s.team.categories);
   const { main, small, gross, } = useMemo(() => linesToCheck(b), [b]);
   const done = reviewState(sc, b).done;
-  const firstOpen = main.find((e) => !done.has(e.id))?.id ?? null;
+  const all = [...main, ...small];
+  const firstOpen = all.find((e) => !done.has(e.id))?.id ?? null;
   const [open, setOpen] = useState<string | null>(firstOpen);
   const hist = useMemo(() => (agg ? monthlyTotals(agg, 'op') : null), [agg]);
   const per = useMemo(() => periodise(b.fc.start, b.fc.H, 'monthly'), [b.fc.start, b.fc.H]);
@@ -74,55 +76,43 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
   });
   const confirm = (id: string) => {
     mark([id]);
-    const next = main.find((e) => e.id !== id && !done.has(e.id));
+    const k = all.findIndex((e) => e.id === id);
+    const next = [...all.slice(k + 1), ...all.slice(0, k)].find((e) => !done.has(e.id));
     setOpen(next?.id ?? null);
   };
-  const checkedMain = main.filter((e) => done.has(e.id));
-  const covered = checkedMain.reduce((s, e) => s + Math.abs(e.historyAnnual), 0) + small.filter((e) => done.has(e.id)).reduce((s, e) => s + Math.abs(e.historyAnnual), 0);
-  const smallDone = small.every((e) => done.has(e.id));
+  const checked = all.filter((e) => done.has(e.id));
+  const covered = checked.reduce((t, e) => t + Math.abs(e.historyAnnual), 0);
+  const card = (e: CategoryExplain) => (
+    <LineCard key={e.id} e={e} sc={sc} upd={upd} b={b} checked={done.has(e.id)} open={open === e.id}
+      onOpen={() => setOpen(open === e.id ? null : e.id)} onConfirm={() => confirm(e.id)}
+      colour={categories.find((c) => c.id === e.id)?.colour ?? '#ced4da'}
+      hist={hist ? { labels: hist.labels.slice(-24), values: hist.values[e.catIdx]?.slice(-24) ?? [] } : null}
+      proposal={{ labels: per.labels.slice(0, 12), values: sumByPeriod(b.fc.daily, e.catIdx * b.fc.H, b.fc.H, per.index, per.labels.length).slice(0, 12) }} />
+  );
 
   return (
     <div className="stack build">
       <div className="build-progress">
         <div>
-          <div className="bp-big">{checkedMain.length} <span>of {main.length}</span></div>
-          <div className="bp-label">main lines checked</div>
+          <div className="bp-big">{checked.length} <span>of {all.length}</span></div>
+          <div className="bp-label">lines checked</div>
         </div>
         <div style={{ flex: 1 }}>
           <div className="meter" style={{ height: 10 }}><div style={{ width: `${Math.min(100, (covered / gross) * 100)}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
           <div className="small muted" style={{ marginTop: 6 }}>
-            {checkedMain.length === main.length && smallDone
+            {checked.length === all.length
               ? <><strong className="navy">Every line is checked.</strong> Next, add anything you know is coming (a land sale, a grant that ends), then check your starting cash.</>
-              : <>Each line below is our proposal, worked out from your history. Check it, change anything you know better, then click <strong>Looks right</strong>. The forecast is shown once every line has been checked.</>}
+              : <>Open each line, check our proposal (worked out from your history), change anything you know better, then click <strong>Looks right</strong>. The forecast is shown once every line has been checked.</>}
           </div>
         </div>
       </div>
 
-      {main.map((e) => (
-        <LineCard key={e.id} e={e} sc={sc} upd={upd} b={b} checked={done.has(e.id)} open={open === e.id}
-          onOpen={() => setOpen(open === e.id ? null : e.id)} onConfirm={() => confirm(e.id)}
-          colour={categories.find((c) => c.id === e.id)?.colour ?? '#ced4da'}
-          hist={hist ? { labels: hist.labels.slice(-24), values: hist.values[e.catIdx]?.slice(-24) ?? [] } : null}
-          proposal={{ labels: per.labels.slice(0, 12), values: sumByPeriod(b.fc.daily, e.catIdx * b.fc.H, b.fc.H, per.index, per.labels.length).slice(0, 12) }} />
-      ))}
-
+      {main.map(card)}
       {small.length > 0 && (
-        <div className={`card card-pad line-card ${smallDone ? 'checked' : ''}`}>
-          <div className="row" style={{ alignItems: 'flex-start' }}>
-            <i className={`bi ${smallDone ? 'bi-check-circle-fill green' : 'bi-collection'} lc-icon`} />
-            <div style={{ flex: 1 }}>
-              <div className="lc-title">{small.length} smaller lines <span className="muted small">· {money(small.reduce((s, e) => s + Math.abs(e.historyAnnual), 0))} a year in total</span></div>
-              <div className="small muted">{small.map((e) => e.name).join(', ')}. Each follows its own past pattern and trend.</div>
-            </div>
-            {smallDone ? <span className="badge green">accepted</span> : <button className="btn" onClick={() => mark(small.map((e) => e.id))}>Accept as proposed</button>}
-          </div>
-        </div>
-      )}
-
-      {main.some((e) => !done.has(e.id)) && (
-        <div className="row small muted" style={{ justifyContent: 'flex-end' }}>
-          In a hurry? <button className="link-btn" onClick={() => { mark([...main, ...small].map((e) => e.id)); setOpen(null); }}>Accept every remaining line as proposed</button>
-        </div>
+        <>
+          <div className="build-sub"><strong>Smaller lines</strong> <span className="small muted">· {money(small.reduce((t, e) => t + Math.abs(e.historyAnnual), 0))} a year between them. Quicker to check, but still worth a look.</span></div>
+          {small.map(card)}
+        </>
       )}
     </div>
   );
@@ -150,7 +140,9 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
   const setLevel = (v: string) => setAssumption((a) => a.kind === 'step' && a.categoryId === e.id && a.note === LEVEL_NOTE,
     v.trim() === '' || isNaN(+v) || +v === 0 ? null : () => ({ id: uid('as'), kind: 'step', categoryId: e.id, pct: +v, effective: sc.settings.start, note: LEVEL_NOTE }));
   const setTiming = (sig: string, v: string) => setAssumption((a) => a.kind === 'timing' && a.signature === sig,
-    v === 'history' ? null : () => ({ id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: v === 'lwd' ? 'last_working_day' : 'day_of_month', dayOfMonth: v === 'lwd' ? undefined : +v }));
+    v === 'history' ? null : () => (v.startsWith('w')
+      ? { id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: 'weekday', weekday: +v.slice(1) }
+      : { id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: v === 'lwd' ? 'last_working_day' : 'day_of_month', dayOfMonth: v === 'lwd' ? undefined : +v }));
   const setStop = (date: string | null) => setAssumption((a) => a.kind === 'stop' && a.categoryId === e.id,
     date ? () => ({ id: uid('as'), kind: 'stop', categoryId: e.id, from: date }) : null);
 
@@ -212,6 +204,11 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                           <option value="lwd">Last working day</option>
                           {Array.from({ length: 28 }, (_, k) => <option key={k} value={k + 1}>On the {ord(k + 1)}</option>)}
                         </select>
+                      ) : WEEK_SET.includes(s.cadence) ? (
+                        <select className="select sm" aria-label={`Which day ${s.signature} is paid`} value={timingValue(sc, e.id, s)} onChange={(ev) => setTiming(s.signature, ev.target.value)}>
+                          <option value="history">As before ({WEEKDAYS[weekday(s.lastDay)]}s)</option>
+                          {[1, 2, 3, 4, 5].map((w) => <option key={w} value={`w${w}`}>{WEEKDAYS[w]}s</option>)}
+                        </select>
                       ) : <span className="small">{whenWords(s)}</span>}</td>
                     </tr>
                   ))}</tbody>
@@ -267,6 +264,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
 function timingValue(sc: Scenario, catId: string, s: SeriesX): string {
   const a = [...sc.assumptions].reverse().find((x) => x.kind === 'timing' && x.signature === s.signature && x.categoryId === catId) as Extract<Assumption, { kind: 'timing' }> | undefined;
   if (!a) return 'history';
+  if (a.rule === 'weekday') return `w${a.weekday}`;
   return a.rule === 'last_working_day' ? 'lwd' : String(a.dayOfMonth ?? s.dayOfMonth);
 }
 

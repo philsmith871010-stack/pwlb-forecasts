@@ -98,7 +98,9 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - what history says, in plain English: regular payments with their amount, how often and on what day; or the seasonal pattern (highest and lowest months); or the flat average;
   - past months next to the proposed next 12;
   - three edits: growth each year, bigger or smaller by a %, and "it stops".
-- **Smaller lines** are accepted together in one click.
+- **Every line is opened and confirmed on its own**, smaller ones included (listed after the main lines). There is no bulk "accept as proposed", so every figure in the forecast is one somebody has looked at.
 - **Locked until checked.** The result, options and breakdown tabs, the results strip, the saved results snapshot, the report and the Excel export stay locked until every line is checked and the user clicks *See my forecast*.
-- **When it is paid, per series.** A timing assumption may name one series (`signature`). The engine then projects that series on the chosen day (last working day, or the Nth), leaving the category's other payments alone. Timing without a signature still moves the whole category, as before.
+- **When it is paid, per series.** A timing assumption may name one series (`signature`). The engine then projects that series on the chosen day, leaving the category's other payments alone:
+  - monthly, quarterly, half-yearly and annual payments: the last working day or the Nth;
+  - weekly, fortnightly and four-weekly payments: a weekday (Monday to Friday), re-anchored on the nearest such weekday to the last payment, so the rhythm is kept. Timing without a signature still moves the whole category, as before.
 - **Checks belong to the data they were made on** (`reviewFor` = the data end date). Loading newer bank data asks for the lines to be checked again, because the proposal has changed.

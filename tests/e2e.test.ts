@@ -134,4 +134,23 @@ describe('checking a line: payment day for one series', async () => {
     expect(Math.abs(moved / s.level - 1)).toBeLessThan(0.03); // the payment, plus a little growth
     expect(fc1.explain.find((e) => e.id === 'salaries')!.series.find((x) => x.signature === s.signature)!.timing).toBe('user');
   });
+
+  it('moves a weekly payment to another weekday, keeping one a week', async () => {
+    const { weekday } = await import('../src/lib/dates');
+    const fc0 = runForecast(req);
+    const sal = fc0.explain.find((e) => e.id === 'salaries')!;
+    const w = sal.series.find((x) => x.cadence === 'weekly')!;
+    expect(w).toBeDefined();
+    const target = (weekday(w.lastDay) + 5) % 7 || 3; // a different weekday (never Sunday)
+    const fc1 = runForecast({ ...req, assumptions: [{ id: 't', kind: 'timing', categoryId: 'salaries', signature: w.signature, from: settings.start, rule: 'weekday', weekday: target === 6 ? 3 : target }] });
+    const want = target === 6 ? 3 : target;
+    const c = sal.catIdx, H = fc0.H;
+    // the days that gained money are (nearly all) the chosen weekday — bank holidays roll forward
+    const gained: number[] = [];
+    for (let d = 0; d < H; d++) if (fc1.daily[c * H + d] - fc0.daily[c * H + d] < -1) gained.push(fc0.start + d);
+    const onDay = gained.filter((d) => weekday(d) === want).length;
+    expect(onDay / gained.length).toBeGreaterThan(0.9);
+    expect(gained.length).toBeGreaterThan(45);
+    expect(gained.length).toBeLessThan(56);
+  });
 });

@@ -181,7 +181,7 @@ export function ForecastStep() {
           ? <NextTab label="See my forecast" onClick={seeForecast} text="Every line is checked. Your forecast is ready." />
           : <NextTab label="Back to checking lines" onClick={() => setTab('lines')} text={`${rv.left.length || 'Some'} line${rv.left.length === 1 ? '' : 's'} still to check before the forecast can be shown.`} />
       ) : tab === 'lines' && locked && !rv.allChecked ? (
-        <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={`${rv.left.length + rv.small.filter((e) => !rv.done.has(e.id)).length} still to check. You can come back to them.`} />
+        <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={`${rv.left.length} still to check. You can come back to them.`} />
       ) : idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={tab === 'result' ? 'See what the forecast means for borrowing and investing.' : !locked ? <button className="link-btn" onClick={() => useStore.getState().goto(advanced ? 'backtest' : 'save')}>or go to {advanced ? 'the backtest' : 'save & share'}</button> : undefined} />
         : !workspace && <StepFooter nextLabel={advanced ? 'Next: test the forecast' : 'Next: save & share'} />}
     </div>

@@ -378,8 +378,15 @@ export function runForecast(req: ForecastRequest): ForecastResult {
         // the user may have said when this payment is made
         const tm = [...req.assumptions].reverse().find((a) => a.kind === 'timing' && a.signature === s.signature && a.categoryId === id) as Extract<Assumption, { kind: 'timing' }> | undefined;
         if (s.active && last >= dataEnd - 400) {
-          const sched = tm ? { ...s, lastWorkingDay: tm.rule === 'last_working_day', dayOfMonth: tm.rule === 'day_of_month' ? tm.dayOfMonth ?? s.dayOfMonth : s.dayOfMonth } : s;
-          const dates = projectDates(sched, last, end);
+          let anchor = last;
+          if (tm?.rule === 'weekday' && tm.weekday !== undefined) {
+            // weekly-type payments: re-anchor on the nearest chosen weekday, keeping the rhythm
+            let delta = (((tm.weekday - weekday(last)) % 7) + 7) % 7;
+            if (delta > 3) delta -= 7;
+            anchor = last + delta;
+          }
+          const sched = tm && tm.rule !== 'weekday' ? { ...s, lastWorkingDay: tm.rule === 'last_working_day', dayOfMonth: tm.rule === 'day_of_month' ? tm.dayOfMonth ?? s.dayOfMonth : s.dayOfMonth } : s;
+          const dates = projectDates(sched, anchor, end).filter((d) => d > last);
           for (const day of dates) {
             if (day < start) continue;
             const amt = level * G(last, day);
@@ -441,7 +448,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
       for (let d = Math.max(0, eff - start); d < H; d++) daily[base + d] *= 1 + pct;
       if (arrears && a.arrearsPaidOn) put(c, rollFor(dayFromISO(a.arrearsPaidOn), arrears), arrears);
       markers.push({ day: eff, label: `${nameOf(req, a.categoryId)} ${a.pct >= 0 ? '+' : ''}${a.pct}%${arrears ? ` (arrears ${fmtMoney(arrears)})` : ''}`, kind: 'assumption' });
-    } else if (a.kind === 'timing' && !a.signature) {
+    } else if (a.kind === 'timing' && !a.signature && a.rule !== 'weekday') {
       const from = dayFromISO(a.from);
       for (let mk = monthKey(Math.max(from, start)); mk <= monthKey(end); mk++) {
         const ms = Math.max(monthStart(mk), from, start), me = Math.min(monthEnd(mk), end);
