@@ -628,7 +628,9 @@ textarea.input { min-height: 120px; font-family: var(--font-mono); font-size: 12
 .ge-days .ge-table tr.off td { background: #f4f5f7; }
 .ge-days .ge-table tr.off td.ge-name { color: var(--pt-muted); font-weight: 500; }
 .ge-days .ge-table tr.off td.ov { background: var(--pt-orange-soft); }
-.ge-table td.byday { background-image: linear-gradient(135deg, transparent 0 82%, var(--pt-orange) 82% 100%); }
+.ge-table td { position: relative; }
+.ge-table td.byday::after { content: ''; position: absolute; top: 3px; right: 3px; width: 0; height: 0; border-top: 6px solid var(--pt-orange); border-left: 6px solid transparent; }
+.ge-mark { display: inline-block; width: 0; height: 0; border-top: 7px solid var(--pt-orange); border-left: 7px solid transparent; vertical-align: 1px; }
 .ge-table th { z-index: 2; }
 .ge-table th.ge-name { z-index: 3; }
 .ge-table td.ovm { background: #fff7ef; }

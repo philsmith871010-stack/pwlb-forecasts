@@ -228,7 +228,7 @@ export function GridEditor({ upd, catId, grid, inflow, start }: { sc: Scenario; 
         ) : <button className="btn sm" onClick={() => setAdding(true)}><i className="bi bi-plus-lg" /> Add a {view === 'day' ? 'column' : 'row'}</button>}
         <span className="xs muted">For money not in your history, such as a grant you’ve been told about.</span>
         <span className="spacer" />
-        {nYours > 0 && <span className="xs muted"><span className="ge-swatch" /> = your figures</span>}
+        {nYours > 0 && <span className="xs muted"><span className="ge-swatch" /> your figure{view === 'month' ? <> · <span className="ge-mark" /> includes figures for single days (see By day)</> : ''} · 0 = set to zero by you</span>}
       </div>
     </div>
   );
