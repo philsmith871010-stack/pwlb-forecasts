@@ -9,6 +9,7 @@ import type { CategoryExplain } from '../../lib/forecast/engine';
 import { periodise, sumByPeriod } from '../../lib/forecast/engine';
 import { monthlyTotals } from '../../lib/analysis/history';
 import { EChart, axisMoney } from '../components/EChart';
+import { GridEditor } from './GridEditor';
 import { money, day } from '../../lib/format';
 import { MONTH_NAMES, weekday, dayFromISO, isoFromDay } from '../../lib/dates';
 
@@ -126,9 +127,13 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
   const next12 = proposal.values.reduce((s, v) => s + v, 0);
   const growthA = sc.assumptions.find((a) => a.kind === 'growth' && a.categoryId === e.id) as Extract<Assumption, { kind: 'growth' }> | undefined;
   const levelA = sc.assumptions.find((a) => a.kind === 'step' && a.categoryId === e.id && a.note === LEVEL_NOTE) as Extract<Assumption, { kind: 'step' }> | undefined;
-  const stopA = sc.assumptions.find((a) => a.kind === 'stop' && a.categoryId === e.id) as Extract<Assumption, { kind: 'stop' }> | undefined;
-  const changed = !!(growthA || levelA || stopA || e.series.some((s) => s.timing === 'user'));
-  const active = e.series.filter((s) => s.active && s.projected !== 0).sort((a, z) => Math.abs(z.level) * (PER_YEAR[z.cadence] ?? 1) - Math.abs(a.level) * (PER_YEAR[a.cadence] ?? 1));
+  const stopA = sc.assumptions.find((a) => a.kind === 'stop' && a.categoryId === e.id && !a.signature) as Extract<Assumption, { kind: 'stop' }> | undefined;
+  const overridesHere = (sc.overrides ?? []).filter((o) => o.categoryId === e.id);
+  const removedSigs = new Set(sc.assumptions.filter((a) => a.kind === 'stop' && a.categoryId === e.id && a.signature).map((a) => (a as Extract<Assumption, { kind: 'stop' }>).signature!));
+  const changed = !!(growthA || levelA || stopA || overridesHere.length || removedSigs.size || e.series.some((s) => s.timing === 'user'));
+  const [showGrid, setShowGrid] = useState(overridesHere.length > 0);
+  const grid = b.fc.grid[e.id];
+  const active = e.series.filter((s) => s.active && (s.projected !== 0 || removedSigs.has(s.signature))).sort((a, z) => Math.abs(z.level) * (PER_YEAR[z.cadence] ?? 1) - Math.abs(a.level) * (PER_YEAR[a.cadence] ?? 1));
   const seriesTotal = active.reduce((s, x) => s + Math.abs(x.level) * (PER_YEAR[x.cadence] ?? 1), 0);
 
   const setAssumption = (match: (a: Assumption) => boolean, make: (() => Assumption) | null) => upd((s) => {
@@ -143,7 +148,9 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
     v === 'history' ? null : () => (v.startsWith('w')
       ? { id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: 'weekday', weekday: +v.slice(1) }
       : { id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: v === 'lwd' ? 'last_working_day' : 'day_of_month', dayOfMonth: v === 'lwd' ? undefined : +v }));
-  const setStop = (date: string | null) => setAssumption((a) => a.kind === 'stop' && a.categoryId === e.id,
+  const toggleSeries = (sig: string) => setAssumption((a) => a.kind === 'stop' && a.categoryId === e.id && a.signature === sig,
+    removedSigs.has(sig) ? null : () => ({ id: uid('as'), kind: 'stop', categoryId: e.id, signature: sig, from: sc.settings.start }));
+  const setStop = (date: string | null) => setAssumption((a) => a.kind === 'stop' && a.categoryId === e.id && !a.signature,
     date ? () => ({ id: uid('as'), kind: 'stop', categoryId: e.id, from: date }) : null);
 
   // what we found, in plain English
@@ -192,9 +199,9 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
               <p className="small" style={{ marginTop: 2 }}>Last 12 months: <strong>{money(Math.abs(e.historyAnnual))}</strong> {inflow ? 'received' : 'paid'}. {found}</p>
               {active.length > 0 && (
                 <table className="tbl tbl-sm lc-series">
-                  <thead><tr><th>Payment</th><th className="num">Each time</th><th>How often</th><th>When</th></tr></thead>
+                  <thead><tr><th>Payment</th><th className="num">Each time</th><th>How often</th><th>When</th><th /></tr></thead>
                   <tbody>{active.slice(0, 5).map((s) => (
-                    <tr key={s.signature}>
+                    <tr key={s.signature} className={removedSigs.has(s.signature) ? 'removed' : ''}>
                       <td title={s.signature} className="lc-name">{niceName(s.signature)}</td>
                       <td className="num">{money(Math.abs(s.level))}</td>
                       <td>{HOW_OFTEN[s.cadence] ?? s.cadence}</td>
@@ -210,6 +217,8 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                           {[1, 2, 3, 4, 5].map((w) => <option key={w} value={`w${w}`}>{WEEKDAYS[w]}s</option>)}
                         </select>
                       ) : <span className="small">{whenWords(s)}</span>}</td>
+                      <td><button className="icon-btn" title={removedSigs.has(s.signature) ? 'Bring this payment back' : 'Take this payment out of the forecast'} aria-label={removedSigs.has(s.signature) ? `Restore ${s.signature}` : `Remove ${s.signature}`} onClick={() => toggleSeries(s.signature)}>
+                        <i className={`bi ${removedSigs.has(s.signature) ? 'bi-arrow-counterclockwise' : 'bi-trash'}`} /></button></td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -249,6 +258,14 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
               </label>
             </div>
           </div>
+
+          <div className="lc-gridbar">
+            <button className="btn sm" onClick={() => setShowGrid(!showGrid)} aria-expanded={showGrid}>
+              <i className="bi bi-grid-3x3" /> {showGrid ? 'Hide month by month' : 'Edit month by month'}{overridesHere.length ? ` (${overridesHere.length} figure${overridesHere.length > 1 ? 's' : ''} yours)` : ''}
+            </button>
+            <span className="xs muted">See every payment month by month, type over any figure, or paste a schedule from Excel (e.g. grant allocations you’ve been told about).</span>
+          </div>
+          {showGrid && grid && <GridEditor sc={sc} upd={upd} catId={e.id} grid={grid} inflow={inflow} start={sc.settings.start} />}
 
           <div className="lc-foot">
             {changed && <span className="small muted"><i className="bi bi-pencil" /> Your changes are already in the proposal above.</span>}

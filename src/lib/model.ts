@@ -63,9 +63,22 @@ export type Assumption =
   | { id: string; kind: 'step'; categoryId: string; pct: number; effective: string; backdateFrom?: string; arrearsPaidOn?: string; note?: string }
   /** moves payments to a day: a whole category, or (with `signature`) just one regular payment series */
   | { id: string; kind: 'timing'; categoryId: string; from: string; rule: 'last_working_day' | 'day_of_month' | 'weekday'; dayOfMonth?: number; /** 0 = Sunday … 6 = Saturday (rule 'weekday', series only) */ weekday?: number; signature?: string; note?: string }
-  | { id: string; kind: 'stop'; categoryId: string; from: string; note?: string }
+  /** stops a whole category, or (with `signature`) just one regular payment series */
+  | { id: string; kind: 'stop'; categoryId: string; from: string; signature?: string; note?: string }
   | { id: string; kind: 'start'; categoryId: string; from: string; until?: string; amount: number; cadence: 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'half_yearly' | 'annual'; dayOfMonth?: number; note?: string }
   | { id: string; kind: 'inflation'; pct: number; categoryIds: string[]; note?: string };
+
+/** A figure typed or pasted into a category's month-by-month grid. It is final: growth and
+ * size changes are not applied on top. `row` is 'series:<signature>', 'pattern' (everything
+ * else in the category) or 'custom:<label>' (a row the user added, e.g. a new grant). */
+export interface GridOverride {
+  categoryId: string;
+  row: string;
+  /** YYYY-MM */
+  month: string;
+  /** signed: + in, − out */
+  amount: number;
+}
 
 export interface OneOff {
   id: string;
@@ -135,6 +148,8 @@ export interface Scenario {
   pastedSchedules: PastedSchedule[];
   treasurySchedule: TreasuryItem[];
   resultsSnapshot?: ResultsSnapshot;
+  /** month-by-month figures the user typed or pasted */
+  overrides?: GridOverride[];
   /** categories the user has checked on "Check each line" */
   reviewed?: string[];
   /** the user has checked the proposal and asked to see the forecast */

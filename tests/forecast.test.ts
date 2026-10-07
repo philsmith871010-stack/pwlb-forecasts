@@ -37,3 +37,17 @@ describe('series projection', () => {
     expect(d).toEqual(['2026-04-30', '2026-05-29', '2026-06-30']);
   });
 });
+
+describe('grid cells', async () => {
+  const { parseCell } = await import('../src/ui/forecast/GridEditor');
+  it('reads what people paste from Excel', () => {
+    expect(parseCell('3,200,000')).toBe(3.2e6);
+    expect(parseCell('£2.5m')).toBe(2.5e6);
+    expect(parseCell('250k')).toBe(250000);
+    expect(parseCell('(1,234)')).toBe(-1234);
+    expect(parseCell('-1234.5')).toBe(-1234.5);
+    expect(Object.is(parseCell('(0)'), 0)).toBe(true);
+    expect(parseCell('')).toBeNull();
+    expect(parseCell('n/a')).toBeNaN();
+  });
+});

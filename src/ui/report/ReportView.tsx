@@ -81,7 +81,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
       case 'growth': return `${catName(a.categoryId)}: ${a.pct >= 0 ? '+' : ''}${a.pct}% a year (${a.mode === 'annual_step' ? 'from each April' : 'steady'})`;
       case 'step': return `${catName(a.categoryId)}: ${a.pct >= 0 ? '+' : ''}${a.pct}% from ${day(dayFromISO(a.effective))}${a.backdateFrom ? `, backdated to ${day(dayFromISO(a.backdateFrom))}` : ''}`;
       case 'timing': return `${catName(a.categoryId)}${a.signature ? ` (${a.signature.replace(/\S*#\S*/g, '').trim()})` : ''}: paid on ${a.rule === 'last_working_day' ? 'the last working day' : a.rule === 'weekday' ? `${['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][a.weekday ?? 5]}` : `day ${a.dayOfMonth}`} from ${day(dayFromISO(a.from))}`;
-      case 'stop': return `${catName(a.categoryId)} stops from ${day(dayFromISO(a.from))}`;
+      case 'stop': return `${catName(a.categoryId)}${a.signature ? `: ${a.signature.replace(/\S*#\S*/g, '').trim()} removed` : ' stops'} from ${day(dayFromISO(a.from))}`;
       case 'start': return `New ${a.cadence.replace('_', '-')} ${money(a.amount)} in ${catName(a.categoryId)} from ${day(dayFromISO(a.from))}`;
       case 'inflation': return `Inflation +${a.pct}% a year on ${a.categoryIds.length} categories`;
     }
@@ -218,8 +218,9 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
               : <p className="r-muted">None — each category follows its historic trend.</p>}
           </div>
           <div>
-            <div className="r-label">One-off items and schedules</div>
-            {sc.oneOffs.length + sc.pastedSchedules.length ? <ul className="r-list">
+            <div className="r-label">One-off items, schedules and figures entered</div>
+            {sc.oneOffs.length + sc.pastedSchedules.length + (sc.overrides?.length ?? 0) ? <ul className="r-list">
+              {[...new Set((sc.overrides ?? []).map((o) => o.categoryId))].map((id) => { const os = (sc.overrides ?? []).filter((o) => o.categoryId === id); return <li key={`ov-${id}`}>{catName(id)}: {os.length} monthly figure{os.length > 1 ? 's' : ''} entered by hand, {money(os.reduce((t, o) => t + o.amount, 0), { sign: true })} in total{os.some((o) => o.row.startsWith('custom:')) ? ` (incl. ${[...new Set(os.filter((o) => o.row.startsWith('custom:')).map((o) => o.row.slice(7)))].join(', ')})` : ''}</li>; })}
               {sc.oneOffs.map((o) => <li key={o.id}>{fmtDay(dayFromISO(o.date))}: {o.description || catName(o.categoryId)} {money(o.amount, { sign: true })} <span className="r-muted">({o.confidence}{o.confidence === 'possible' ? `, ${Math.round((o.probability ?? 0.5) * 100)}%` : ''})</span></li>)}
               {sc.pastedSchedules.map((p) => <li key={p.id}>{p.name}: {p.entries.length} payments, {money(p.entries.reduce((t, e) => t + e.amount, 0))} <span className="r-muted">({p.mode === 'replace' ? 'replaces the model' : 'on top of the model'})</span></li>)}
             </ul> : <p className="r-muted">None entered.</p>}

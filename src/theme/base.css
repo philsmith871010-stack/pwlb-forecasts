@@ -592,3 +592,29 @@ textarea.input { min-height: 120px; font-family: var(--font-mono); font-size: 12
 .line-card .lc-series select { width: 168px; }
 .line-card .lc-body > .grid.g2 { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
 .build-sub { margin: 8px 2px -4px; color: var(--pt-navy); }
+
+/* month-by-month grid */
+.grid-editor { margin-top: 10px; }
+.grid-editor .ge-help { color: var(--pt-text); margin-bottom: 6px; }
+.ge-scroll { overflow-x: auto; border: 1px solid var(--pt-line); border-radius: var(--radius-md); }
+.ge-table { border-collapse: separate; border-spacing: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.ge-table th { background: var(--pt-navy); color: #fff; font-weight: 600; padding: 6px 8px; text-align: right; white-space: nowrap; position: sticky; top: 0; }
+.ge-table th.ge-name, .ge-table td.ge-name { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 190px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ge-table td.ge-name { background: #fff; font-weight: 600; color: var(--pt-navy); padding: 0 8px; border-right: 1px solid var(--pt-line); }
+.ge-table td { border-bottom: 1px solid var(--pt-line-soft); padding: 0; text-align: right; }
+.ge-table td input { width: 92px; border: 0; background: transparent; font: inherit; text-align: right; padding: 6px 8px; }
+.ge-table td input:focus { outline: 2px solid var(--pt-orange); outline-offset: -2px; background: #fff; }
+.ge-table td > span { display: inline-block; padding: 6px 8px; min-width: 92px; }
+.ge-table td.ov { background: var(--pt-orange-soft); }
+.ge-table td.ov input { font-weight: 700; color: var(--pt-orange-hover); }
+.ge-table tr.ro td { color: var(--pt-muted); background: #fafbfc; }
+.ge-table tr.removed td:not(.ge-act) { text-decoration: line-through; color: var(--pt-muted-2); }
+.ge-table .ge-tot { font-weight: 700; padding: 6px 10px; background: #f3f6f9; white-space: nowrap; }
+.ge-table th.ge-tot { background: var(--pt-navy); }
+.ge-table .ge-act { white-space: nowrap; padding: 0 8px; text-align: left; }
+.ge-table .ge-act .link-btn { margin-right: 8px; }
+.ge-table tr.ge-total td { font-weight: 800; color: var(--pt-navy); background: #eef3f8; padding: 6px 8px; border-top: 2px solid var(--pt-navy); }
+.ge-swatch { display: inline-block; width: 10px; height: 10px; background: var(--pt-orange-soft); border: 1px solid var(--pt-orange); border-radius: 2px; vertical-align: -1px; }
+.link-btn.xs { font-size: 11.5px; }
+.line-card .lc-gridbar { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.line-card .lc-series tr.removed td:not(:last-child) { text-decoration: line-through; color: var(--pt-muted-2); }

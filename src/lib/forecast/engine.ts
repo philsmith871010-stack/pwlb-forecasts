@@ -3,7 +3,7 @@
 // an assumption, a pasted schedule or a one-off the user entered.
 
 import type { Category, ForecastMethod } from '../categories';
-import type { Assumption, ForecastSettings, OneOff, PastedSchedule, TreasuryItem, GrowthMode } from '../model';
+import type { Assumption, ForecastSettings, OneOff, PastedSchedule, TreasuryItem, GrowthMode, GridOverride } from '../model';
 import type { ForecastBasis, SeriesBasis } from '../analysis/aggregates';
 import {
   Day, dayFromISO, ymdFromDay, dayFromYMD, daysInMonth, isBusinessDay, prevBusinessDay, nextBusinessDay,
@@ -25,7 +25,22 @@ export interface ForecastRequest {
   /** the council's deal register: money available now (MMFs, call accounts) and its dated
    * loan and investment cash flows. When present the headline position includes both. */
   register?: { liquid: number; events: { day: Day; amount: number; label: string; kind: string }[] } | null;
+  /** month-by-month figures from the grid: final, applied after everything else in the model */
+  overrides?: GridOverride[];
 }
+
+/** One row of a category's month-by-month grid. */
+export interface GridRow {
+  key: string;
+  label: string;
+  kind: 'series' | 'pattern' | 'custom' | 'added' | 'schedule' | 'oneoff';
+  editable: boolean;
+  values: number[];
+  overridden: boolean[];
+  /** a regular payment the user removed */
+  removed?: boolean;
+}
+export interface CategoryGrid { months: string[]; rows: GridRow[] }
 
 export interface Clamp { year: number; month: number; value: number; clampedTo: number }
 
@@ -69,6 +84,8 @@ export interface ForecastResult {
   /** deal register cash flows per day (included in cumulative) */
   registerDaily: Float64Array;
   register: { liquid: number; events: number; net: number } | null;
+  /** month-by-month rows for each forecast category (by category id) */
+  grid: Record<string, CategoryGrid>;
   lower: Float64Array;
   upper: Float64Array;
   opening: number;
@@ -127,6 +144,8 @@ export function runForecast(req: ForecastRequest): ForecastResult {
     const d = day - start;
     if (d >= 0 && d < H) daily[c * H + d] += amt;
   };
+  // each regular payment's own projection, so the grid can show and edit it row by row
+  const seriesRows = new Map<number, Map<string, Float64Array>>();
 
   // ---------- complete months available for profiling ----------
   const firstFull = (() => { const { y, m, d } = ymdFromDay(agg.startDay); return d === 1 ? y * 12 + m - 1 : y * 12 + m; })();
@@ -387,10 +406,16 @@ export function runForecast(req: ForecastRequest): ForecastResult {
           }
           const sched = tm && tm.rule !== 'weekday' ? { ...s, lastWorkingDay: tm.rule === 'last_working_day', dayOfMonth: tm.rule === 'day_of_month' ? tm.dayOfMonth ?? s.dayOfMonth : s.dayOfMonth } : s;
           const dates = projectDates(sched, anchor, end).filter((d) => d > last);
+          // the user may have removed this payment from a date
+          const stopS = [...req.assumptions].reverse().find((a) => a.kind === 'stop' && a.signature === s.signature && a.categoryId === id) as Extract<Assumption, { kind: 'stop' }> | undefined;
+          const stopDay = stopS ? dayFromISO(stopS.from) : Infinity;
+          let rowArr = seriesRows.get(c)?.get(s.signature);
+          if (!rowArr) { rowArr = new Float64Array(H); if (!seriesRows.has(c)) seriesRows.set(c, new Map()); seriesRows.get(c)!.set(s.signature, rowArr); }
           for (const day of dates) {
-            if (day < start) continue;
+            if (day < start || day >= stopDay) continue;
             const amt = level * G(last, day);
             put(c, day, amt);
+            if (day - start < H) rowArr[day - start] += amt;
             projected += amt;
             if (next === null) next = day;
           }
@@ -415,10 +440,16 @@ export function runForecast(req: ForecastRequest): ForecastResult {
   }
 
   const ci = (id: string) => catIds.indexOf(id);
+  // the model before any change, how changes scale it day by day, and what changes add
+  const modelBase = daily.slice();
+  const mult = new Float64Array((C + 1) * H).fill(1);
+  const added = new Float64Array((C + 1) * H);
+  const putAdded = (c: number, day: Day, amt: number) => { put(c, day, amt); const d = day - start; if (d >= 0 && d < H) added[c * H + d] += amt; };
 
   // ---------- assumptions ----------
   for (const a of req.assumptions) {
     if (a.kind === 'timing' && a.signature) continue; // applied to its series above
+    if (a.kind === 'stop' && a.signature) continue;   // likewise
     if (a.kind === 'growth' || a.kind === 'inflation') {
       markers.push({ day: start, label: a.kind === 'growth' ? `${nameOf(req, a.categoryId)} ${a.pct >= 0 ? '+' : ''}${a.pct}% p.a.` : `Inflation +${a.pct}% on ${a.categoryIds.length} categories`, kind: 'assumption' });
       continue;
@@ -428,14 +459,14 @@ export function runForecast(req: ForecastRequest): ForecastResult {
     const base = c * H;
     if (a.kind === 'stop') {
       const from = dayFromISO(a.from) - start;
-      for (let d = Math.max(0, from); d < H; d++) daily[base + d] = 0;
+      for (let d = Math.max(0, from); d < H; d++) { daily[base + d] = 0; mult[base + d] = 0; added[base + d] = 0; }
       markers.push({ day: dayFromISO(a.from), label: `${nameOf(req, a.categoryId)} stops`, kind: 'assumption' });
     } else if (a.kind === 'start') {
       const from = dayFromISO(a.from);
       const until = a.until ? dayFromISO(a.until) : end;
       const s = { cadence: a.cadence, dayOfMonth: a.dayOfMonth ?? ymdFromDay(from).d, lastWorkingDay: false, amounts: Float64Array.of(a.amount) };
       const dates = [from, ...projectDates(s, from, until)].filter((d, i, arr) => arr.indexOf(d) === i);
-      for (const day of dates) if (day >= from && day <= until) put(c, rollFor(day, a.amount), a.amount);
+      for (const day of dates) if (day >= from && day <= until) putAdded(c, rollFor(day, a.amount), a.amount);
       markers.push({ day: from, label: `New: ${a.note || nameOf(req, a.categoryId)} ${fmtMoney(a.amount)} ${a.cadence.replace('_', '-')}`, kind: 'assumption' });
     } else if (a.kind === 'step') {
       const eff = dayFromISO(a.effective);
@@ -445,8 +476,8 @@ export function runForecast(req: ForecastRequest): ForecastResult {
         const bf = dayFromISO(a.backdateFrom);
         for (let d = Math.max(0, bf - start); d < Math.min(H, eff - start); d++) arrears += daily[base + d] * pct;
       }
-      for (let d = Math.max(0, eff - start); d < H; d++) daily[base + d] *= 1 + pct;
-      if (arrears && a.arrearsPaidOn) put(c, rollFor(dayFromISO(a.arrearsPaidOn), arrears), arrears);
+      for (let d = Math.max(0, eff - start); d < H; d++) { daily[base + d] *= 1 + pct; mult[base + d] *= 1 + pct; added[base + d] *= 1 + pct; }
+      if (arrears && a.arrearsPaidOn) putAdded(c, rollFor(dayFromISO(a.arrearsPaidOn), arrears), arrears);
       markers.push({ day: eff, label: `${nameOf(req, a.categoryId)} ${a.pct >= 0 ? '+' : ''}${a.pct}%${arrears ? ` (arrears ${fmtMoney(arrears)})` : ''}`, kind: 'assumption' });
     } else if (a.kind === 'timing' && !a.signature && a.rule !== 'weekday') {
       const from = dayFromISO(a.from);
@@ -463,6 +494,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
   }
 
   // ---------- pasted schedules ----------
+  const scheduled = new Float64Array((C + 1) * H);
   for (const s of req.pastedSchedules) {
     const c = ci(s.categoryId);
     if (c < 0) continue;
@@ -470,12 +502,58 @@ export function runForecast(req: ForecastRequest): ForecastResult {
       // replace the model only over the months the schedule covers
       const days = s.entries.map((e) => dayFromISO(e.date));
       const from = monthStart(monthKey(Math.min(...days))), to = monthEnd(monthKey(Math.max(...days)));
-      for (let d = Math.max(0, from - start); d < Math.min(H, to - start + 1); d++) daily[c * H + d] = 0;
+      for (let d = Math.max(0, from - start); d < Math.min(H, to - start + 1); d++) { daily[c * H + d] = 0; mult[c * H + d] = 0; added[c * H + d] = 0; scheduled[c * H + d] = 0; }
     }
-    for (const e of s.entries) put(c, dayFromISO(e.date), e.amount);
+    for (const e of s.entries) { put(c, dayFromISO(e.date), e.amount); const d = dayFromISO(e.date) - start; if (d >= 0 && d < H) scheduled[c * H + d] += e.amount; }
     const first = s.entries[0];
     if (first) markers.push({ day: dayFromISO(first.date), label: `Schedule: ${s.name}`, kind: 'schedule' });
   }
+
+  // ---------- month-by-month grid: the user's own figures, then the rows shown ----------
+  const mk0 = monthKey(start), mk1 = monthKey(end);
+  const nM = mk1 - mk0 + 1;
+  const mkLabel = (mk: number) => `${Math.floor(mk / 12)}-${String((mk % 12) + 1).padStart(2, '0')}`;
+  const mkOf = (label: string) => { const [y, m] = label.split('-').map(Number); return y * 12 + m - 1; };
+  const monthDays = (mk: number): [number, number] => [Math.max(monthStart(mk), start) - start, Math.min(monthEnd(mk), end) - start];
+  const rowBase = (c: number, key: string): Float64Array | null => {
+    if (key.startsWith('series:')) return seriesRows.get(c)?.get(key.slice(7)) ?? null;
+    if (key === 'pattern') {
+      const out = modelBase.slice(c * H, (c + 1) * H);
+      for (const arr of seriesRows.get(c)?.values() ?? []) for (let d = 0; d < H; d++) out[d] -= arr[d];
+      return out;
+    }
+    return null;
+  };
+  const patternCache = new Map<number, Float64Array>();
+  const rowOf = (c: number, key: string) => {
+    if (key === 'pattern') { if (!patternCache.has(c)) patternCache.set(c, rowBase(c, 'pattern')!); return patternCache.get(c)!; }
+    return rowBase(c, key);
+  };
+  const overrideAt = new Map<string, number>(); // `${c}|${row}|${mk}` → amount
+  for (const o of req.overrides ?? []) {
+    const c = ci(o.categoryId);
+    const mk = mkOf(o.month);
+    if (c < 0 || mk < mk0 || mk > mk1) continue;
+    overrideAt.set(`${c}|${o.row}|${mk}`, o.amount);
+    const [d0, d1] = monthDays(mk);
+    const rb = rowOf(c, o.row);
+    // take the row's modelled amount out of the month…
+    let old = 0, wsum = 0;
+    if (rb) for (let d = d0; d <= d1; d++) { const v = rb[d] * mult[c * H + d]; daily[c * H + d] -= v; old += v; wsum += Math.abs(v); }
+    // …and put the user's figure in, on the row's usual days where it has them
+    if (rb && wsum > 0) {
+      for (let d = d0; d <= d1; d++) { const v = Math.abs(rb[d] * mult[c * H + d]); if (v) daily[c * H + d] += o.amount * v / wsum; }
+    } else if (rb && rb.subarray(d0, d1 + 1).some((v) => v)) {
+      const w = rb.subarray(d0, d1 + 1).reduce((t, v) => t + Math.abs(v), 0);
+      for (let d = d0; d <= d1; d++) if (rb[d]) daily[c * H + d] += o.amount * Math.abs(rb[d]) / w;
+    } else {
+      const y = Math.floor(mk / 12), m = (mk % 12) + 1;
+      put(c, Math.min(end, Math.max(start, rollFor(dayFromYMD(y, m, 15), o.amount))), o.amount);
+    }
+    void old;
+  }
+
+  const oneOffByCat = new Float64Array((C + 1) * H);
 
   // ---------- one-offs ----------
   for (const o of req.oneOffs) {
@@ -486,8 +564,45 @@ export function runForecast(req: ForecastRequest): ForecastResult {
     if (day >= start && day <= end) {
       put(c, day, amt);
       oneOffDaily[day - start] += amt;
+      oneOffByCat[c * H + day - start] += amt;
     }
     markers.push({ day, label: `${o.description || 'One-off'} ${fmtMoney(o.amount)}${o.confidence === 'possible' ? ` (possible, ${Math.round((o.probability ?? 0.5) * 100)}%)` : o.confidence === 'likely' ? ' (likely)' : ''}`, kind: 'oneoff', amount: o.amount });
+  }
+
+  // the rows shown in each category's grid
+  const grid: Record<string, CategoryGrid> = {};
+  const months = Array.from({ length: nM }, (_, k) => mkLabel(mk0 + k));
+  const byMonth = (arr: Float64Array, c: number, scale: boolean) => {
+    const out = new Array(nM).fill(0);
+    for (let k = 0; k < nM; k++) { const [d0, d1] = monthDays(mk0 + k); for (let d = d0; d <= d1; d++) out[k] += arr[(scale ? 0 : c * H) + d] * (scale ? mult[c * H + d] : 1); }
+    return out;
+  };
+  for (const e of explain) {
+    if (e.method === 'exclude') continue;
+    const c = e.catIdx;
+    const rows: GridRow[] = [];
+    const editableRow = (key: string, label: string, kind: GridRow['kind'], arr: Float64Array | null, removed = false) => {
+      const values = arr ? byMonth(arr, c, true) : new Array(nM).fill(0);
+      const overridden = values.map((_, k) => overrideAt.has(`${c}|${key}|${mk0 + k}`));
+      overridden.forEach((o, k) => { if (o) values[k] = overrideAt.get(`${c}|${key}|${mk0 + k}`)!; });
+      rows.push({ key, label, kind, editable: true, values, overridden, removed });
+    };
+    for (const sx of e.series) {
+      if (!sx.active) continue;
+      const removed = req.assumptions.some((a) => a.kind === 'stop' && a.signature === sx.signature && a.categoryId === e.id);
+      editableRow(`series:${sx.signature}`, sx.signature, 'series', seriesRows.get(c)?.get(sx.signature) ?? null, removed);
+    }
+    editableRow('pattern', e.series.length ? 'Everything else (usual pattern)' : 'Usual pattern', 'pattern', rowOf(c, 'pattern'));
+    const customs = [...new Set((req.overrides ?? []).filter((o) => o.categoryId === e.id && o.row.startsWith('custom:')).map((o) => o.row))];
+    for (const key of customs) editableRow(key, key.slice(7), 'custom', null);
+    const ro = (key: string, label: string, kind: GridRow['kind'], arr: Float64Array) => {
+      const values = byMonth(arr, c, false);
+      if (values.some((v) => Math.abs(v) >= 0.5)) rows.push({ key, label, kind, editable: false, values, overridden: values.map(() => false) });
+    };
+    ro('added', 'Changes from Known future items', 'added', added);
+    ro('schedule', 'Pasted schedules', 'schedule', scheduled);
+    ro('oneoff', 'One-offs', 'oneoff', oneOffByCat);
+    grid[e.id] = { months, rows };
   }
 
   // ---------- treasury schedule (separate layer) ----------
@@ -567,7 +682,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
   const summary = buildSummary({ start, lo, hi, cumulative, buffer, borrowingRequirement, drivers, windowFrom, breaches, H, end, withRegister: !!regInfo });
 
   return {
-    start, H, catIds, daily, oneOffDaily, treasuryDaily, net, cumulative, cumulativeAfterTreasury, cumulativeBefore, registerDaily, register: regInfo, lower, upper, opening,
+    start, H, catIds, daily, oneOffDaily, treasuryDaily, net, cumulative, cumulativeAfterTreasury, cumulativeBefore, registerDaily, register: regInfo, grid, lower, upper, opening,
     low: { day: start + lo, amount: cumulative[lo] }, high: { day: start + hi, amount: cumulative[hi] },
     lowAfterTreasury: { day: start + loT, amount: cumulativeAfterTreasury[loT] },
     breaches, borrowingRequirement, buffer, explain, markers: markers.sort((a, b) => a.day - b.day), summary, drivers, ms: performance.now() - t0,

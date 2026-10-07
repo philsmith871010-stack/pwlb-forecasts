@@ -154,3 +154,63 @@ describe('checking a line: payment day for one series', async () => {
     expect(gained.length).toBeLessThan(56);
   });
 });
+
+describe('month-by-month grid', async () => {
+  const { periodise, sumByPeriod } = await import('../src/lib/forecast/engine');
+  const g = generateDataset({ ...DEFAULT_GENERATOR_OPTIONS, seed: 'e2e-grid' });
+  const ds = await ingest(g.files.map((f) => ({ name: f.name, data: f.text, size: f.text.length, mapping: detectMapping(f.text.slice(0, 96000), f.name).mapping })));
+  const res = categorise(ds, { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true });
+  const basis = buildBasis(ds, res);
+  const start = basis.dataEnd + 1;
+  const settings = { start: isoFromDay(start), end: isoFromDay(addMonths(start, 12) - 1), granularity: 'monthly' as const, openingPosition: null, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: true, bandZ: 1.645 };
+  const req = { basis, categories: DEFAULT_CATEGORIES, settings, assumptions: [], oneOffs: [{ id: 'o', date: isoFromDay(start + 40), amount: 3e6, categoryId: 'grants_general', description: 'x', confidence: 'firm' as const }], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 0 };
+  const monthly = (fc: ReturnType<typeof runForecast>, id: string) => {
+    const c = fc.explain.find((e) => e.id === id)!.catIdx;
+    const p = periodise(fc.start, fc.H, 'monthly');
+    return sumByPeriod(fc.daily, c * fc.H, fc.H, p.index, p.labels.length);
+  };
+  const colSum = (fc: ReturnType<typeof runForecast>, id: string) => fc.grid[id].months.map((_, k) => fc.grid[id].rows.reduce((t, r) => t + r.values[k], 0));
+
+  it('rows add up to the forecast, month by month', () => {
+    const fc = runForecast(req);
+    for (const id of ['salaries', 'council_tax', 'grants_general', 'suppliers']) {
+      const a = monthly(fc, id), b = colSum(fc, id);
+      a.forEach((v, k) => expect(b[k]).toBeCloseTo(v, 0));
+    }
+  });
+
+  it('a typed figure is final, a pasted block lands cell by cell, and a new row adds money', () => {
+    const fc0 = runForecast(req);
+    const gr = fc0.grid.salaries;
+    const sRow = gr.rows.find((r) => r.kind === 'series')!;
+    const [m1, m2, m3] = gr.months;
+    const ov = [
+      { categoryId: 'salaries', row: sRow.key, month: m2, amount: -1_234_567 },
+      // a pasted block: three months of the "everything else" row
+      ...[m1, m2, m3].map((m, k) => ({ categoryId: 'salaries', row: 'pattern', month: m, amount: -100_000 * (k + 1) })),
+      { categoryId: 'grants_general', row: 'custom:New grant', month: m3, amount: 2_500_000 },
+    ];
+    const fc1 = runForecast({ ...req, assumptions: [{ id: 'g', kind: 'growth', categoryId: 'salaries', pct: 10, mode: 'annual_step' }], overrides: ov });
+    const g1 = fc1.grid.salaries;
+    expect(g1.rows.find((r) => r.key === sRow.key)!.values[1]).toBe(-1_234_567);
+    expect(g1.rows.find((r) => r.key === 'pattern')!.values.slice(0, 3)).toEqual([-100_000, -200_000, -300_000]);
+    // still adds up after the edits (growth applies elsewhere, never to typed figures)
+    const a = monthly(fc1, 'salaries'), b = colSum(fc1, 'salaries');
+    a.forEach((v, k) => expect(b[k]).toBeCloseTo(v, 0));
+    expect(monthly(fc1, 'grants_general')[2] - monthly(fc0, 'grants_general')[2]).toBeCloseTo(2_500_000, 0);
+    expect(fc1.grid.grants_general.rows.find((r) => r.key === 'custom:New grant')!.values[2]).toBe(2_500_000);
+    expect(fc1.grid.grants_general.rows.find((r) => r.kind === 'oneoff')!.values.some((v) => Math.abs(v - 3e6) < 1)).toBe(true);
+  });
+
+  it('removing one regular payment removes only that payment', () => {
+    const fc0 = runForecast(req);
+    const sRow = fc0.grid.salaries.rows.find((r) => r.kind === 'series')!;
+    const sig = sRow.key.slice(7);
+    const fc1 = runForecast({ ...req, assumptions: [{ id: 's', kind: 'stop', categoryId: 'salaries', signature: sig, from: settings.start }] });
+    const r1 = fc1.grid.salaries.rows.find((r) => r.key === sRow.key)!;
+    expect(r1.removed).toBe(true);
+    expect(r1.values.every((v) => v === 0)).toBe(true);
+    const drop = monthly(fc0, 'salaries').reduce((t, v) => t + v, 0) - monthly(fc1, 'salaries').reduce((t, v) => t + v, 0);
+    expect(drop).toBeCloseTo(sRow.values.reduce((t, v) => t + v, 0), 0);
+  });
+});

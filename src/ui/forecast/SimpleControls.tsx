@@ -83,7 +83,7 @@ export function SimpleItems({ sc, upd }: { sc: Scenario; upd: Upd }) {
     ...sc.oneOffs.map((o) => ({ id: o.id, date: o.date, kind: 'One-off', amount: o.amount, text: `${o.description || name(o.categoryId)}${o.confidence !== 'firm' ? ` (${o.confidence === 'likely' ? 'likely' : `possible, counted at ${Math.round((o.probability ?? 0.5) * 100)}%`})` : ''}`, remove: () => upd((s) => ({ ...s, oneOffs: s.oneOffs.filter((x) => x.id !== o.id) })) })),
     ...sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').map((a) => ({
       id: a.id, date: a.kind === 'stop' ? a.from : (a as Extract<Assumption, { kind: 'step' }>).effective, kind: a.kind === 'stop' ? 'Stops' : 'Change',
-      text: a.kind === 'stop' ? `${name(a.categoryId)} stops${a.note ? ` — ${a.note}` : ''}` : `${name(a.categoryId)} ${(a as Extract<Assumption, { kind: 'step' }>).pct >= 0 ? '+' : ''}${(a as Extract<Assumption, { kind: 'step' }>).pct}%${a.note ? ` — ${a.note}` : ''}`,
+      text: a.kind === 'stop' ? `${name(a.categoryId)}${a.signature ? `: ${a.signature.replace(/\S*#\S*/g, '').trim()} removed` : ' stops'}${a.note ? ` — ${a.note}` : ''}` : `${name(a.categoryId)} ${(a as Extract<Assumption, { kind: 'step' }>).pct >= 0 ? '+' : ''}${(a as Extract<Assumption, { kind: 'step' }>).pct}%${a.note ? ` — ${a.note}` : ''}`,
       remove: () => upd((s) => ({ ...s, assumptions: s.assumptions.filter((x) => x.id !== a.id) })),
     })),
   ].sort((x, y) => x.date.localeCompare(y.date));
