@@ -6,7 +6,7 @@ const STAGES = [
   { icon: 'bi-cloud-arrow-up', title: 'Add your data', text: 'Drop in the bank statement files (CSV) from your online banking — or try the example data.' },
   { icon: 'bi-ui-checks', title: 'Check the sorting', text: 'Almost everything is sorted for you. Confirm the handful of items we weren’t sure about.' },
   { icon: 'bi-bar-chart-line', title: 'Look back', text: 'See how your cash has behaved: year by year, and through the seasons.' },
-  { icon: 'bi-graph-up-arrow', title: 'Look ahead', text: 'Get your forecast. Add what you know — a pay award, a land sale — and watch it update.' },
+  { icon: 'bi-graph-up-arrow', title: 'Look ahead', text: 'Check our proposal line by line — how big, how fast it grows, when it’s paid — add what you know, then see your forecast.' },
   { icon: 'bi-box-arrow-down', title: 'Save & share', text: 'Download a ready-made report or Excel file, and save your work for next time.' },
 ];
 

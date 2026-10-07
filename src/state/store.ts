@@ -19,7 +19,7 @@ export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] =
   { id: 'categorise', label: 'Sorting results', sub: 'How lines were sorted', icon: 'bi-tags' },
   { id: 'review', label: 'Check the sorting', sub: 'Confirm a few items', icon: 'bi-ui-checks' },
   { id: 'history', label: 'Look back', sub: 'Your cash so far', icon: 'bi-bar-chart-line' },
-  { id: 'forecast', label: 'Look ahead', sub: 'Your forecast', icon: 'bi-graph-up-arrow' },
+  { id: 'forecast', label: 'Look ahead', sub: 'Build your forecast', icon: 'bi-graph-up-arrow' },
   { id: 'backtest', label: 'Test the forecast', sub: 'Against past years', icon: 'bi-bullseye' },
   { id: 'save', label: 'Save & share', sub: 'Report, Excel, team file', icon: 'bi-box-arrow-down' },
 ];

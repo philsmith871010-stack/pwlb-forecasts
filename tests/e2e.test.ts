@@ -105,3 +105,33 @@ describe('end to end with the example deal register', async () => {
     expect(st.options.length).toBeGreaterThan(1);
   });
 });
+
+describe('checking a line: payment day for one series', async () => {
+  const { lastWorkingDayOfMonth, ymdFromDay } = await import('../src/lib/dates');
+  const g = generateDataset({ ...DEFAULT_GENERATOR_OPTIONS, seed: 'e2e-timing' });
+  const ds = await ingest(g.files.map((f) => ({ name: f.name, data: f.text, size: f.text.length, mapping: detectMapping(f.text.slice(0, 96000), f.name).mapping })));
+  const res = categorise(ds, { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true });
+  const basis = buildBasis(ds, res);
+  const start = basis.dataEnd + 1;
+  const settings = { start: isoFromDay(start), end: isoFromDay(addMonths(start, 12) - 1), granularity: 'monthly' as const, openingPosition: null, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: true, bandZ: 1.645 };
+  const req = { basis, categories: DEFAULT_CATEGORIES, settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 0 };
+
+  it('moves only that series to the last working day, keeping the total', () => {
+    const fc0 = runForecast(req);
+    const sal = fc0.explain.find((e) => e.id === 'salaries')!;
+    const s = sal.series.filter((x) => x.cadence === 'monthly' && !x.lastWorkingDay).sort((a, z) => Math.abs(z.level) - Math.abs(a.level))[0];
+    expect(s).toBeDefined();
+    const fc1 = runForecast({ ...req, assumptions: [{ id: 't', kind: 'timing', categoryId: 'salaries', signature: s.signature, from: settings.start, rule: 'last_working_day' }] });
+    const c = sal.catIdx, H = fc0.H;
+    const row = (fc: typeof fc0) => fc.daily.subarray(c * H, (c + 1) * H);
+    const tot = (a: Float64Array) => a.reduce((x, v) => x + v, 0);
+    // same payments, a few days later (growth is by date, so the total moves a hair)
+    expect(Math.abs(tot(row(fc1)) / tot(row(fc0)) - 1)).toBeLessThan(0.001);
+    // in a month where the usual day isn't the last working day, that series' payment moves there
+    const { y, m } = ymdFromDay(addMonths(start, 2));
+    const lwd = lastWorkingDayOfMonth(y, m) - fc0.start;
+    const moved = row(fc1)[lwd] - row(fc0)[lwd];
+    expect(Math.abs(moved / s.level - 1)).toBeLessThan(0.03); // the payment, plus a little growth
+    expect(fc1.explain.find((e) => e.id === 'salaries')!.series.find((x) => x.signature === s.signature)!.timing).toBe('user');
+  });
+});

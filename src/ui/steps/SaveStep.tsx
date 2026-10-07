@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Panel, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
+import { isReviewed } from '../forecast/BuildView';
 import { useForecast } from '../forecast/useForecast';
 import { engine } from '../../worker/client';
 import { downloadBlob, fsAccessSupported } from '../../lib/teamfile';
@@ -21,7 +22,9 @@ function SimpleSave() {
   const s = useStore();
   const { team, agg, cat, dirty, teamName, saveTeam, updateTeam, user, setUser } = s;
   const sc = team.forecasts.find((f) => f.id === s.activeScenarioId) ?? team.forecasts[0];
-  const b = useForecast(sc);
+  const b0 = useForecast(sc);
+  // nothing is shared until the forecast has been checked line by line
+  const b = sc && b0 && isReviewed(sc, b0) ? b0 : null;
   const eyebrow = useEyebrow('save');
   const [busy, setBusy] = useState<string | null>(null);
   const [view, setView] = useState<'cards' | 'report'>('cards');
@@ -53,6 +56,10 @@ function SimpleSave() {
       <PageHead eyebrow={eyebrow} title="Save & share">
         Take your forecast away as a report or spreadsheet, and save your work so you can pick it up next time.
       </PageHead>
+      {!b && b0 && (
+        <div className="callout mb"><strong>Your forecast isn’t ready to share yet.</strong> Check each line on the Look ahead step first. The report and Excel file become available once you’ve seen your forecast.
+          {' '}<button className="link-btn" onClick={() => { s.setStepTab('forecast-simple', 'lines'); s.setStepTab('forecast', 'lines'); s.goto('forecast'); }}>Go to Look ahead</button></div>
+      )}
       {b && <div className="summary-box mb"><div className="eyebrow">Your forecast in one line</div>
         Lowest point <strong>{money(b.fc.low.amount)}</strong> on <strong>{day(b.fc.low.day)}</strong>{b.fc.borrowingRequirement > 0 ? <> — you may need to borrow about <strong>{money(b.fc.borrowingRequirement)}</strong> to keep {money(b.fc.buffer)} in the bank.</> : <> — no borrowing needed to keep {money(b.fc.buffer)} in the bank.</>}
       </div>}
@@ -92,7 +99,9 @@ function AdvancedSave() {
   const s = useStore();
   const { team, agg, cat, dirty, teamName, saveTeam, updateTeam, user, setUser } = s;
   const sc = team.forecasts.find((f) => f.id === s.activeScenarioId) ?? team.forecasts[0];
-  const b = useForecast(sc);
+  const b0 = useForecast(sc);
+  // nothing is shared until the forecast has been checked line by line
+  const b = sc && b0 && isReviewed(sc, b0) ? b0 : null;
   const [busy, setBusy] = useState<string | null>(null);
   const eyebrow = useEyebrow('save');
   const tabs: TabDef[] = [{ id: 'team', label: 'Save team file', badge: dirty ? 'unsaved' : '' }, { id: 'exports', label: 'Excel & CSV' }, { id: 'report', label: 'Report / PDF', disabled: !b }];

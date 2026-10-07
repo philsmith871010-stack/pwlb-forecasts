@@ -4,7 +4,7 @@ import type { Scenario, Assumption, OneOff } from '../../lib/model';
 import { uid } from '../../lib/model';
 import type { ForecastBundle } from './useForecast';
 import { Seg, Money, Panel } from '../components/common';
-import { money, pct, day } from '../../lib/format';
+import { money, day } from '../../lib/format';
 import { addMonths, dayFromISO, isoFromDay, ymdFromDay } from '../../lib/dates';
 import type { Category } from '../../lib/categories';
 
@@ -67,44 +67,6 @@ export function SimpleStart({ sc, upd, b }: { sc: Scenario; upd: Upd; b: Forecas
         </div>
       </div>
     </div>
-  );
-}
-
-// ------------------------------------------------------------------ growth
-
-export function SimpleGrowth({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastBundle }) {
-  const categories = useStore((s) => s.team.categories);
-  const growthFor = (id: string) => sc.assumptions.find((a) => a.kind === 'growth' && a.categoryId === id) as Extract<Assumption, { kind: 'growth' }> | undefined;
-  const setGrowth = (id: string, v: string) => upd((s) => {
-    const rest = s.assumptions.filter((a) => !(a.kind === 'growth' && a.categoryId === id));
-    if (v.trim() === '' || isNaN(+v)) return { ...s, assumptions: rest };
-    return { ...s, assumptions: [...rest, { id: uid('as'), kind: 'growth', categoryId: id, pct: +v, mode: 'annual_step' }] };
-  });
-  const rows = b.fc.explain.filter((e) => e.method !== 'exclude' && Math.abs(e.historyAnnual) > 2e6).sort((a, z) => Math.abs(z.historyAnnual) - Math.abs(a.historyAnnual));
-  return (
-    <Panel title="Expected growth each year" flush>
-      <table className="tbl simple-tbl">
-        <thead><tr><th>Category</th><th className="num">Last 12 months</th><th className="num">Past growth</th><th className="num">Your figure (leave empty to keep the past growth)</th></tr></thead>
-        <tbody>{rows.map((e) => {
-          const g = growthFor(e.id);
-          const cat = categories.find((c) => c.id === e.id);
-          return (
-            <tr key={e.id}>
-              <td><span className="swatch" style={{ background: cat?.colour ?? '#ced4da', marginRight: 8 }} />{e.name} <span className="xs muted">{e.historyAnnual >= 0 ? 'in' : 'out'}</span></td>
-              <td className="num"><Money v={Math.abs(e.historyAnnual)} /></td>
-              <td className="num muted">{pct(e.historicCagr / 100, 1, true)} a year</td>
-              <td className="num">
-                <div className="pct-input">
-                  <input className={`input ${g ? 'set' : ''}`} placeholder="same" title={`Leave empty to keep the past trend (${e.historicCagr.toFixed(1)}%)`} defaultValue={g ? String(g.pct) : ''} key={g ? g.id : 'none'}
-                    aria-label={`Your growth for ${e.name}`} onBlur={(ev) => setGrowth(e.id, ev.target.value)} onKeyDown={(ev) => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} />
-                  <span>% a year</span>
-                </div>
-              </td>
-            </tr>
-          );
-        })}</tbody>
-      </table>
-    </Panel>
   );
 }
 

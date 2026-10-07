@@ -91,3 +91,14 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - **The term-out ladder** is the running minimum of the lower band above the minimum cash, at 1/3/6/12/24 months.
   - Counterparty limits, rates and the TMSS are not checked, and every screen says so.
 - **The example council carries a register** (built by the generator from the same deals that made its bank lines, so the two agree). Its projections size the capital programme from its own operational deficit, so bottom up and top down are of the same order. Two generator fixes came out of this: the first month's schools funding was being dropped, which left the schools account £11m overdrawn; and the cash manager now keeps about £10m in MMFs as a liquidity reserve, borrowing rather than running it down.
+
+## Building the forecast before showing it
+
+- **The forecast is proposed, checked, then shown.** Look ahead opens on *Check each line*. Every income and spending line that makes up at least 1% of gross flows (or £2m) gets a card showing:
+  - what history says, in plain English: regular payments with their amount, how often and on what day; or the seasonal pattern (highest and lowest months); or the flat average;
+  - past months next to the proposed next 12;
+  - three edits: growth each year, bigger or smaller by a %, and "it stops".
+- **Smaller lines** are accepted together in one click.
+- **Locked until checked.** The result, options and breakdown tabs, the results strip, the saved results snapshot, the report and the Excel export stay locked until every line is checked and the user clicks *See my forecast*.
+- **When it is paid, per series.** A timing assumption may name one series (`signature`). The engine then projects that series on the chosen day (last working day, or the Nth), leaving the category's other payments alone. Timing without a signature still moves the whole category, as before.
+- **Checks belong to the data they were made on** (`reviewFor` = the data end date). Loading newer bank data asks for the lines to be checked again, because the proposal has changed.

@@ -44,7 +44,7 @@ export interface CategoryExplain {
   clamps: Clamp[];
   sigmaMonthly: number;
   distribution: 'day_of_month' | 'weekday' | 'even' | 'series';
-  series: { signature: string; cadence: string; level: number; next: Day | null; projected: number; active: boolean }[];
+  series: { signature: string; cadence: string; level: number; next: Day | null; projected: number; active: boolean; dayOfMonth: number; lastWorkingDay: boolean; regularity: number; lastDay: Day; timing: 'history' | 'user' }[];
   notes: string[];
   forecastTotal: number;
   historyAnnual: number;
@@ -375,8 +375,11 @@ export function runForecast(req: ForecastRequest): ForecastResult {
         for (let j = s.amounts.length - k; j < s.amounts.length; j++) recent.push(s.amounts[j] * G(s.days[j], last));
         const level = median(recent);
         let projected = 0, next: Day | null = null;
+        // the user may have said when this payment is made
+        const tm = [...req.assumptions].reverse().find((a) => a.kind === 'timing' && a.signature === s.signature && a.categoryId === id) as Extract<Assumption, { kind: 'timing' }> | undefined;
         if (s.active && last >= dataEnd - 400) {
-          const dates = projectDates(s, last, end);
+          const sched = tm ? { ...s, lastWorkingDay: tm.rule === 'last_working_day', dayOfMonth: tm.rule === 'day_of_month' ? tm.dayOfMonth ?? s.dayOfMonth : s.dayOfMonth } : s;
+          const dates = projectDates(sched, last, end);
           for (const day of dates) {
             if (day < start) continue;
             const amt = level * G(last, day);
@@ -386,7 +389,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
           }
         }
         forecastTotal += projected;
-        seriesExplain.push({ signature: s.signature, cadence: s.cadence, level, next, projected, active: s.active });
+        seriesExplain.push({ signature: s.signature, cadence: s.cadence, level, next, projected, active: s.active, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, regularity: s.regularity, lastDay: last, timing: tm ? 'user' : 'history' });
       }
       const stopped = catSeries.filter((s) => !s.active);
       if (stopped.length) notes.push(`${stopped.length} series stopped before the end of the data and are not projected: ${stopped.map((s) => s.signature).slice(0, 3).join('; ')}.`);
@@ -408,6 +411,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
 
   // ---------- assumptions ----------
   for (const a of req.assumptions) {
+    if (a.kind === 'timing' && a.signature) continue; // applied to its series above
     if (a.kind === 'growth' || a.kind === 'inflation') {
       markers.push({ day: start, label: a.kind === 'growth' ? `${nameOf(req, a.categoryId)} ${a.pct >= 0 ? '+' : ''}${a.pct}% p.a.` : `Inflation +${a.pct}% on ${a.categoryIds.length} categories`, kind: 'assumption' });
       continue;
@@ -437,7 +441,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
       for (let d = Math.max(0, eff - start); d < H; d++) daily[base + d] *= 1 + pct;
       if (arrears && a.arrearsPaidOn) put(c, rollFor(dayFromISO(a.arrearsPaidOn), arrears), arrears);
       markers.push({ day: eff, label: `${nameOf(req, a.categoryId)} ${a.pct >= 0 ? '+' : ''}${a.pct}%${arrears ? ` (arrears ${fmtMoney(arrears)})` : ''}`, kind: 'assumption' });
-    } else if (a.kind === 'timing') {
+    } else if (a.kind === 'timing' && !a.signature) {
       const from = dayFromISO(a.from);
       for (let mk = monthKey(Math.max(from, start)); mk <= monthKey(end); mk++) {
         const ms = Math.max(monthStart(mk), from, start), me = Math.min(monthEnd(mk), end);

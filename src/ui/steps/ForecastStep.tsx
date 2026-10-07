@@ -9,40 +9,46 @@ import { useForecast } from '../forecast/useForecast';
 import { ForecastChart } from '../forecast/ForecastChart';
 import { SetupSection, MethodsSection, AssumptionsSection, OneOffsSection, PasteSection } from '../forecast/Controls';
 import { StackedView, CategoryExplorer, ForecastTable, CompareView } from '../forecast/Views';
-import { SimpleStart, SimpleGrowth, SimpleItems, SimpleBreakdown } from '../forecast/SimpleControls';
+import { SimpleStart, SimpleItems, SimpleBreakdown } from '../forecast/SimpleControls';
+import { BuildView, reviewState, isReviewed, dataEndIso } from '../forecast/BuildView';
 import { SnapshotForecastView } from '../forecast/SnapshotView';
 import { money, day, ago } from '../../lib/format';
 import type { Scenario } from '../../lib/model';
 import { buildResultsSnapshot } from '../../lib/analysis/snapshot';
 
 const FC_TABS: TabDef[] = [
-  { id: 'result', label: 'Result' },
-  { id: 'options', label: 'What you could do' },
-  { id: 'setup', label: 'Starting point' },
-  { id: 'growth', label: 'Growth' },
+  { id: 'lines', label: 'Check each line' },
+  { id: 'growth', label: 'Methods' },
   { id: 'changes', label: 'Planned changes' },
   { id: 'oneoffs', label: 'Known one-offs' },
   { id: 'schedules', label: 'Schedules' },
+  { id: 'setup', label: 'Starting point' },
+  { id: 'result', label: 'Result' },
+  { id: 'options', label: 'What you could do' },
   { id: 'breakdown', label: 'Breakdown' },
   { id: 'scenarios', label: 'Scenarios' },
 ];
 
 const FC_TABS_SIMPLE: TabDef[] = [
+  { id: 'lines', label: 'Check each line' },
+  { id: 's-items', label: 'Known future items' },
+  { id: 's-start', label: 'Starting cash' },
   { id: 'result', label: 'Your forecast' },
   { id: 'options', label: 'What you could do' },
-  { id: 's-start', label: 'Starting cash' },
-  { id: 's-growth', label: 'Growth' },
-  { id: 's-items', label: 'Known future items' },
   { id: 's-breakdown', label: 'What’s in it' },
 ];
 
+/** tabs that show results: locked until the proposal has been checked */
+const RESULT_TABS = ['result', 'options', 's-breakdown', 'breakdown', 'scenarios'];
+
 const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
+  lines: { what: 'Our proposal for each kind of income and spending, worked out from your history: how big it is, how it is growing, and when it is paid.', why: 'A forecast is only as good as its parts. Checking each line takes a few minutes and means every figure is one you have agreed.', todo: <>Open each line, check what we found, change anything you know better (e.g. salaries <strong>+3%</strong> for a pay award, or paid on the <strong>last working day</strong>), then click <strong>Looks right</strong>.</> },
   options: { what: 'Borrowing and investing options worked out from your forecast and, if you added it, your deal register.', why: 'The forecast shows when cash runs short or sits idle. These options turn that into figures to take to your treasury meeting.', todo: 'Read the options, then check them against your treasury management strategy. Change the forecast and they update.' },
   's-start': { what: 'Three simple settings that frame the forecast: the cash you start with, the minimum you want to keep, and how far ahead to look.', todo: 'Check each one. The figures we’ve filled in are a sensible starting point.' },
   's-growth': { what: 'How much each kind of money is expected to grow each year. We’ve worked out the past trend for you (shown in grey).', why: 'Small changes add up: 2% more on salaries over two years is millions of pounds.', todo: <>Leave a box empty to use the past trend. Type a number to use your own — e.g. <strong>3</strong> for a 3% pay award.</> },
   's-items': { what: 'Things you know are coming that past years can’t predict: a land sale, a grant that ends, a pay award.', why: 'These often decide whether the low point is £10m or £30m.', todo: 'Pick the kind of item, fill in the short form and click Add. Each appears on the chart as an orange diamond.' },
   's-breakdown': { what: 'The forecast split into categories, year by year, next to the last 12 months for comparison.', why: 'Lets you sense-check it: does each line look about right?', todo: 'Look for anything that seems too high or too low, and adjust it on the Growth tab.' },
-  result: { what: <>Your everyday cash, day by day. The <strong>navy line</strong> is the past, the <strong>orange dashed line</strong> is the forecast. The red dashed line is the minimum cash you want to keep.</>, why: 'Where the orange line drops below the red line, you would need to borrow to stay safe. Its lowest point tells you how much and when.', todo: <>Read the summary below. Then use the tabs above to add what you know — e.g. a pay award or a land sale — and watch the numbers update.</> },
+  result: { what: <>Your everyday cash, day by day. The <strong>navy line</strong> is the past, the <strong>orange dashed line</strong> is the forecast. The red dashed line is the minimum cash you want to keep.</>, why: 'Where the orange line drops below the red line, you would need to borrow to stay safe. Its lowest point tells you how much and when.', todo: <>Read the summary below. To change anything, go back to <strong>Check each line</strong> or <strong>Known future items</strong>: the forecast updates as you go.</> },
   setup: { what: 'When the forecast starts, how far ahead it looks, what cash you start with, and how much past history it learns from.', why: 'The starting cash shifts the whole line up or down; the buffer decides when you’d need to borrow.', todo: 'Check the start date and opening cash. The defaults are usually right.' },
   growth: { what: <>How fast each category is expected to grow each year, and how it’s projected: <strong>Seasonal</strong> repeats last years’ monthly pattern; <strong>Schedule</strong> projects regular payments on their own dates; <strong>Flat</strong> uses an average.</>, why: 'Growth compounds — a couple of percent on payroll moves the low point by millions over two years.', todo: <>The grey number is the historic trend. Type your own figure where you know better, e.g. <strong>Salaries 2</strong> for a 2% pay award.</> },
   changes: { what: 'Specific changes you know about: a pay award from a date (with backdated arrears), a payment day moving, a grant stopping, a new regular payment starting, or general inflation.', why: 'History can’t know about decisions that haven’t happened yet — you can.', todo: 'Pick the type of change, fill in the boxes, click Add. It appears on the chart as an orange diamond.' },
@@ -70,7 +76,7 @@ export function ForecastStep() {
 
   // keep a results snapshot on the scenario so it can be viewed without the CSV (debounced)
   useEffect(() => {
-    if (!b || !sc) return;
+    if (!b || !sc || !isReviewed(sc, b)) return;
     const t = setTimeout(() => {
       const snap = buildResultsSnapshot(b.fc);
       if (JSON.stringify(snap.cumulative) !== JSON.stringify(sc.resultsSnapshot?.cumulative) || snap.summary !== sc.resultsSnapshot?.summary) {
@@ -89,22 +95,27 @@ export function ForecastStep() {
   const fc = b.fc;
   const endPos = fc.cumulative[fc.H - 1];
   const help = tab === 'result' && fc.register ? { ...FC_HELP.result, what: <>Your cash, day by day, <strong>including your loans and investments</strong> from the deal register. The <strong>navy line</strong> is the past, the <strong>orange dashed line</strong> the forecast, and the grey dotted line is your everyday cash without the deals. The red dashed line is the minimum cash you want to keep.</> } : FC_HELP[tab];
+  const rv = reviewState(sc, b);
+  const locked = !isReviewed(sc, b);
   const idx = TABS.findIndex((t) => t.id === tab);
-  const tabs = TABS.map((t) => ({ ...t, badge:
+  const tabs = TABS.map((t) => ({ ...t, disabled: locked && RESULT_TABS.includes(t.id), hint: locked && RESULT_TABS.includes(t.id) ? 'Check each line first, then see your forecast' : undefined, badge:
+    t.id === 'lines' ? (rv.left.length ? `${rv.left.length} to check` : '✓') :
     t.id === 's-items' ? sc.oneOffs.length + sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').length || '' :
-    t.id === 's-growth' ? sc.assumptions.filter((a) => a.kind === 'growth').length || '' :
     t.id === 'changes' ? sc.assumptions.filter((a) => a.kind !== 'growth').length || '' :
-    t.id === 'growth' ? sc.assumptions.filter((a) => a.kind === 'growth').length || '' :
     t.id === 'oneoffs' ? sc.oneOffs.length || '' :
     t.id === 'schedules' ? sc.pastedSchedules.length + (sc.treasurySchedule.length ? 1 : 0) || '' :
     t.id === 'scenarios' ? team.forecasts.length : '' }));
+  const firstResult = TABS.findIndex((t) => t.id === 'result');
+  const seeForecast = () => { upd((s) => ({ ...s, reviewDone: true, reviewFor: dataEndIso(b) })); setTab('result'); };
   return (
     <div className="page">
-      <PageHead eyebrow={eyebrow} title="Look ahead: your cash forecast" actions={advanced ? <ScenarioBar /> : undefined}>
-        Your council’s regular cash pattern carried forward, plus anything you know is coming. The lowest point tells you how much you may need to borrow, and when.
+      <PageHead eyebrow={eyebrow} title={locked ? 'Look ahead: build your forecast' : 'Look ahead: your cash forecast'} actions={advanced ? <ScenarioBar /> : undefined}>
+        {locked
+          ? <>We’ve drafted a forecast from your history. Check it line by line, add anything you know is coming, then see the result.</>
+          : <>Your council’s regular cash pattern carried forward, plus anything you know is coming. The lowest point tells you how much you may need to borrow, and when.</>}
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />
-      {tab !== 'result' && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
+      {!locked && tab !== 'result' && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
       <Explain compact what={help.what} why={help.why} todo={help.todo} />
 
       {tab === 'result' && (
@@ -147,7 +158,7 @@ export function ForecastStep() {
       )}
       {tab === 'options' && <StrategyView b={b} />}
       {tab === 's-start' && <SimpleStart sc={sc} upd={upd} b={b} />}
-      {tab === 's-growth' && <SimpleGrowth sc={sc} upd={upd} b={b} />}
+      {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
       {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}
       {tab === 's-breakdown' && <SimpleBreakdown b={b} />}
       {tab === 'setup' && <div style={{ maxWidth: 640 }}><SetupSection sc={sc} upd={upd} b={b} /></div>}
@@ -165,7 +176,13 @@ export function ForecastStep() {
       )}
       {tab === 'scenarios' && <div className="card card-pad"><CompareView /></div>}
 
-      {idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={tab === 'result' ? 'Make it yours — add what you know about the future.' : <button className="link-btn" onClick={() => useStore.getState().goto(advanced ? 'backtest' : 'save')}>or go to {advanced ? 'the backtest' : 'save & share'}</button>} />
+      {locked && idx === firstResult - 1 ? (
+        rv.allChecked
+          ? <NextTab label="See my forecast" onClick={seeForecast} text="Every line is checked. Your forecast is ready." />
+          : <NextTab label="Back to checking lines" onClick={() => setTab('lines')} text={`${rv.left.length || 'Some'} line${rv.left.length === 1 ? '' : 's'} still to check before the forecast can be shown.`} />
+      ) : tab === 'lines' && locked && !rv.allChecked ? (
+        <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={`${rv.left.length + rv.small.filter((e) => !rv.done.has(e.id)).length} still to check. You can come back to them.`} />
+      ) : idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={tab === 'result' ? 'See what the forecast means for borrowing and investing.' : !locked ? <button className="link-btn" onClick={() => useStore.getState().goto(advanced ? 'backtest' : 'save')}>or go to {advanced ? 'the backtest' : 'save & share'}</button> : undefined} />
         : !workspace && <StepFooter nextLabel={advanced ? 'Next: test the forecast' : 'Next: save & share'} />}
     </div>
   );

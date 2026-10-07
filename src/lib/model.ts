@@ -61,7 +61,8 @@ export type GrowthMode = 'annual_step' | 'continuous';
 export type Assumption =
   | { id: string; kind: 'growth'; categoryId: string; pct: number; mode: GrowthMode; note?: string }
   | { id: string; kind: 'step'; categoryId: string; pct: number; effective: string; backdateFrom?: string; arrearsPaidOn?: string; note?: string }
-  | { id: string; kind: 'timing'; categoryId: string; from: string; rule: 'last_working_day' | 'day_of_month'; dayOfMonth?: number; note?: string }
+  /** moves payments to a day: a whole category, or (with `signature`) just one regular payment series */
+  | { id: string; kind: 'timing'; categoryId: string; from: string; rule: 'last_working_day' | 'day_of_month'; dayOfMonth?: number; signature?: string; note?: string }
   | { id: string; kind: 'stop'; categoryId: string; from: string; note?: string }
   | { id: string; kind: 'start'; categoryId: string; from: string; until?: string; amount: number; cadence: 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'half_yearly' | 'annual'; dayOfMonth?: number; note?: string }
   | { id: string; kind: 'inflation'; pct: number; categoryIds: string[]; note?: string };
@@ -134,6 +135,12 @@ export interface Scenario {
   pastedSchedules: PastedSchedule[];
   treasurySchedule: TreasuryItem[];
   resultsSnapshot?: ResultsSnapshot;
+  /** categories the user has checked on "Check each line" */
+  reviewed?: string[];
+  /** the user has checked the proposal and asked to see the forecast */
+  reviewDone?: boolean;
+  /** the data end date (ISO) the checks were made against: new data means checking again */
+  reviewFor?: string;
 }
 
 export interface HistorySummary {
