@@ -42,6 +42,7 @@ export function HomePage() {
             <button className="btn lg on-dark" onClick={demo}><i className="bi bi-stars" /> Try it with example data</button>
             {ingest && <button className="btn lg on-dark" onClick={() => goto('forecast')}>Continue where I was <i className="bi bi-arrow-right" /></button>}
           </div>
+          <div className="home-daily"><button className="link-btn" onClick={() => { goto('load'); void useStore.getState().tryDayToDay(); }}>Or see day-to-day use</button> <span>— a saved history, and today’s statement sorted in seconds</span></div>
           <div className="home-trust">
             <span><i className="bi bi-shield-lock-fill" /> Bank data never leaves this computer</span>
             <span><i className="bi bi-eye" /> Every number explained</span>

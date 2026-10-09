@@ -115,6 +115,22 @@ const api = {
 
   registerInfo(): RegisterInfo | null { return registerInfo(); },
 
+  /** The example's bank lines for one day, written as an ordinary statement export (for trying day-to-day use). */
+  exampleStatement(day: Day): { name: string; size: number; report: DetectionReport } {
+    const d = need(ds, 'Data');
+    const q = (v: string) => (/[",]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const iso = isoFromDay(day);
+    const lines = ['Date,Account Number,Description,Amount'];
+    for (let i = 0; i < d.n; i++) {
+      if (d.day[i] !== day) continue;
+      lines.push([`${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`, d.accounts[d.account[i]], q(d.narratives[d.narr[i]]), d.amount[i].toFixed(2)].join(','));
+    }
+    const name = `northbridge_statement_${iso}.csv`;
+    const text = lines.join('\n') + '\n';
+    demoFiles.set(name, text);
+    return { name, size: text.length, report: detectMapping(text, name) };
+  },
+
   demoFileBlob(name: string): Blob | null {
     const t = demoFiles.get(name);
     return t ? new Blob([t], { type: 'text/csv' }) : null;

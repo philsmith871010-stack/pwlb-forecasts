@@ -8,7 +8,7 @@ import { categorise } from '../src/lib/categorise/engine';
 import { buildBasis } from '../src/lib/analysis/aggregates';
 import { DEFAULT_CATEGORIES } from '../src/lib/categories';
 import { runForecast } from '../src/lib/forecast/engine';
-import { fromSession, mergeHistory, basisFromHistory, historySpan, historyBytes } from '../src/lib/history/cashHistory';
+import { fromSession, mergeHistory, basisFromHistory, historySpan, historyBytes, historyBefore } from '../src/lib/history/cashHistory';
 import { isoFromDay, addMonths, dayFromISO } from '../src/lib/dates';
 
 const cfg = { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true };
@@ -98,6 +98,17 @@ describe('cash history', async () => {
     const occAfter = history.series.reduce((t, s) => t + s.occ.length, 0), occBefore = h.series.reduce((t, s) => t + s.occ.length, 0);
     expect(occAfter).toBeGreaterThanOrEqual(occBefore);
     expect(basisFromHistory(history, catIds)!.dataEnd).toBe(day);
+  });
+
+  it('holding back the last day, then adding it again, gives the full history back', () => {
+    const h = fromSession(ds, res);
+    const back = historyBefore(h, ds.maxDay);
+    expect(historySpan(back)!.to).toBeLessThan(ds.maxDay);
+    const one = slice(ds, ds.maxDay, ds.maxDay);
+    const { history } = mergeHistory(back, fromSession(one, categorise(one, cfg), back.series));
+    const tot = (x: typeof h) => x.cells.reduce((t, c) => { for (let k = 0; k < c.length; k += 4) t += c[k + 3]; return t; }, 0);
+    expect(tot(history)).toBe(tot(h));
+    expect(historySpan(history)).toEqual(historySpan(h));
   });
 
   it('reports a gap when a period is missing', () => {

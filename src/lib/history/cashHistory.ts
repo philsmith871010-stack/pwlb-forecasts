@@ -271,3 +271,30 @@ export function basisFromHistory(h: CashHistory, catIds: string[]): ForecastBasi
 
 /** Rough size in the team file, for telling the user. */
 export const historyBytes = (h: CashHistory) => JSON.stringify(h).length;
+
+/** The history as it stood before `day` (used to hold back a day as "today's statement" in the example). */
+export function historyBefore(h: CashHistory, day: Day): CashHistory {
+  const accounts: HistoryAccount[] = [];
+  const cells: number[][] = [];
+  h.accounts.forEach((a, i) => {
+    const keep: number[] = [];
+    let removed = 0;
+    const src = h.cells[i];
+    for (let k = 0; k < src.length; k += 4) {
+      if (src[k] >= day) { removed += src[k + 3]; continue; }
+      keep.push(src[k], src[k + 1], src[k + 2], src[k + 3]);
+    }
+    const ranges = a.ranges.filter((r) => r[0] < day).map((r) => [r[0], Math.min(r[1], day - 1)] as [Day, Day]);
+    if (!ranges.length) return;
+    const last = Math.max(...ranges.map((r) => r[1]));
+    accounts.push({
+      ...a, ranges,
+      closing: a.closing !== null && a.closingDay !== null ? Math.round((a.closing - (a.closingDay >= day ? removed / 100 : 0)) * 100) / 100 : null,
+      closingDay: a.closingDay !== null ? Math.min(a.closingDay, last) : null,
+    });
+    cells.push(keep);
+  });
+  const acctMap = new Map(h.accounts.map((a, i) => [i, accounts.findIndex((x) => x.key === a.key)]));
+  const series = h.series.map((s) => ({ ...s, occ: s.occ.filter(([d]) => d < day).map(([d, p, a]) => [d, p, acctMap.get(a)!] as [Day, number, number]) })).filter((s) => s.occ.length);
+  return { ...h, updatedAt: new Date().toISOString(), accounts, cells, series };
+}

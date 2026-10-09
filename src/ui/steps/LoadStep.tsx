@@ -112,6 +112,10 @@ function DemoCard() {
         </div>
       )}
       <button className="btn navy lg" disabled={!!ingestBusy} onClick={() => void generateDemo(o)}><i className="bi bi-play-fill" /> Use example data</button>
+      <div className="demo-alt">
+        <button className="link-btn" disabled={!!ingestBusy} onClick={() => void useStore.getState().tryDayToDay()}>Or try day to day</button>
+        <span className="xs muted">as a returning user: the example’s saved history up to yesterday, then today’s statement.</span>
+      </div>
     </div>
   );
 }

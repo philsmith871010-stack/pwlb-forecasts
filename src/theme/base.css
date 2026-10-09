@@ -671,3 +671,6 @@ textarea.input { min-height: 120px; font-family: var(--font-mono); font-size: 12
 .history-choice { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; margin: 6px 0 10px; text-align: left; }
 .history-choice span { display: flex; flex-direction: column; gap: 3px; }
 .history-choice small { color: var(--pt-muted); font-size: 11.5px; }
+.demo-alt { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.home-daily { margin-top: 12px; font-size: 13.5px; color: rgba(255,255,255,.75); }
+.home-daily .link-btn { color: #fff; }

@@ -5,10 +5,10 @@ import type { TeamFile, Rule, Scenario, TxnOverride, SeriesOverride, ForecastSet
 import { uid } from '../lib/model';
 import { emptyTeamFile, parseTeamFile, serialiseTeamFile, teamHash, fsAccessSupported, readHandle, writeHandle, saveAsWithPicker, downloadText, mergeTeamFiles, MergeConflict } from '../lib/teamfile';
 import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
-import { mergeHistory, basisFromHistory, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
+import { mergeHistory, basisFromHistory, historyBefore, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
-import type { GeneratorOptions } from '../generator';
+import { DEFAULT_GENERATOR_OPTIONS, type GeneratorOptions } from '../generator';
 import { isoFromDay, addMonths } from '../lib/dates';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
@@ -122,6 +122,7 @@ interface Actions {
   setMapping: (name: string, m: ColumnMapping) => void;
   saveProfile: (name: string, profileName: string) => void;
   generateDemo: (o: GeneratorOptions) => Promise<void>;
+  tryDayToDay: () => Promise<void>;
   loadRegisterFile: (f: File) => Promise<void>;
   useExampleRegister: () => Promise<void>;
   clearRegister: () => Promise<void>;
@@ -320,6 +321,22 @@ export const useStore = create<State & Actions>((set, get) => ({
     } catch (e) {
       set({ ingestBusy: null, ingestError: (e as Error).message });
     }
+  },
+
+  /** The example as a returning user sees it: a saved history up to yesterday, and today's statement. */
+  tryDayToDay: async () => {
+    await get().generateDemo({ ...DEFAULT_GENERATOR_OPTIONS });
+    const ing = get().ingest, h = get().team.cashHistory;
+    if (!ing || !h) return;
+    const today = ing.maxDay;
+    const base = historyBefore(h, today);
+    const st = await engine().exampleStatement(today);
+    set((s) => ({
+      historyBase: base, team: { ...s.team, cashHistory: base },
+      sources: [{ name: st.name, size: st.size, demo: true, report: st.report, mapping: st.report.mapping }],
+      demo: null, ingest: null, cat: null, agg: null, basis: null,
+    }));
+    await get().runIngest();
   },
 
   loadRegisterFile: async (f) => {
