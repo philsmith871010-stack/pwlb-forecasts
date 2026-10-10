@@ -9,7 +9,7 @@ import type { BacktestResult } from './backtest';
 import type { Scenario } from '../model';
 import type { Category } from '../categories';
 import { basisFromHistory, historySpan, type CashHistory } from '../history/cashHistory';
-import { Day, dayFromISO, isoFromDay, monthIndex, monthFromIndex, MONTH_NAMES } from '../dates';
+import { Day, dayFromISO, isoFromDay, monthIndex, monthFromIndex, ymdFromDay, MONTH_NAMES } from '../dates';
 
 export interface SignedForecast {
   v: 1;
@@ -153,4 +153,13 @@ export function knownItemsOf(sc: Scenario, categories: Category[]): string[] {
   const ov = sc.overrides ?? [];
   if (ov.length) out.push(`${ov.length} figure${ov.length > 1 ? 's' : ''} typed or pasted into the grids`);
   return out;
+}
+
+/**
+ * Where to read a comparison: the latest month end inside it, so a payday or a grant landing a day
+ * earlier or later than forecast doesn't swing the figure. Null before the first month end.
+ */
+export function monthEndIndex(r: Pick<BacktestResult, 'cutoff' | 'H'>): number | null {
+  for (let d = r.H - 1; d >= 0; d--) if (ymdFromDay(r.cutoff + d + 1).d === 1) return d;
+  return null;
 }

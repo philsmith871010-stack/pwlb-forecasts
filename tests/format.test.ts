@@ -24,3 +24,16 @@ describe('minimum history', () => {
     expect(historyDays(h(100, 100 + MIN_HISTORY_DAYS - 1))).toBe(MIN_HISTORY_DAYS);
   });
 });
+
+describe('comparisons read at month ends', async () => {
+  const { monthEndIndex } = await import('../src/lib/forecast/signoff');
+  const { dayFromYMD } = await import('../src/lib/dates');
+  const cutoff = dayFromYMD(2025, 10, 1);
+  it('uses the latest month end inside the period', () => {
+    expect(monthEndIndex({ cutoff, H: dayFromYMD(2026, 3, 30) - cutoff + 1 })).toBe(dayFromYMD(2026, 2, 28) - cutoff);
+    expect(monthEndIndex({ cutoff, H: dayFromYMD(2026, 3, 31) - cutoff + 1 })).toBe(dayFromYMD(2026, 3, 31) - cutoff);
+  });
+  it('has none before the first month end', () => {
+    expect(monthEndIndex({ cutoff, H: 20 })).toBeNull();
+  });
+});

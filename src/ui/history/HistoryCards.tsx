@@ -8,7 +8,7 @@ import { historySpan, historyBytes, type CashHistory } from '../../lib/history/c
 import { money, day, int } from '../../lib/format';
 import { Money, CatBadge } from '../components/common';
 import { isBusinessDay, dayFromISO } from '../../lib/dates';
-import { useTracking, aheadWords } from '../forecast/useTracking';
+import { useTracking, aheadWords, asOfWords } from '../forecast/useTracking';
 import { computeForecast } from '../forecast/useForecast';
 import { AddMoreFiles } from '../components/AddMoreFiles';
 import { basisFromHistory } from '../../lib/history/cashHistory';
@@ -119,8 +119,8 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
       </table>
       <div className="day-foot small">
         <span>Everyday cash {one ? 'on the day' : 'over these days'}: <strong>{money(everyday, { sign: true })}</strong>{expected !== null && <span className="muted"> · your forecast expected about {money(expected, { sign: true })}</span>}.</span>
-        {tr?.r && tr.asOf >= ingest.maxDay && (
-          <span className="day-track"><i className="bi bi-patch-check-fill" /> Since the signed-off “{tr.rec.scenarioName}” began ({day(dayFromISO(tr.rec.start))}), everyday cash is <strong>{aheadWords(tr.gap, money)}</strong> it.{' '}
+        {tr?.r && (
+          <span className="day-track"><i className="bi bi-patch-check-fill" /> Against the signed-off “{tr.rec.scenarioName}” (from {day(dayFromISO(tr.rec.start))}), everyday cash was <strong>{aheadWords(tr.gap, money)}</strong> it {asOfWords(tr)}.{' '}
             <button className="link-btn" onClick={() => goto('monitor')}>See how</button></span>
         )}
       </div>

@@ -3,7 +3,7 @@
 import { useStore, expectedStatementDay, type StepId } from '../../state/store';
 import { historySpan, MIN_HISTORY_DAYS } from '../../lib/history/cashHistory';
 import { day, money } from '../../lib/format';
-import { useTracking, aheadWords } from '../forecast/useTracking';
+import { useTracking, aheadWords, asOfWords } from '../forecast/useTracking';
 import { ymdFromDay, dayFromISO, MONTH_NAMES } from '../../lib/dates';
 
 const monthOf = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
@@ -36,7 +36,7 @@ export function JobsPage() {
     : behind > CATCH_UP_DAYS ? { id: 'history', title: `Catch up from ${day(span!.to + 1)}`, why: `Your history stops ${behind} days ago. Add the statements since then under History, so the forecast starts from where you are.`, cta: 'Add statements' }
     : !latest ? { id: 'forecast', title: 'Build your forecast and sign it off', why: 'Check each line we propose, add anything you know is coming, then sign it off. Signed-off forecasts are what you monitor against.', cta: 'Build the forecast' }
     : !upToDate ? { id: 'today', title: 'Add today’s statement', why: `Your history runs to ${day(span!.to)}. Drop in the latest statement: it’s sorted in seconds and checked against your signed-off forecast.`, cta: 'Add today’s statement' }
-    : { id: 'monitor', title: 'You’re up to date', why: tr?.r ? `Everyday cash is ${aheadWords(tr.gap, money)} the signed-off “${tr.rec.scenarioName}”, to ${day(tr.asOf)}.` : `“${latest.scenarioName}” is signed off. It’s compared with what happens as statements come in.`, cta: 'See forecast vs actual' };
+    : { id: 'monitor', title: 'You’re up to date', why: tr?.r ? `Everyday cash was ${aheadWords(tr.gap, money)} the signed-off “${tr.rec.scenarioName}” ${asOfWords(tr)}.` : `“${latest.scenarioName}” is signed off. It’s compared with what happens as statements come in.`, cta: 'See forecast vs actual' };
 
   // ---- the four jobs, in order
   const status = (id: StepId, done: boolean, waiting = false): Status => (next.id === id ? 'next' : done ? 'done' : waiting ? 'waiting' : 'todo');
@@ -52,7 +52,7 @@ export function JobsPage() {
       note: upToDate ? `Up to date: ${day(span!.to)}` : span ? `Last statement ${day(span.to)}` : 'Once your history is loaded' },
     { id: 'monitor', n: 4, icon: 'bi-activity', title: 'Monitor', what: 'Signed-off forecasts against what happened.',
       status: status('monitor', !!tr?.r, !latest),
-      note: tr?.r ? `${aheadWords(tr.gap, money).replace(/^./, (c) => c.toUpperCase())} “${tr.rec.scenarioName}”` : latest ? 'Waiting for statements after it' : 'After your first sign-off' },
+      note: tr?.r ? `${aheadWords(tr.gap, money).replace(/^./, (c) => c.toUpperCase())} “${tr.rec.scenarioName}” ${asOfWords(tr)}` : latest ? 'Waiting for statements after it' : 'After your first sign-off' },
   ];
 
   return (

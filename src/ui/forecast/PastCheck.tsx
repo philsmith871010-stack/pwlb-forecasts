@@ -6,7 +6,7 @@ import { Kpi, Panel, Seg } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, pct, day } from '../../lib/format';
 import { addMonths, dayFromYMD, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
-import { compareSigned, fullMonthsLabel } from '../../lib/forecast/signoff';
+import { compareSigned, fullMonthsLabel, monthEndIndex } from '../../lib/forecast/signoff';
 import { useTracking } from './useTracking';
 import { backtestFromHistory, type BacktestResult } from '../../lib/forecast/backtest';
 import { historySpan, type CashHistory } from '../../lib/history/cashHistory';
@@ -75,7 +75,7 @@ function SignedView() {
         {rec.note && <div className="muted">“{rec.note}”</div>}
         {rec.knownItems.length > 0 && <div className="muted">Added by hand: {rec.knownItems.join('; ')}.</div>}
       </div>
-      {r ? <PastResult r={r} intro={<>Signed off on {signedOn}, the forecast said</>} sofar={dayFromISO(rec.end) > r.end} handAdded={rec.knownItems.length > 0}
+      {r ? <PastResult r={r} intro={<>Signed off on {signedOn}, the forecast said</>} handAdded={rec.knownItems.length > 0}
         chartNote="Exactly as signed off, including anything added by hand. Everyday cash only: loans, investments and transfers between your own accounts are left out."
         catsLabel={fullMonthsLabel(r) ? `over the complete months so far, ${fullMonthsLabel(r)}` : ''} />
         : <div className="callout navy small">Nothing to compare yet: no statements from {day(dayFromISO(rec.start))} onwards have come in. As each new statement arrives, it’s compared with this forecast.</div>}
@@ -113,19 +113,23 @@ function MethodCheck({ sc }: { sc: Scenario }) {
   );
 }
 
-function PastResult({ r, intro, chartNote, sofar, catsLabel, handAdded }: { r: BacktestResult; intro: ReactNode; chartNote: string; sofar?: boolean; catsLabel?: string; handAdded?: boolean }) {
-  const end = r.H - 1;
+function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: BacktestResult; intro: ReactNode; chartNote: string; catsLabel?: string; handAdded?: boolean }) {
+  // read at the latest month end, so payment timing doesn't swing the figures (the chart shows every day)
+  const me = monthEndIndex(r);
+  const end = me ?? r.H - 1;
+  const at = r.cutoff + end;
+  const atWords = me === null ? ' (so far: the first month end isn’t in yet)' : at < r.end ? ' (the latest month end)' : '';
   const fc = r.forecastCum[end], act = r.actualCum[end], gap = act - fc;
   // the cash that flowed in and out over the period, for scale
   let gross = 0;
-  for (let d = 0; d < r.H; d++) gross += Math.abs(r.actualCum[d] - (d ? r.actualCum[d - 1] : 0));
+  for (let d = 0; d <= end; d++) gross += Math.abs(r.actualCum[d] - (d ? r.actualCum[d - 1] : 0));
   const share = gross ? Math.abs(gap) / gross : 0;
   let inside = 0;
   for (let d = 0; d < r.H; d++) if (r.actualCum[d] >= r.lowerCum[d] && r.actualCum[d] <= r.upperCum[d]) inside++;
   const oneOffs = r.actualCum[end] - r.actualCoreCum[end];
   const verdict = share < 0.02 ? { word: 'Very close', cls: 'green' } : share < 0.05 ? { word: 'Close', cls: 'green' } : { word: 'Some way out', cls: 'soft' };
   const move = (v: number, past = false) => (v < 0 ? `${past ? 'fell' : 'fall'} by ${money(-v)}` : `${past ? 'rose' : 'rise'} by ${money(v)}`);
-  const months = Math.round(r.H / 30.44);
+  const months = Math.max(1, Math.round((end + 1) / 30.44));
 
   const option = useMemo(() => {
     const x: string[] = [], f: number[] = [], a: number[] = [], lo: number[] = [], w: number[] = [];
@@ -155,14 +159,14 @@ function PastResult({ r, intro, chartNote, sofar, catsLabel, handAdded }: { r: B
     <>
       <div className="summary-box">
         <div className="eyebrow">In a sentence <span className={`badge ${verdict.cls}`} style={{ marginLeft: 8 }}>{verdict.word}</span></div>
-        {intro} everyday cash would <strong>{move(fc)}</strong> by {day(r.end)}{sofar ? ' (the latest statement)' : ''}. It actually <strong>{move(act, true)}</strong>: {Math.abs(gap) < 0.05e6 ? 'almost exactly as forecast' : <>a difference of <strong>{money(Math.abs(gap))}</strong>, {pct(share)} of the {money(gross)} that flowed in and out</>}.
+        {intro} everyday cash would <strong>{move(fc)}</strong> by {day(at)}{atWords}. It actually <strong>{move(act, true)}</strong>: {Math.abs(gap) < 0.05e6 ? 'almost exactly as forecast' : <>a difference of <strong>{money(Math.abs(gap))}</strong>, {pct(share)} of the {money(gross)} that flowed in and out</>}.
         {Math.abs(oneOffs) >= 1e6 && (handAdded
           ? <> One-off items account for {money(oneOffs, { sign: true })} of what happened; only those added by hand were in the forecast.</>
           : <> One-off items, which no forecast from history can see, account for {money(oneOffs, { sign: true })} of what happened.</>)}
       </div>
 
       <div className="grid g3">
-        <Kpi label="Forecast made then" value={money(fc, { sign: true })} sub={`change in everyday cash to ${day(r.end)}`} />
+        <Kpi label="Forecast made then" value={money(fc, { sign: true })} sub={`change in everyday cash to ${day(at)}`} />
         <Kpi light label="What actually happened" value={money(act, { sign: true })} sub={`over the same ${months === 1 ? 'month' : `${months} months`}`} />
         <Kpi light label="Inside the likely range" value={pct(inside / r.H, 0)} sub="of the days" />
       </div>

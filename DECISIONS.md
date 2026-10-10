@@ -324,3 +324,9 @@ New features should stay on this side of the line. Signing off and monitoring a 
 - **The expected statement day** is the last working day before today, or for the example council its last day (31 Mar 2026), so the example has a daily job to do until its statement is added.
 - **The example's sign-offs** are dated from the month after its history ends (1 Apr and 1 Oct 2025), so they don't move when the last day's statement is added.
 - **Phones:** five menu items need the header's room, so the Yours | Example switch is hidden there (Home has the big one) and an "Example" tag shows when you're in the example.
+
+## Forecast vs actual read at month ends
+
+- **Headline comparisons read at the latest month end inside the period** (`monthEndIndex`), not the latest day. A payday or grant landing a day off forecast swung the daily figure by £10m or more (in the example: £21.5m ahead on 30 Mar, £11.2m on 31 Mar). Home, Today's statement and Monitor's sentence and figures all use the month end and say so ("at the end of Mar 2026"). Monitor's chart still shows every day, so timing is visible but doesn't drive the headline.
+- **Before the first month end of a period**, the latest day is used and labelled "so far".
+- "Inside the likely range" still counts every day: it's about the range, not the headline.
