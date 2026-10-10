@@ -810,3 +810,10 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 .landing-job span { display: block; color: rgba(255,255,255,.72); font-size: 13.5px; margin-top: 2px; }
 .landing-one .home-trust { margin-top: 26px; }
 @media (max-width: 800px) { .landing-jobs { grid-template-columns: 1fr; } }
+.start-form { display: flex; flex-direction: column; gap: 0; padding-top: 6px; padding-bottom: 6px; }
+.start-form .sf-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 18px; align-items: center; padding: 12px 0; }
+.start-form .sf-row + .sf-row { border-top: 1px solid var(--pt-line-soft); }
+.start-form .sf-label strong { display: block; color: var(--pt-navy); }
+.start-form .sf-label small { color: var(--pt-muted); font-size: 12.5px; }
+.start-form .sf-note { display: block; margin-top: 6px; color: var(--pt-muted-2); font-size: 12.5px; }
+@media (max-width: 760px) { .start-form .sf-row { grid-template-columns: 1fr; gap: 6px; } }

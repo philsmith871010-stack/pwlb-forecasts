@@ -4,7 +4,7 @@ import { historySpan } from '../../lib/history/cashHistory';
 import { day, int } from '../../lib/format';
 
 export function JobsPage() {
-  const { goto, team, ingest, cat, historyOnly, historyBase, basis, space, switchWorkspace, exampleBusy, register } = useStore();
+  const { goto, team, ingest, cat, historyBase, basis, space, switchWorkspace, exampleBusy, register } = useStore();
   const span = historyBase ? historySpan(historyBase) : null;
   const checked = team.forecasts.find((f) => f.reviewDone);
   const example = space === 'example';
@@ -30,7 +30,7 @@ export function JobsPage() {
                 <span>Sort today’s bank statement in seconds.</span>
                 <em>{span ? `History saved to ${day(span.to)}` : 'Works best once your history is loaded'}</em>
               </button>
-              <button className="job" onClick={() => goto(cat || historyOnly ? 'history' : 'load')}>
+              <button className="job" onClick={() => goto('history')}>
                 <i className="bi bi-bar-chart-line" />
                 <strong>History</strong>
                 <span>Load years of statements and see how your cash behaves.</span>

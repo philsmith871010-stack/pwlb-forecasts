@@ -33,38 +33,23 @@ export function SimpleStart({ sc, upd, b }: { sc: Scenario; upd: Upd; b: Forecas
   const months = Math.round((dayFromISO(st.end) - start + 1) / 30.44);
   const manual = st.openingMode === 'manual';
   return (
-    <div className="qa-list">
-      <div className="qa">
-        <div className="qa-n">1</div>
-        <div className="qa-body">
-          <h3>How much cash does the council have at the start?</h3>
-          <p>We’ve used the bank balance at the end of your files. If you know today’s figure, type it instead.{b.fc.register ? '' : ' Include money in instant-access investments.'}</p>
+    <div className="card card-pad start-form">
+      <div className="sf-row">
+        <div className="sf-label"><strong>Cash at the start</strong><small>From the bank balance at the end of your files, unless you type today’s figure.</small></div>
+        <div className="sf-field">
           <Seg value={manual ? 'manual' : 'bank'} onChange={(v) => set(v === 'manual' ? { openingMode: 'manual', openingPosition: Math.round(b.bankEnd) } : { openingMode: 'bank', openingPosition: null })}
-            options={[{ v: 'bank', label: `Use the balance from my files (${money(b.bankEnd)})` }, { v: 'manual', label: 'Type a figure' }]} />
-          {manual && <div className="mt" style={{ maxWidth: 260 }}><MoneyInput id="opening" label={b.fc.register ? 'Bank balance' : 'Starting cash'} value={st.openingPosition ?? 0} onChange={(v) => set({ openingPosition: v })} /></div>}
-          {b.fc.register && (
-            <div className="callout green mt small">
-              <strong>Plus {money(b.fc.register.liquid)} from your deal register</strong>, held in money market funds and call accounts, so the forecast starts from <strong>{money(b.fc.opening)}</strong>.
-              Fixed-term investments come back as they mature, and loans are repaid on their dates.
-            </div>
-          )}
+            options={[{ v: 'bank', label: `From my files (${money(b.bankEnd)})` }, { v: 'manual', label: 'Type a figure' }]} />
+          {manual && <div className="mt" style={{ maxWidth: 240 }}><MoneyInput id="opening" label={b.fc.register ? 'Bank balance' : 'Starting cash'} value={st.openingPosition ?? 0} onChange={(v) => set({ openingPosition: v })} /></div>}
+          {b.fc.register && <small className="sf-note">+ {money(b.fc.register.liquid)} in funds from your deal register = <strong>{money(b.fc.opening)}</strong></small>}
         </div>
       </div>
-      <div className="qa">
-        <div className="qa-n">2</div>
-        <div className="qa-body">
-          <h3>What’s the least cash you want to hold at any time?</h3>
-          <p>Your safety margin, sometimes called a <em>liquidity buffer</em>. If the forecast dips below it, that’s when you’d need to borrow. Many councils use £5m–£20m.</p>
-          <div style={{ maxWidth: 260 }}><MoneyInput id="buffer" label="Minimum cash" value={team.settings.liquidityBuffer} onChange={(v) => updateTeam((t) => ({ ...t, settings: { ...t.settings, liquidityBuffer: v } }))} /></div>
-        </div>
+      <div className="sf-row">
+        <div className="sf-label"><strong>Least cash to hold</strong><small>Your safety margin. Below it, you’d borrow. Many councils use £5m–£20m.</small></div>
+        <div className="sf-field" style={{ maxWidth: 240 }}><MoneyInput id="buffer" label="Minimum cash" value={team.settings.liquidityBuffer} onChange={(v) => updateTeam((t) => ({ ...t, settings: { ...t.settings, liquidityBuffer: v } }))} /></div>
       </div>
-      <div className="qa">
-        <div className="qa-n">3</div>
-        <div className="qa-body">
-          <h3>How far ahead should we look?</h3>
-          <p>Starting {day(start)}. Two years is a good default; further ahead is less certain.</p>
-          <Seg value={[12, 24, 36].includes(months) ? months : 24} onChange={(m) => set({ end: isoFromDay(addMonths(start, m) - 1) })} options={[{ v: 12, label: '1 year' }, { v: 24, label: '2 years' }, { v: 36, label: '3 years' }]} />
-        </div>
+      <div className="sf-row">
+        <div className="sf-label"><strong>How far ahead</strong><small>From {day(start)}.</small></div>
+        <div className="sf-field"><Seg value={[12, 24, 36].includes(months) ? months : 24} onChange={(m) => set({ end: isoFromDay(addMonths(start, m) - 1) })} options={[{ v: 12, label: '1 year' }, { v: 24, label: '2 years' }, { v: 36, label: '3 years' }]} /></div>
       </div>
     </div>
   );

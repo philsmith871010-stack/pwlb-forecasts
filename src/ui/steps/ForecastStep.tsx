@@ -185,8 +185,8 @@ export function ForecastStep() {
       {tab === 'before' && (
         <div className="stack before-tab">
           <section><SimpleItems sc={sc} upd={upd} /></section>
-          <section><h3>Cash at the start, and the least you want to hold</h3><SimpleStart sc={sc} upd={upd} b={b} /></section>
-          <section><h3>Loans and investments <span className="muted small">(optional)</span></h3><RegisterCard /></section>
+          <section><h3>Your starting point</h3><SimpleStart sc={sc} upd={upd} b={b} /></section>
+          <section><h3>Loans and investments {!useStore.getState().register && <span className="muted small">(optional)</span>}</h3><RegisterCard /></section>
         </div>
       )}
       {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
@@ -213,7 +213,7 @@ export function ForecastStep() {
           : <NextTab label="Back to checking lines" onClick={() => setTab('lines')} text={`${rv.left.length || 'Some'} line${rv.left.length === 1 ? '' : 's'} still to check before the forecast can be shown.`} />
       ) : tab === 'lines' && locked && !rv.allChecked ? (
         <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={`${rv.left.length} still to check. You can come back to them.`} />
-      ) : idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={tab === 'result' ? 'See what the forecast means for borrowing and investing.' : !locked ? <button className="link-btn" onClick={() => useStore.getState().goto(advanced ? 'backtest' : 'save')}>or go to {advanced ? 'the backtest' : 'save & share'}</button> : undefined} />
+      ) : idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={tab === 'result' ? 'See what the forecast means for borrowing and investing.' : !locked && advanced ? <button className="link-btn" onClick={() => useStore.getState().goto('backtest')}>or go to the backtest</button> : undefined} />
         : !workspace && advanced && <StepFooter nextLabel="Next: test the forecast" />}
     </div>
   );

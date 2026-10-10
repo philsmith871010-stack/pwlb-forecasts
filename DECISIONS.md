@@ -221,3 +221,9 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - summaries are rounded to £m / £k, since pennies on a two-year forecast imply false precision;
   - individual bank lines (Today's statement) are always shown to the penny, for reconciling, and Excel is exact;
   - a setting, "Show exact amounts (£ and pence)", switches every on-screen figure to pounds and pence. Chart axes and the "about £…" option headlines stay rounded.
+
+## Fourth simplification pass
+
+- **With a saved history there's nothing to choose:** History opens on Look back and Forecast on its build tabs, straight from the saved history. "Load statements" is just the upload, for adding more. The saved-history card (with its three competing actions) is gone; "Clear saved work" in settings covers forgetting it.
+- **The starting cash, minimum and horizon** are one compact form (a row each) instead of three numbered cards with paragraphs.
+- **Small fixes:** a stale "save & share" link removed; "(optional)" hidden once a register is in; the section is "Your starting point".

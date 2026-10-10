@@ -258,6 +258,9 @@ export const useStore = create<State & Actions>((set, get) => ({
   setUser: (u) => { lsSet(LS_USER, u); set({ user: u }); },
 
   goto: (step) => {
+    // with a saved history there's nothing to choose: look back and forecast work from it straight away
+    if ((step === 'history' || step === 'forecast') && !get().basis && get().historyBase) get().useSavedHistory();
+    if (step === 'history' && !get().basis) step = 'load';
     const list = stepsFor(get().advanced);
     const i = list.findIndex((s) => s.id === step);
     set((s) => ({ step, reached: Math.max(s.reached, i) }));

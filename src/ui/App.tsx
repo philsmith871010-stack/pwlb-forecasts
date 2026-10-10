@@ -45,7 +45,7 @@ export function App() {
   // where each job opens: wherever it makes sense given what's loaded
   const openStream = (id: StreamId) => {
     if (id === 'today') return goto('today');
-    if (id === 'history') return goto(cat || s.historyOnly ? 'history' : 'load');
+    if (id === 'history') return goto('history');
     return goto('forecast');
   };
 

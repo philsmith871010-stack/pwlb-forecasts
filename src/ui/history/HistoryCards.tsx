@@ -14,32 +14,6 @@ import { basisFromHistory } from '../../lib/history/cashHistory';
 
 const workingDays = (from: number, to: number) => { let n = 0; for (let d = from; d <= to; d++) if (isBusinessDay(d)) n++; return n; };
 
-/** The saved history, when nothing has been loaded yet this session. */
-export function SavedHistoryCard({ h }: { h: CashHistory }) {
-  const { useSavedHistory, goto, forgetHistory } = useStore();
-  const span = historySpan(h);
-  if (!span) return null;
-  return (
-    <div className="card card-pad history-card fade">
-      <div className="row" style={{ alignItems: 'flex-start' }}>
-        <i className="bi bi-clock-history hc-icon" />
-        <div style={{ flex: 1 }}>
-          <h3 style={{ margin: 0 }}>Your saved cash history{h.example && <span className="badge navy" style={{ marginLeft: 8 }}>example</span>}</h3>
-          <p className="small" style={{ margin: '4px 0 8px' }}>
-            <strong>{day(span.from)}</strong> to <strong>{day(span.to)}</strong> across {h.accounts.length} bank account{h.accounts.length > 1 ? 's' : ''},
-            saved in this browser as daily totals (no bank lines).
-          </p>
-          <p className="small muted" style={{ margin: 0 }}>Add the latest period below, or go straight to your analysis with what’s saved.</p>
-        </div>
-        <div className="col-actions">
-          <button className="btn primary" onClick={() => { useSavedHistory(); goto('history'); }}>Go straight to your analysis <i className="bi bi-arrow-right" /></button>
-          <button className="link-btn xs" onClick={() => { if (confirm('Forget the saved cash history? Your forecasts and rules are kept. You can rebuild the history by loading your bank files again.')) forgetHistory(); }}>Forget the saved history</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** One line on what loading these files did to the saved history. */
 export function HistoryAddedNote({ gapsOnly }: { gapsOnly?: boolean } = {}) {
   const { historyReport: r, team, historyBase } = useStore();

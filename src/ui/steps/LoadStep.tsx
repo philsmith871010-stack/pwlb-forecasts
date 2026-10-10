@@ -5,7 +5,7 @@ import { downloadBlob } from '../../lib/teamfile';
 import { bytes, day, int } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
 import { engine } from '../../worker/client';
-import { SavedHistoryCard, HistoryAddedNote } from '../history/HistoryCards';
+import { HistoryAddedNote } from '../history/HistoryCards';
 import { AddMoreFiles } from '../components/AddMoreFiles';
 
 export function LoadStep() {
@@ -31,7 +31,6 @@ export function LoadStep() {
       {busy && <ReadingCard />}
       {done && !daily && <DoneCard />}
 
-      {!busy && !done && saved && <SavedHistoryCard h={saved} />}
 
       {!busy && !done && (
         <>
@@ -40,7 +39,7 @@ export function LoadStep() {
               ? <>Bank statement exports (<strong>CSV files</strong>) for the days since your history ends, or any period you want to load again. One day is fine.</>
               : <>Bank statement exports — the <strong>CSV files</strong> you can download from your online banking. Three to five years is ideal.</>}
             todo="Drag your files into the box below. Several files (different accounts or years) is fine." />
-          {s.space === 'example' && <>
+          {s.space === 'example' && !saved && <>
             <button className="example-action" onClick={() => void s.loadExampleHistory()}>
               <i className="bi bi-stars" />
               <span><strong>Load the example council’s five years of statements</strong><small>22,000 bank lines across four accounts, April 2021 to March 2026.</small></span>
