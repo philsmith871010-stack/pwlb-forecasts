@@ -235,3 +235,5 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
 - **The forecast chart's zoom slider** shows only with advanced tools; scroll-to-zoom still works.
 - **Step footers only go forward.** The strip and tabs handle going back, and the old back button could point across jobs or at a step that wasn't available.
 - **Confirmations use the app's own dialog** (`askConfirm`), never the browser's `confirm()`, which some embedded browsers block (it returns "cancel" without showing). This affects accept all, clear our forecast, clear saved work and delete scenario.
+- **The forecast unlocks as soon as every line is checked**, with no separate "See my forecast" step.
+- **The example council's lines come already accepted** (again after its history changes), so its forecast opens on the result with nothing locked.
