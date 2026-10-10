@@ -97,26 +97,28 @@ function Ladder({ st }: { st: Strategy }) {
   );
 }
 
+/** Existing loans against the liability benchmark, year by year (£m in, £ out). */
+export function benchmarkChartOption(lb: NonNullable<RegisterInfo['lb']>) {
+  const rows = lb.filter((r) => !r.actual).slice(0, 12);
+  return {
+    grid: { left: 64, right: 12, top: 36, bottom: 28 },
+    tooltip: { trigger: 'axis', valueFormatter: (v: number) => money(v) },
+    legend: { top: 0, right: 0 },
+    xAxis: { type: 'category', data: rows.map((r) => r.fy) },
+    yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
+    series: [
+      { name: 'Existing loans', type: 'bar', stack: 'd', data: rows.map((r) => r.existingLoans * 1e6), itemStyle: { color: '#0a2540' }, barMaxWidth: 34 },
+      { name: 'Room to borrow (benchmark)', type: 'bar', stack: 'd', data: rows.map((r) => r.need * 1e6), itemStyle: { color: 'rgba(253,126,20,.35)' }, barMaxWidth: 34 },
+      { name: 'Liability benchmark', type: 'line', data: rows.map((r) => r.lb * 1e6), lineStyle: { color: '#fd7e14', width: 2.5 }, itemStyle: { color: '#fd7e14' }, symbolSize: 6 },
+      { name: 'Capital financing requirement', type: 'line', data: rows.map((r) => r.cfr * 1e6), lineStyle: { color: '#544fc5', type: 'dashed', width: 1.5 }, itemStyle: { color: '#544fc5' }, showSymbol: false },
+    ],
+  };
+}
+
 function LongTerm({ b, register }: { b: ForecastBundle; register: RegisterInfo | null }) {
   const st = b.strategy;
   const lb = register?.lb ?? null;
-  const option = useMemo(() => {
-    if (!lb) return null;
-    const rows = lb.slice(0, 12);
-    return {
-      grid: { left: 64, right: 12, top: 36, bottom: 28 },
-      tooltip: { trigger: 'axis', valueFormatter: (v: number) => money(v) },
-      legend: { top: 0, right: 0 },
-      xAxis: { type: 'category', data: rows.map((r) => r.fy) },
-      yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
-      series: [
-        { name: 'Existing loans', type: 'bar', stack: 'd', data: rows.map((r) => r.existingLoans * 1e6), itemStyle: { color: '#0a2540' }, barMaxWidth: 34 },
-        { name: 'Room to borrow (benchmark)', type: 'bar', stack: 'd', data: rows.map((r) => r.need * 1e6), itemStyle: { color: 'rgba(253,126,20,.35)' }, barMaxWidth: 34 },
-        { name: 'Liability benchmark', type: 'line', data: rows.map((r) => r.lb * 1e6), lineStyle: { color: '#fd7e14', width: 2.5 }, itemStyle: { color: '#fd7e14' }, symbolSize: 6 },
-        { name: 'Capital financing requirement', type: 'line', data: rows.map((r) => r.cfr * 1e6), lineStyle: { color: '#544fc5', type: 'dashed', width: 1.5 }, itemStyle: { color: '#544fc5' }, showSymbol: false },
-      ],
-    };
-  }, [lb]);
+  const option = useMemo(() => (lb ? benchmarkChartOption(lb) : null), [lb]);
   return (
     <Panel title="The long-term view" sub="two ways of looking at the same question">
       <div className="grid g2 views-explain">

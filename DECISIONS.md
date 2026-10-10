@@ -192,3 +192,12 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - The live strip shows only on the editing tabs.
 - **The loaded deal register** is one line, with the rest under "More detail".
 - **A built-in rule** reads "…NND" at the end of a narrative (NNDR cut at 30 characters) as business rates. On the example, uncategorised money fell from £28m to £0.
+
+## Deal register on its own; accepting every line at once
+
+- **Forecast's starting screen** (no history yet) offers the deal register on its own (`RegisterOverview`):
+  - totals: loans, fixed-term investments, funds, and the next 12 months net;
+  - the next 24 months of repayments, interest, maturities and agreed new deals, by month;
+  - the largest items, LOBO call dates, and the liability benchmark (shared chart with "What you could do");
+  - a pointer to load statements, since only those show when cash runs short.
+- **"Accept all N remaining as proposed"** returns to Check each line at the user's request, behind a confirmation that says the lines haven't been opened. This reverses the earlier "every line opened individually" decision. Any line can still be opened and changed afterwards.

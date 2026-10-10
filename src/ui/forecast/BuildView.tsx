@@ -110,6 +110,12 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
               ? <><strong className="navy">Every line is checked.</strong> Next: anything you know is coming, and your starting cash.</>
               : <>Open each line below and click <strong>Looks right</strong> when it is. Your forecast appears once every line is checked.</>}
           </div>
+          {checked.length < all.length && (
+            <button className="link-btn small accept-all" onClick={() => {
+              const left = all.filter((e) => !done.has(e.id));
+              if (window.confirm(`Accept all ${left.length} remaining line${left.length > 1 ? 's' : ''} as proposed, without opening ${left.length > 1 ? 'them' : 'it'}? You can still open and change any line afterwards.`)) { mark(left.map((e) => e.id)); setOpen(null); }
+            }}>Accept all {all.length - checked.length} remaining as proposed</button>
+          )}
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import { historySpan } from '../../lib/history/cashHistory';
 import { day, int } from '../../lib/format';
 
 export function JobsPage() {
-  const { goto, team, ingest, cat, historyOnly, historyBase, basis, space, switchWorkspace, exampleBusy } = useStore();
+  const { goto, team, ingest, cat, historyOnly, historyBase, basis, space, switchWorkspace, exampleBusy, register } = useStore();
   const span = historyBase ? historySpan(historyBase) : null;
   const checked = team.forecasts.find((f) => f.reviewDone);
   const example = space === 'example';
@@ -40,7 +40,7 @@ export function JobsPage() {
                 <i className="bi bi-graph-up-arrow" />
                 <strong>Forecast</strong>
                 <span>See when you’d need to borrow, and your options.</span>
-                <em>{checked ? `“${checked.name}” checked` : basis || span ? 'Ready to build' : 'Needs your history first'}</em>
+                <em>{checked ? `“${checked.name}” checked` : basis || span ? 'Ready to build' : register ? 'Deal register loaded' : 'Needs your history first'}</em>
               </button>
             </div>
           )}

@@ -4,6 +4,7 @@ import type { ECharts } from 'echarts/core';
 import { useStore, useEyebrow } from '../../state/store';
 import { StrategyView } from '../forecast/StrategyView';
 import { RegisterCard } from '../register/RegisterCard';
+import { RegisterOverview } from '../register/RegisterOverview';
 import { SaveStep } from './SaveStep';
 import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
@@ -289,15 +290,21 @@ function ScenarioBar() {
 
 /** The forecast needs a history first: the saved one, or statements loaded under History. */
 function ForecastStart() {
-  const { historyBase, useSavedHistory, goto, space, switchWorkspace } = useStore();
+  const { historyBase, useSavedHistory, goto, space, switchWorkspace, register } = useStore();
   return (
-    <div className="page narrow">
+    <div className={`page ${register ? '' : 'narrow'}`}>
       <PageHead title="Forecast">A forecast is built from your cash history.</PageHead>
       <div className="start-choices">
         {historyBase && <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>Nothing to load.</span></button>}
         <button className={`start-choice ${historyBase ? '' : 'primary'}`} onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
         {space === 'mine' && <button className="start-choice" onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /><strong>Explore the example council</strong><span>See a finished forecast first.</span></button>}
       </div>
+      <section className="register-start">
+        <h3>{register ? 'Your deal register on its own' : 'Or start with your deal register'}</h3>
+        {!register && <p className="small muted" style={{ marginTop: 0 }}>No bank statements yet? Your deal register alone shows what you owe and hold, the repayments, interest and maturities coming up, and your liability benchmark.</p>}
+        <RegisterCard />
+        {register && <RegisterOverview r={register} />}
+      </section>
     </div>
   );
 }
