@@ -6,7 +6,9 @@ import { Kpi, Panel, Seg } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, pct, day } from '../../lib/format';
 import { addMonths, dayFromYMD, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
-import { compareSigned, fullMonthsLabel, monthEndIndex } from '../../lib/forecast/signoff';
+import { compareSigned, fullMonthsLabel, monthEndIndex, firstFairMonthEnd, MIN_COMPARE_DAYS } from '../../lib/forecast/signoff';
+
+const monthName = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
 import { useTracking } from './useTracking';
 import { backtestFromHistory, type BacktestResult } from '../../lib/forecast/backtest';
 import { historySpan, type CashHistory } from '../../lib/history/cashHistory';
@@ -74,7 +76,8 @@ function SignedView() {
         {rec.note && <div className="muted">“{rec.note}”</div>}
         {rec.knownItems.length > 0 && <div className="muted">Added by hand: {rec.knownItems.join('; ')}.</div>}
       </div>
-      {r ? <PastResult r={r} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
+      {r && r.H < MIN_COMPARE_DAYS ? <div className="callout navy small">Too early to tell: {r.H === 1 ? 'one day' : `${r.H} days`} of statements since it started. It’s judged at month ends, from the end of {monthName(firstFairMonthEnd(r.cutoff))}.</div>
+        : r ? <PastResult r={r} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
         chartNote="Exactly as signed off, including anything added by hand. Everyday cash only: loans, investments and transfers between your own accounts are left out."
         catsLabel={fullMonthsLabel(r) ? `over the complete months so far, ${fullMonthsLabel(r)}` : ''} />
         : <div className="callout navy small">Nothing to compare yet: no statements from {day(dayFromISO(rec.start))} onwards have come in. As each new statement arrives, it’s compared with this forecast.</div>}

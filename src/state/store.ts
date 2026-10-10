@@ -8,7 +8,7 @@ import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
 import { signForecast, knownItemsOf, type SignedForecast } from '../lib/forecast/signoff';
 import { exampleSignOffs } from '../lib/forecast/exampleSignoffs';
 import type { ForecastResult } from '../lib/forecast/engine';
-import { mergeHistory, basisFromHistory, historyBefore, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
+import { mergeHistory, basisFromHistory, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
 import type { GeneratorOptions } from '../generator';
@@ -173,14 +173,12 @@ interface Actions {
   setMapping: (name: string, m: ColumnMapping) => void;
   saveProfile: (name: string, profileName: string) => void;
   generateDemo: (o: GeneratorOptions) => Promise<void>;
-  tryDayToDay: () => Promise<void>;
   enter: (ws: Workspace) => Promise<void>;
   setExactAmounts: (v: boolean) => void;
   askConfirm: (o: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput }) => Promise<boolean>;
   switchWorkspace: (ws: Workspace) => Promise<void>;
-  setupExample: () => Promise<void>;
+  pickExampleFiles: () => Promise<void>;
   useExampleStatement: () => Promise<void>;
-  loadExampleHistory: () => Promise<void>;
   forgetWorkspace: () => void;
   loadRegisterFile: (f: File) => Promise<void>;
   useExampleRegister: () => Promise<void>;
@@ -207,7 +205,9 @@ export interface ConfirmInput { label: string; value: string; placeholder?: stri
 const LS_USER = 'cfi.user';
 const LS_WS = 'cfi.workspace';
 /** each workspace's team (rules, saved history, forecasts) lives in this browser under its own key */
-const teamKey = (ws: Workspace) => (ws === 'example' ? 'cfi.teamCache.example' : 'cfi.teamCache');
+const teamKey = (ws: Workspace) => (ws === 'example' ? 'cfi.teamCache.example2' : 'cfi.teamCache');
+// the ready-made example of earlier versions: the example is now set up step by step
+try { localStorage.removeItem('cfi.teamCache.example'); } catch { /* storage unavailable */ }
 function persistTeam(json: string) { lsSet(teamKey(useStore.getState().space), json); }
 function cachedTeam(ws: Workspace): TeamFile {
   const cached = lsGet(teamKey(ws));
@@ -406,12 +406,6 @@ export const useStore = create<State & Actions>((set, get) => ({
     }
   },
 
-  /** The example as a returning user sees it: a saved history up to yesterday, and today's statement. */
-  tryDayToDay: async () => {
-    await get().switchWorkspace('example');
-    get().goto('today');
-  },
-
   askConfirm: (o) => new Promise<boolean>((resolve) => {
     set({ confirmBox: { ...o, resolve: (yes) => { set({ confirmBox: null }); resolve(yes); } } });
   }),
@@ -434,33 +428,22 @@ export const useStore = create<State & Actions>((set, get) => ({
         sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, ingestError: null,
       });
     }
-    if (ws === 'example' && !get().team.cashHistory) await get().setupExample();
-    // an example saved before sign-offs existed gets its two signed-off forecasts
-    else if (ws === 'example' && !get().team.signedOff?.length && get().team.cashHistory) {
-      const h = get().team.cashHistory!;
-      get().updateTeam((t) => ({ ...t, signedOff: exampleSignOffs(h, t.categories, t.settings.liquidityBuffer) }));
-    }
-    // the example council's deal register is always connected
-    if (ws === 'example' && !get().register) await get().useExampleRegister();
+    // the example starts empty and is set up step by step, exactly as your own council would be
     // stay on the same job, now working from this workspace's saved history
     const st = get().step;
     if (st === 'forecast' || st === 'history' || st === 'load' || st === 'review') get().goto(st === 'forecast' ? 'forecast' : 'history');
   },
 
-  /** The example council's saved history: five years, up to the day before its last statement. */
-  setupExample: async () => {
+  /**
+   * The example council's statement files, as if just picked in the file chooser: they're listed,
+   * ready for "Read my files", exactly like your own. Nothing is uploaded.
+   */
+  pickExampleFiles: async () => {
     if (get().exampleBusy) return;
-    set({ exampleBusy: true });
+    set({ exampleBusy: true, ingestError: null });
     try {
-      set({ team: emptyTeamFile('Northbridge Council (example)'), historyBase: null });
-      await get().generateDemo({ ...EXAMPLE_OPTIONS });
-      const ing = get().ingest, h = get().team.cashHistory;
-      if (ing && h) {
-        const base = historyBefore(h, ing.maxDay);
-        const signedOff = exampleSignOffs(base, get().team.categories, get().team.settings.liquidityBuffer);
-        set((s) => ({ team: { ...s.team, authorityName: 'Northbridge Council (example)', cashHistory: base, signedOff }, historyBase: base, historyReport: null, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null }));
-        persistTeam(JSON.stringify(get().team));
-      }
+      const r = await engine().exampleHistoryFiles({ ...EXAMPLE_OPTIONS });
+      set({ sources: r.files.map((f) => applyProfile({ name: f.name, size: f.size, demo: true, report: f.report, mapping: f.report.mapping }, get().team)), demo: { rows: r.rows, options: { ...EXAMPLE_OPTIONS } }, hasTruth: true });
     } finally { set({ exampleBusy: false }); }
   },
 
@@ -471,9 +454,6 @@ export const useStore = create<State & Actions>((set, get) => ({
     set({ sources: [{ name: st.name, size: st.size, demo: true, report: st.report, mapping: st.report.mapping }], demo: null, ingest: null, cat: null, agg: null, basis: null });
     await get().runIngest();
   },
-
-  /** Example workspace: its five years of statements, as if loaded. */
-  loadExampleHistory: async () => { await get().generateDemo({ ...EXAMPLE_OPTIONS }); },
 
   /** Clear this workspace's saved work from the browser. */
   forgetWorkspace: () => {
@@ -514,7 +494,8 @@ export const useStore = create<State & Actions>((set, get) => ({
   runIngest: async () => {
     const sources = get().sources;
     if (!sources.length) return false;
-    set({ ingestBusy: { phase: 'Starting…', frac: 0 }, ingestError: null, cat: null, agg: null, basis: null });
+    // new files join the history as saved now, including anything added earlier in this session
+    set((s) => ({ ingestBusy: { phase: 'Starting…', frac: 0 }, ingestError: null, cat: null, agg: null, basis: null, historyBase: s.team.cashHistory ?? s.historyBase }));
     try {
       // progress messages can arrive after the result (small files): ignore any once it's done
       let live = true;
@@ -563,6 +544,11 @@ export const useStore = create<State & Actions>((set, get) => ({
         cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1, historyReport: keepSaved ? null : report, historyOnly: false,
         team: { ...s.team, cashHistory: keepSaved ? hb! : history, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
       }));
+      // the example: its treasury team signed off two forecasts in the past year
+      const eh = get().team.cashHistory;
+      if (get().space === 'example' && !get().team.signedOff?.length && historyDays(eh) >= 550) {
+        set((s) => ({ team: { ...s.team, signedOff: exampleSignOffs(eh!, s.team.categories, s.team.settings.liquidityBuffer) } }));
+      }
       persistTeam(JSON.stringify(get().team));
       if (!get().activeScenarioId && !get().team.forecasts.length) {
         const wasDirty = get().dirty;

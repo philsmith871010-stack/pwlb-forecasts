@@ -37,3 +37,12 @@ describe('comparisons read at month ends', async () => {
     expect(monthEndIndex({ cutoff, H: 20 })).toBeNull();
   });
 });
+
+describe('when a signed-off forecast can first be judged', async () => {
+  const { firstFairMonthEnd } = await import('../src/lib/forecast/signoff');
+  const { dayFromYMD } = await import('../src/lib/dates');
+  it('is the first month end at least four weeks in', () => {
+    expect(firstFairMonthEnd(dayFromYMD(2026, 3, 31))).toBe(dayFromYMD(2026, 4, 30));
+    expect(firstFairMonthEnd(dayFromYMD(2025, 10, 1))).toBe(dayFromYMD(2025, 10, 31));
+  });
+});

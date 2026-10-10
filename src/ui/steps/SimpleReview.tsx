@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { RegisterCard } from '../register/RegisterCard';
 import { useStore, useEyebrow } from '../../state/store';
-import { PageHead, StepFooter, Money } from '../components/common';
+import { PageHead, StepFooter, Money, PracticeNote } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
 import { money, pctDone, day, int } from '../../lib/format';
@@ -49,7 +50,7 @@ function confirmWithUndo(text: string) {
 }
 
 export function SimpleReview() {
-  const { cat, catBusy, goto } = useStore();
+  const { cat, catBusy, goto, register } = useStore();
   const eyebrow = useEyebrow('review');
   const unsorted = useQueue(() => engine().uncategorisedQueue(200));
   const deals = useQueue(() => engine().dealQueue(200));
@@ -81,6 +82,7 @@ export function SimpleReview() {
         {catBusy && <span className="spinner" title="Updating" />}
       </div>
 
+      {useStore.getState().space === 'example' && !allDone && <PracticeNote>The rules sorted almost everything. These are the few they weren’t sure about. Choose what each one is and click <strong>Save</strong>: your choice becomes a rule, so next time it’s sorted for you.</PracticeNote>}
       {useStore.getState().advanced && <RegisterNote />}
 
       {allDone ? (
@@ -102,6 +104,12 @@ export function SimpleReview() {
             <section className="review-sec">
               <h3>Possible loans or investments <span className="muted">({questions.length})</span></h3>
               <p className="small muted">Loans and investments are left out of the everyday forecast, so it matters which these are. Each says why we’re asking.</p>
+              {!register && questions.length >= 5 && (
+                <div className="mb">
+                  <p className="small" style={{ margin: '0 0 4px' }}><strong>Quicker: add your deal register.</strong> It lists your loans and investments, so most of these are recognised without asking.</p>
+                  <RegisterCard />
+                </div>
+              )}
               <div className="stack" style={{ gap: 12 }}>{questions.slice(0, 12).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</div>
             </section>
           )}

@@ -14,7 +14,10 @@ type Status = 'done' | 'next' | 'todo' | 'waiting';
 interface Job { id: StepId; n: number; icon: string; title: string; what: string; status: Status; note: string }
 
 export function JobsPage() {
-  const { goto, team, historyBase, space, switchWorkspace, exampleBusy } = useStore();
+  const { goto, team, historyBase, space, switchWorkspace, exampleBusy, askConfirm, forgetWorkspace } = useStore();
+  const restart = async () => {
+    if (await askConfirm({ title: 'Start the practice again?', body: 'The example council goes back to the start, with no history or forecasts, so you can go through every step again. Your own council isn’t affected.', ok: 'Start again' })) { forgetWorkspace(); goto('home'); }
+  };
   const tr = useTracking();
   const example = space === 'example';
 
@@ -64,7 +67,8 @@ export function JobsPage() {
             <button role="tab" aria-selected={example} className={example ? 'on' : ''} onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /> Example council</button>
           </div>
           <h1 className="jobs-title">{example ? 'Northbridge Council (example)' : team.authorityName === 'My Council' ? 'Your council’s cash' : team.authorityName}</h1>
-          {example && <p className="home-lead">A made-up council with five years of history, ready to try every job. Nothing you do here touches your own council’s work.</p>}
+          {example && <p className="home-lead">A practice run on a made-up council. Every step works exactly as it will for your own; wherever you’d choose a file, a click picks the example’s instead. Nothing here touches your own council’s work.{' '}
+            {(span || latest) && <button className="link-btn on-dark" onClick={() => void restart()}>Start the practice again</button>}</p>}
           {exampleBusy ? (
             <div className="jobs-busy"><span className="spinner" /> Setting up the example council: five years of statements, sorted…</div>
           ) : (

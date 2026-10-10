@@ -22,7 +22,7 @@ export function HomePage() {
               <p className="home-lead">Your council’s bank statements, sorted, understood and forecast.</p>
               <div className="landing-ctas">
                 <button className="btn primary xl" onClick={() => void enter('mine')}>Enter <i className="bi bi-arrow-right" /></button>
-                <button className="btn xl on-dark" onClick={() => void enter('example')}><i className="bi bi-stars" /> Explore the example council</button>
+                <button className="btn xl on-dark" onClick={() => void enter('example')}><i className="bi bi-mortarboard" /> Practise on an example council</button>
               </div>
             </div>
             <Preview />

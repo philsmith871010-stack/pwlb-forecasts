@@ -6,7 +6,7 @@ import { StrategyView } from '../forecast/StrategyView';
 import { RegisterCard } from '../register/RegisterCard';
 import { RegisterOverview } from '../register/RegisterOverview';
 import { SaveStep } from './SaveStep';
-import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
+import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef, PracticeNote } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast, type ForecastBundle } from '../forecast/useForecast';
 import { isoFromDay, dayFromISO } from '../../lib/dates';
@@ -72,17 +72,12 @@ export function ForecastStep() {
   useEffect(() => { if (basis && !team.forecasts.length) newScenario('Base'); }, [basis, team.forecasts.length, newScenario]);
   useEffect(() => { if (sc && sc.id !== activeScenarioId) setActiveScenario(sc.id); }, [sc, activeScenarioId, setActiveScenario]);
   const b = useForecast(sc);
-  // the example council's forecast comes already checked, so it opens on the result
+  // the forecast unlocks as soon as every line is checked: no extra step (the example too: it's a practice run)
   const space = useStore((st) => st.space);
-  // and any forecast unlocks as soon as every line is checked: no extra step
   useEffect(() => {
     if (!sc || !b || isReviewed(sc, b)) return;
-    const st = reviewState(sc, b);
-    if (space === 'example') {
-      updateScenario(sc.id, (x) => ({ ...x, reviewed: [...st.main, ...st.small].map((e) => e.id), reviewDone: true, reviewFor: dataEndIso(b) }));
-      setTab('result');
-    } else if (st.allChecked) updateScenario(sc.id, (x) => ({ ...x, reviewDone: true, reviewFor: dataEndIso(b) }));
-  }, [space, sc, b]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (reviewState(sc, b).allChecked) updateScenario(sc.id, (x) => ({ ...x, reviewDone: true, reviewFor: dataEndIso(b) }));
+  }, [sc, b]); // eslint-disable-line react-hooks/exhaustive-deps
   const [gran, setGran] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [histMonths, setHistMonths] = useState(24);
   const [lower, setLower] = useState<'stacked' | 'explorer' | 'table'>('stacked');
@@ -112,7 +107,7 @@ export function ForecastStep() {
   const fc = b.fc;
   const help = tab === 'result' && fc.register ? { ...FC_HELP.result, what: <>Your cash, day by day, <strong>including your loans and investments</strong> from the deal register. The <strong>navy line</strong> is the past, the <strong>orange dashed line</strong> the forecast, and the grey dotted line is your everyday cash without the deals. The red dashed line is the minimum cash you want to keep.</> } : FC_HELP[tab];
   const rv = reviewState(sc, b);
-  const locked = !(space === 'example' || isReviewed(sc, b) || rv.allChecked);
+  const locked = !(isReviewed(sc, b) || rv.allChecked);
   const idx = TABS.findIndex((t) => t.id === tab);
   const tabs = TABS.map((t) => ({ ...t, hint: locked && RESULT_TABS.includes(t.id) ? 'Appears once every line is checked' : undefined, badge: locked && RESULT_TABS.includes(t.id) ? <i className="bi bi-lock-fill" aria-label="locked" /> :
     t.id === 'lines' ? (rv.left.length ? `${rv.left.length} to check` : '✓') :
@@ -160,6 +155,7 @@ export function ForecastStep() {
               {fc.breaches.length > 0 ? <>Cash first drops below {money(fc.buffer)} on <strong>{day(fc.breaches[0].from)}</strong>.</> : <>Cash stays above {money(fc.buffer)} throughout.</>}
             </p>
           )}
+          {space === 'example' && <PracticeNote>Happy with it? Sign it off, as your treasury lead would. A signed-off forecast is kept exactly as it stands and compared with what happens under <strong>Monitor</strong>.</PracticeNote>}
           <SignOffRow b={b} sc={sc} onSee={() => useStore.getState().goto('monitor')} />
           <Panel title={fc.register ? 'Your cash, with your loans and investments: past and forecast' : 'Your everyday cash: past and forecast'} sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
             right={advanced ? <>
@@ -196,6 +192,7 @@ export function ForecastStep() {
       {tab === 'options' && !locked && <StrategyView b={b} />}
       {tab === 'report' && !locked && <SaveStep embedded />}
       {tab === 's-start' && <><RegisterCard /><SimpleStart sc={sc} upd={upd} b={b} /></>}
+      {tab === 'before' && space === 'example' && <PracticeNote>Add what you know that history can’t: try <strong>A one-off amount</strong>, say a £5m land sale in September, and watch the borrowing figure above change. Then check the starting cash, and add the deal register under <strong>Loans and investments</strong>.</PracticeNote>}
       {tab === 'before' && (
         <div className="stack before-tab">
           <section><SimpleItems sc={sc} upd={upd} /></section>
@@ -203,6 +200,7 @@ export function ForecastStep() {
           <section><h3>Loans and investments {!useStore.getState().register && <span className="muted small">(optional)</span>}</h3><RegisterCard /></section>
         </div>
       )}
+      {tab === 'lines' && space === 'example' && rv.left.length > 0 && <PracticeNote>We’ve proposed each line from the example’s history. Open a few, see what we found, change anything if you like (try salaries +3% for a pay award), and click <strong>Looks right</strong>. When you’re happy, <strong>Accept all</strong> does the rest.</PracticeNote>}
       {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
       {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}
       {tab === 's-breakdown' && !locked && <SimpleBreakdown b={b} />}
@@ -319,7 +317,7 @@ function ForecastStart() {
       <div className="start-choices">
         {historyBase && !short && <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>Pick up where you left off.</span></button>}
         <button className={`start-choice ${historyBase && !short ? '' : 'primary'}`} onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
-        {space === 'mine' && <button className="start-choice" onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /><strong>Explore the example council</strong><span>See a finished forecast first.</span></button>}
+        {space === 'mine' && <button className="start-choice" onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /><strong>Practise on the example council</strong><span>Every step, with the files provided.</span></button>}
       </div>
       <section className="register-start">
         <h3>{register ? 'Your deal register on its own' : 'Meanwhile: your deal register'}</h3>

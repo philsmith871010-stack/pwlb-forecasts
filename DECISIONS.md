@@ -341,3 +341,21 @@ New features should stay on this side of the line. Signing off and monitoring a 
   - The box under it gives what the forecast said at the time.
   - The sentence is just what it said and what happened.
   - The difference has its own figure, replacing "inside the likely range: 29% of the days", which was hard to read (the chart still shows the range).
+
+## The example council is a practice run
+
+- **The example starts empty and is set up step by step, exactly as your own council would be.** It's no longer generated, connected and accepted for you. Wherever you'd choose a file, the same box or button picks the example's file instead, and nothing is uploaded:
+  - History: clicking the drop box lists the example's five statement files, just as chosen files are listed. You click Read my files, check the sorting, and look back.
+  - The deal register: "Choose register (.xlsx)" picks the example's register, in Check the sorting or under Known items and cash.
+  - Today's statement: clicking the drop box reads the example's statement for 31 Mar 2026.
+- **The practice files stop on 30 Mar 2026** (`exampleHistoryFiles` removes the last day's lines from each file), so today's statement really is the next day.
+- **Nothing is done for you:** forecast lines are checked as for real (Accept all is there), and you sign off the forecast yourself.
+- **A "Practice run" note at each step** says what you'd do with your own council and what the click does here.
+- **The example's treasury team signed off two forecasts in the past year.** They're added once the history has been read, so Monitor has something to compare straight away.
+- **"Start the practice again"** on the example's Home resets it. Earlier ready-made examples saved in a browser are discarded (new storage key), so everyone starts the practice from the beginning.
+- **Check the sorting offers the deal register** when it has five or more loan questions and no register: it recognises most of them (the example drops from 20 questions to 2).
+
+## Fixes found by the practice run
+
+- **The day's statement replaced the history when both happened in one session.** The saved history the new files join was captured only when a workspace opened, so loading years of statements and then today's statement, without a reload, kept only the day. Each read now starts from the history as saved at that moment.
+- **A forecast is judged only after a month of actuals** (`MIN_COMPARE_DAYS`). Home and Today's statement feature the newest sign-off with at least that much. A newer one says "too early to tell" and gives the first month end it'll be judged at, instead of a one-day verdict.

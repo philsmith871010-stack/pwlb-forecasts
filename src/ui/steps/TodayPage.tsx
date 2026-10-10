@@ -1,7 +1,7 @@
 // Today's statement: drop it in, see the day sorted, sort anything new, save. One screen.
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Progress } from '../components/common';
+import { PageHead, Progress, PracticeNote } from '../components/common';
 import { DayCard } from '../history/HistoryCards';
 import { SortCard, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
@@ -10,7 +10,7 @@ import { day } from '../../lib/format';
 
 export function TodayPage() {
   const s = useStore();
-  const { ingest, cat, historyBase, ingestBusy, catBusy, addFiles, runIngest, goto, space, useExampleStatement, exampleBusy } = s;
+  const { ingest, cat, historyBase, ingestBusy, catBusy, addFiles, runIngest, goto, space, useExampleStatement } = s;
   const busy = !!ingestBusy || (!!catBusy && !cat);
   const short = !!ingest && !!cat && ingest.maxDay - ingest.minDay <= 3;
   const long = !!ingest && !!cat && !short;
@@ -37,11 +37,7 @@ export function TodayPage() {
       )}
 
       {space === 'example' && !busy && !short && (
-        <button className="example-action" disabled={exampleBusy} onClick={() => void useExampleStatement()}>
-          <i className="bi bi-stars" />
-          <span><strong>Use the example council’s statement</strong><small>Its bank lines for 31 Mar 2026, as if you’d downloaded them this morning.</small></span>
-          <i className="bi bi-arrow-right" />
-        </button>
+        <PracticeNote>Each morning you’d download yesterday’s statement from online banking and drop it in the box below. Here, clicking the box picks the example council’s statement for 31 Mar 2026: nothing is uploaded.</PracticeNote>
       )}
 
       {busy && (
@@ -49,7 +45,7 @@ export function TodayPage() {
           <div className="mt"><Progress frac={(ingestBusy ?? catBusy)?.frac ?? 0} /></div></div>
       )}
 
-      {!busy && !short && <>{space === 'example' && <div className="or-line">or drop a statement of your own</div>}<TodayDrop onFiles={read} /></>}
+      {!busy && !short && <TodayDrop onFiles={read} onPick={space === 'example' ? () => void useExampleStatement() : undefined} />}
 
       {!busy && long && (
         <div className="callout mt small">That covers <strong>{day(ingest!.minDay)}</strong> to <strong>{day(ingest!.maxDay)}</strong>, more than a few days, so it has gone into your history.{' '}
@@ -70,12 +66,14 @@ export function TodayPage() {
   );
 }
 
-function TodayDrop({ onFiles }: { onFiles: (f: File[]) => void }) {
+/** The drop box. `onPick` replaces the file chooser (the example picks its own statement). */
+function TodayDrop({ onFiles, onPick }: { onFiles: (f: File[]) => void; onPick?: () => void }) {
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const choose = () => (onPick ? onPick() : input.current?.click());
   return (
     <div className={`dropzone today-drop ${over ? 'over' : ''}`} tabIndex={0} role="button" aria-label="Choose today’s statement"
-      onClick={() => input.current?.click()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') input.current?.click(); }}
+      onClick={choose} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') choose(); }}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); onFiles([...e.dataTransfer.files]); }}>
       <i className="bi bi-file-earmark-arrow-up big-icon" />

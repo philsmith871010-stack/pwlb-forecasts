@@ -155,6 +155,16 @@ export function knownItemsOf(sc: Scenario, categories: Category[]): string[] {
   return out;
 }
 
+/** Less than this many days of actuals is too early to judge a forecast. */
+export const MIN_COMPARE_DAYS = 28;
+
+/** The first month end at least MIN_COMPARE_DAYS after a forecast starts: when it can first be judged. */
+export function firstFairMonthEnd(start: Day): Day {
+  let d = start + MIN_COMPARE_DAYS - 1;
+  while (ymdFromDay(d + 1).d !== 1) d++;
+  return d;
+}
+
 /**
  * Where to read a comparison: the latest month end inside it, so a payday or a grant landing a day
  * earlier or later than forecast doesn't swing the figure. Null before the first month end.

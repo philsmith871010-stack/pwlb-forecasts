@@ -219,3 +219,8 @@ export function NextTab({ label, onClick, text }: { label: string; onClick: () =
     </div>
   );
 }
+
+/** In the example council: what the next click does instead of opening your computer's files. */
+export function PracticeNote({ children }: { children: ReactNode }) {
+  return <div className="practice-note"><i className="bi bi-mortarboard" /><span><strong>Practice run.</strong> {children}</span></div>;
+}

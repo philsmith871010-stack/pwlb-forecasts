@@ -98,6 +98,35 @@ const api = {
     };
   },
 
+  /**
+   * The example council's statement files, as a user would pick them: five years of statements
+   * up to the day before its last day. That last day is "today", and its statement comes in
+   * separately under Today's statement.
+   */
+  async exampleHistoryFiles(o: GeneratorOptions): Promise<{ files: { name: string; size: number; report: DetectionReport }[]; rows: number; lastDay: Day }> {
+    demoFiles.clear();
+    const g = generateDataset(o);
+    demoRegister = g.register;
+    truth = g.truth;
+    const read = await Promise.all(g.files.map(async (f) => {
+      const mapping = detectMapping(f.text.slice(0, 96 * 1024), f.name).mapping;
+      return { f, tmp: await ingest([{ name: f.name, data: f.text, size: f.text.length, mapping }]) };
+    }));
+    const lastDay = Math.max(...read.map((x) => x.tmp.maxDay));
+    let rows = 0;
+    const files = read.map(({ f, tmp }) => {
+      // each row knows its record number in the file: drop the last day's records
+      const drop = new Set<number>();
+      for (let i = 0; i < tmp.n; i++) if (tmp.day[i] === lastDay) drop.add(tmp.line[i]);
+      const lines = f.text.split('\n');
+      const text = drop.size ? lines.filter((_, k) => !drop.has(k)).join('\n') : f.text;
+      rows += tmp.n - drop.size;
+      demoFiles.set(f.name, text);
+      return { name: f.name, size: text.length, report: detectMapping(text.slice(0, 96 * 1024), f.name) };
+    });
+    return { files, rows, lastDay };
+  },
+
   // ------------------------------------------------------------- deal register
 
   async loadRegister(bytes: Uint8Array, name: string): Promise<RegisterInfo> {

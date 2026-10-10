@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
-import { PageHead, Progress, Counter, Explain } from '../components/common';
+import { PageHead, Progress, Counter, Explain, PracticeNote } from '../components/common';
 import { downloadBlob } from '../../lib/teamfile';
 import { bytes, day, int, pctDone } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
@@ -39,17 +39,14 @@ export function LoadStep() {
               ? <>Bank statement exports (<strong>CSV files</strong>) for the days since your history ends, or any period you want to load again. One day is fine.</>
               : <>Bank statement exports — the <strong>CSV files</strong> you can download from your online banking. Three to five years is ideal.</>}
             todo="Drag your files into the box below. Several files (different accounts or years) is fine." />
-          {s.space === 'example' && !saved && <>
-            <button className="example-action" onClick={() => void s.loadExampleHistory()}>
-              <i className="bi bi-stars" />
-              <span><strong>Load the example council’s five years of statements</strong><small>22,000 bank lines across four accounts, April 2021 to March 2026.</small></span>
-              <i className="bi bi-arrow-right" />
-            </button>
-            {s.advanced && <DemoCard />}
-            <div className="or-line">or drop statements of your own to try them here</div>
-          </>}
-          <UploadCard />
-          {realSources.length > 0 && <FileList />}
+          {s.space === 'example' && realSources.length === 0 && (
+            <PracticeNote>{s.sources.length
+              ? <>These are the example council’s statement files, listed just as yours will be once chosen. Next, click <strong>Read my files</strong>.</>
+              : <>With your own council you’d drag your bank’s CSV files into the box below, or click it to choose them. Here, clicking the box picks the example council’s files instead: nothing is uploaded.</>}</PracticeNote>
+          )}
+          {s.space === 'example' && s.advanced && !s.sources.length && <DemoCard />}
+          {!(s.space === 'example' && s.sources.length) && <UploadCard />}
+          {s.sources.length > 0 && <FileList />}
         </>
       )}
     </div>
@@ -57,12 +54,15 @@ export function LoadStep() {
 }
 
 function UploadCard() {
-  const { addFiles } = useStore();
+  const { addFiles, space, pickExampleFiles, exampleBusy } = useStore();
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // the example: the same box and the same click, but it picks the example council's files
+  const choose = () => (space === 'example' ? void pickExampleFiles() : input.current?.click());
+  if (exampleBusy) return <div className="dropzone big"><span className="spinner" /><h3>Choosing the example files…</h3></div>;
   return (
     <div className={`dropzone big ${over ? 'over' : ''}`} tabIndex={0} role="button" aria-label="Choose bank statement files"
-      onClick={() => input.current?.click()} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') input.current?.click(); }}
+      onClick={choose} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') choose(); }}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); void addFiles([...e.dataTransfer.files]); }}>
       <i className="bi bi-file-earmark-arrow-up big-icon" />
@@ -75,7 +75,7 @@ function UploadCard() {
 
 function FileList() {
   const { sources, removeSource, runIngest, ingestBusy } = useStore();
-  const real = sources.filter((x) => !x.demo);
+  const real = sources;
   return (
     <div className="card card-pad mt fade">
       <h3 style={{ marginTop: 0 }}>{real.length} file{real.length > 1 ? 's' : ''} ready to read</h3>
@@ -89,7 +89,7 @@ function FileList() {
           </li>
         ))}
       </ul>
-      <div className="row mt"><span className="small muted">You can still add more files.</span><span className="spacer" />
+      <div className="row mt">{!real.some((x) => x.demo) && <span className="small muted">You can still add more files.</span>}<span className="spacer" />
         <button className="btn primary lg" disabled={!!ingestBusy} onClick={() => void runIngest()}>Read my files <i className="bi bi-arrow-right" /></button></div>
     </div>
   );
@@ -115,10 +115,6 @@ function DemoCard() {
         </div>
       )}
       <button className="btn navy lg" disabled={!!ingestBusy} onClick={() => void generateDemo(o)}><i className="bi bi-play-fill" /> Use example data</button>
-      <div className="demo-alt">
-        <button className="link-btn" disabled={!!ingestBusy} onClick={() => void useStore.getState().tryDayToDay()}>Or try day to day</button>
-        <span className="xs muted">as a returning user: the example’s saved history up to yesterday, then today’s statement.</span>
-      </div>
     </div>
   );
 }

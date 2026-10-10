@@ -2,7 +2,7 @@
 // statement and Forecast vs actual, so they always agree.
 import { useMemo } from 'react';
 import { useStore } from '../../state/store';
-import { compareSigned, monthEndIndex, type SignedForecast } from '../../lib/forecast/signoff';
+import { compareSigned, monthEndIndex, MIN_COMPARE_DAYS, type SignedForecast } from '../../lib/forecast/signoff';
 import type { BacktestResult } from '../../lib/forecast/backtest';
 import { ymdFromDay, MONTH_NAMES } from '../../lib/dates';
 
@@ -11,7 +11,7 @@ export type Tracking =
   | { rec: SignedForecast; r: BacktestResult; gap: number; asOf: number; soFar: boolean }
   | { rec: SignedForecast; r: null };
 
-/** The newest sign-off with actuals to compare, read at the latest month end; else the newest one, still waiting. */
+/** The newest sign-off with a month or more of actuals, read at the latest month end; else the newest one, still waiting. */
 export function useTracking(): Tracking | null {
   const signed = useStore((s) => s.team.signedOff);
   const history = useStore((s) => s.team.cashHistory ?? s.historyBase);
@@ -19,13 +19,12 @@ export function useTracking(): Tracking | null {
   return useMemo(() => {
     const list = [...(signed ?? [])].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
     if (!list.length || !history) return null;
-    for (const rec of list) {
-      const r = compareSigned(rec, history, categories);
-      if (!r) continue;
-      const me = monthEndIndex(r), d = me ?? r.H - 1;
-      return { rec, r, gap: r.actualCum[d] - r.forecastCum[d], asOf: r.cutoff + d, soFar: me === null };
-    }
-    return { rec: list[0], r: null };
+    // the newest with at least a month of actuals to judge it by; else the newest, still too early
+    const compared = list.map((rec) => ({ rec, r: compareSigned(rec, history, categories) }));
+    const pick = compared.find((x) => x.r && x.r.H >= MIN_COMPARE_DAYS);
+    if (!pick) return { rec: list[0], r: null };
+    const r = pick.r!, me = monthEndIndex(r), d = me ?? r.H - 1;
+    return { rec: pick.rec, r, gap: r.actualCum[d] - r.forecastCum[d], asOf: r.cutoff + d, soFar: me === null };
   }, [signed, history, categories]);
 }
 

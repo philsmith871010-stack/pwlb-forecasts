@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import { money, day, int } from '../../lib/format';
+import { PracticeNote } from '../components/common';
 
 const TEMPLATE_URL = `${import.meta.env.BASE_URL}templates/pwlb-register.xlsx`;
 
@@ -13,14 +14,12 @@ export function RegisterCard() {
 
   if (register) {
     const m = cat?.registerMatch;
-    // in the example council the register is connected, not uploaded
-    const connected = register.example && space === 'example';
     return (
       <div className="card card-pad mt fade register-card on">
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <i className="bi bi-journal-check reg-icon" />
           <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0 }}>{connected ? 'Deal register connected' : 'Deal register added'} {register.example && <span className="badge navy">example</span>}</h3>
+            <h3 style={{ margin: 0 }}>Deal register added {register.example && <span className="badge navy">example</span>}</h3>
             <p className="small" style={{ margin: '4px 0 0' }}>
               <strong>{money(register.stats.debt)}</strong> of loans, <strong>{money(register.investments.reduce((s, t) => s + t.principal, 0))}</strong> in fixed-term investments and <strong>{money(register.liquid.total)}</strong> in funds, as at {register.asAt ? day(register.asAt) : 'its date'}. Repayments, interest and maturities are in the forecast.
             </p>
@@ -36,12 +35,10 @@ export function RegisterCard() {
             {register.issues.length > 0 && <p className="xs muted" style={{ margin: '6px 0 0' }}><i className="bi bi-info-circle" /> The register notes {register.issues.length} thing{register.issues.length > 1 ? 's' : ''} to tidy up (for example a missing date). It was still read.</p>}
             </details>
           </div>
-          {!connected && (
-            <div className="col-actions">
-              <button className="btn sm" disabled={registerBusy} onClick={() => input.current?.click()}><i className="bi bi-arrow-repeat" /> Replace</button>
-              <button className="btn sm ghost" disabled={registerBusy} onClick={() => void clearRegister()}>Remove</button>
-            </div>
-          )}
+          <div className="col-actions">
+            {space !== 'example' && <button className="btn sm" disabled={registerBusy} onClick={() => input.current?.click()}><i className="bi bi-arrow-repeat" /> Replace</button>}
+            <button className="btn sm ghost" disabled={registerBusy} onClick={() => void clearRegister()}>Remove</button>
+          </div>
         </div>
         <input ref={input} type="file" accept=".xlsx" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
       </div>
@@ -60,10 +57,10 @@ export function RegisterCard() {
             The spreadsheet of your loans and investments (the one used for PWLBtoday reports). With it, repayments, maturities and
             interest are in the forecast, and the options say how much to borrow and for how long.
           </p>
+          {space === 'example' && <div className="mt"><PracticeNote>With your own council you’d choose your deal register spreadsheet. Here, <strong>Choose register</strong> picks the example council’s: nothing is uploaded.</PracticeNote></div>}
           {registerError && <div className="callout red mt"><strong>We couldn’t read that register.</strong> {registerError}</div>}
           <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
-            {space === 'example' && <button className="btn primary" disabled={registerBusy} onClick={() => void useExampleRegister()}><i className="bi bi-stars" /> Use the example council’s register</button>}
-            <button className={`btn ${space === 'example' ? '' : 'navy'}`} disabled={registerBusy} onClick={() => input.current?.click()}>
+            <button className="btn navy" disabled={registerBusy} onClick={() => (space === 'example' ? void useExampleRegister() : input.current?.click())}>
               {registerBusy ? <><span className="spinner sm" /> Reading…</> : <><i className="bi bi-file-earmark-excel" /> Choose register (.xlsx)</>}
             </button>
             <a className="btn ghost" href={TEMPLATE_URL} download="pwlb-register.xlsx"><i className="bi bi-download" /> Blank template</a>
