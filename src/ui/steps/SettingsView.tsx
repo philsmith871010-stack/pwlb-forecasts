@@ -24,7 +24,7 @@ export function SettingsView() {
   const [tab, setTab] = useStepTab('settings', tabs);
   return (
     <div className="page">
-      <PageHead eyebrow="Advanced tools" title="Settings">Everything here is saved in the team file and shared with your colleagues.</PageHead>
+      <PageHead eyebrow="Advanced tools" title="Settings">Everything here is saved with your work in this browser.</PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} numbered={false} />
       {tab === 'general' && <>
         <Explain compact what="Your council’s name, when its financial year starts, and the minimum cash buffer you want to keep." why="The buffer is the red line on the forecast: falling below it is what creates a borrowing need." />

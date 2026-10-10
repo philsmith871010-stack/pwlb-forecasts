@@ -6,7 +6,7 @@ const TEMPLATE_URL = `${import.meta.env.BASE_URL}templates/pwlb-register.xlsx`;
 
 /** Step 1: add the council's deal register (the PWLBtoday workbook), optional but recommended. */
 export function RegisterCard() {
-  const { register, registerBusy, registerError, loadRegisterFile, clearRegister, cat, ingest } = useStore();
+  const { register, registerBusy, registerError, loadRegisterFile, clearRegister, cat, ingest, space, useExampleRegister } = useStore();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const pick = (f: File | undefined) => { if (f) void loadRegisterFile(f); };
@@ -64,11 +64,12 @@ export function RegisterCard() {
           </p>
           {registerError && <div className="callout red mt"><strong>We couldn’t read that register.</strong> {registerError}</div>}
           <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
-            <button className="btn navy" disabled={registerBusy} onClick={() => input.current?.click()}>
+            {space === 'example' && <button className="btn primary" disabled={registerBusy} onClick={() => void useExampleRegister()}><i className="bi bi-stars" /> Use the example council’s register</button>}
+            <button className={`btn ${space === 'example' ? '' : 'navy'}`} disabled={registerBusy} onClick={() => input.current?.click()}>
               {registerBusy ? <><span className="spinner sm" /> Reading…</> : <><i className="bi bi-file-earmark-excel" /> Choose register (.xlsx)</>}
             </button>
             <a className="btn ghost" href={TEMPLATE_URL} download="pwlb-register.xlsx"><i className="bi bi-download" /> Blank template</a>
-            <span className="xs muted">Read on this computer only. Not saved in the team file.</span>
+            <span className="xs muted">Read on this computer only, for this session.</span>
           </div>
         </div>
       </div>

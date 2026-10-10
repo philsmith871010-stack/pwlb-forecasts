@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useStore, StepId, STREAMS, streamOf, streamSteps, type StreamId } from '../state/store';
 import { Toasts, Modal } from './components/common';
 import { LoadStep } from './steps/LoadStep';
@@ -13,7 +12,8 @@ import { DataWorkspace } from './steps/DataWorkspace';
 import { SettingsView } from './steps/SettingsView';
 import { HomePage } from './steps/HomePage';
 import { TodayPage } from './steps/TodayPage';
-import { TeamFileMenu, SettingsMenu } from './components/HeaderMenus';
+import { SpaceSwitch, SettingsMenu } from './components/HeaderMenus';
+import { JobsPage } from './steps/JobsPage';
 
 function Logo() {
   return (
@@ -31,12 +31,8 @@ export function App() {
   const s = useStore();
   const { step, team, cat, goto, advanced } = s;
 
-  // Warn before closing with unsaved team-file changes
-  useEffect(() => {
-    const h = (e: BeforeUnloadEvent) => { if (useStore.getState().dirty) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', h);
-    return () => window.removeEventListener('beforeunload', h);
-  }, []);
+  // the landing page comes first, on its own; one click enters the app
+  if (!s.entered) return <div className="landing-shell"><HomePage /><Toasts /></div>;
 
   const enabled = (id: StepId) => {
     if (id === 'load' || id === 'save' || id === 'today' || id === 'home' || id === 'settings') return true;
@@ -69,7 +65,7 @@ export function App() {
         </nav>
         <div className="header-spacer" />
         <span className="privacy-dot" title="Everything happens in this browser tab. Nothing is uploaded."><i className="bi bi-shield-lock-fill" /></span>
-        <TeamFileMenu />
+        {step !== 'home' && <SpaceSwitch />}
         <SettingsMenu />
       </header>
 
@@ -83,7 +79,7 @@ export function App() {
             ))}
           </div>
         )}
-        {step === 'home' && <HomePage />}
+        {step === 'home' && <JobsPage />}
         {step === 'today' && <TodayPage />}
         {step === 'load' && <LoadStep />}
         {step === 'map' && <MappingStep />}

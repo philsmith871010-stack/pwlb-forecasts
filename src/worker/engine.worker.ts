@@ -106,14 +106,30 @@ const api = {
 
   hasExampleRegister(): boolean { return !!demoRegister; },
 
-  useExampleRegister(): RegisterInfo {
-    if (!demoRegister) throw new Error('Load the example bank data first.');
+  useExampleRegister(o?: GeneratorOptions): RegisterInfo {
+    if (!demoRegister) demoRegister = generateDataset(o ?? { seed: 'northbridge', startFY: 2021, years: 5, preset: 'small', accounts: 4, nastiness: 1 }).register;
     return setRegister(registerFromSnapshot(demoRegister, 'Northbridge Council deal register (example)'), true);
   },
 
   clearRegister(): void { register = null; },
 
   registerInfo(): RegisterInfo | null { return registerInfo(); },
+
+  /** The example council's statement for its last day, generated afresh (works after a reload). */
+  async exampleLastDayStatement(o: GeneratorOptions): Promise<{ name: string; size: number; report: DetectionReport; day: Day }> {
+    const g = generateDataset(o);
+    demoRegister = g.register;
+    const tmp = await ingest(g.files.map((f) => ({ name: f.name, data: f.text, size: f.text.length, mapping: detectMapping(f.text.slice(0, 96 * 1024), f.name).mapping })));
+    const day = tmp.maxDay;
+    const q = (v: string) => (/[",]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const iso = isoFromDay(day);
+    const lines = ['Date,Account Number,Description,Amount'];
+    for (let i = 0; i < tmp.n; i++) if (tmp.day[i] === day) lines.push([`${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`, tmp.accounts[tmp.account[i]], q(tmp.narratives[tmp.narr[i]]), tmp.amount[i].toFixed(2)].join(','));
+    const name = `northbridge_statement_${iso}.csv`;
+    const text = lines.join('\n') + '\n';
+    demoFiles.set(name, text);
+    return { name, size: text.length, report: detectMapping(text, name), day };
+  },
 
   /** The example's bank lines for one day, written as an ordinary statement export (for trying day-to-day use). */
   exampleStatement(day: Day): { name: string; size: number; report: DetectionReport } {

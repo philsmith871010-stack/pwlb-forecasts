@@ -8,7 +8,7 @@ import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
 import { mergeHistory, basisFromHistory, historyBefore, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
-import { DEFAULT_GENERATOR_OPTIONS, type GeneratorOptions } from '../generator';
+import type { GeneratorOptions } from '../generator';
 import { isoFromDay, addMonths } from '../lib/dates';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
@@ -79,7 +79,15 @@ export interface SessionChange { id: string; at: string; label: string; kind: 'r
 
 export interface Toast { id: string; text: string; kind?: 'ok' | 'err'; action?: { label: string; run: () => void } }
 
+/** Your council's work, or the example council's: each kept separately in this browser. */
+export type Workspace = 'mine' | 'example';
+export const EXAMPLE_OPTIONS: GeneratorOptions = { seed: 'northbridge', startFY: 2021, years: 5, preset: 'small', accounts: 4, nastiness: 1 };
+
 interface State {
+  /** past the landing page */
+  entered: boolean;
+  space: Workspace;
+  exampleBusy: boolean;
   team: TeamFile;
   teamName: string | null;
   teamHandle: FileSystemFileHandle | null;
@@ -145,6 +153,12 @@ interface Actions {
   saveProfile: (name: string, profileName: string) => void;
   generateDemo: (o: GeneratorOptions) => Promise<void>;
   tryDayToDay: () => Promise<void>;
+  enter: (ws: Workspace) => Promise<void>;
+  switchWorkspace: (ws: Workspace) => Promise<void>;
+  setupExample: () => Promise<void>;
+  useExampleStatement: () => Promise<void>;
+  loadExampleHistory: () => Promise<void>;
+  forgetWorkspace: () => void;
   loadRegisterFile: (f: File) => Promise<void>;
   useExampleRegister: () => Promise<void>;
   clearRegister: () => Promise<void>;
@@ -163,7 +177,16 @@ interface Actions {
 }
 
 const LS_USER = 'cfi.user';
-const LS_TEAM = 'cfi.teamCache';
+const LS_WS = 'cfi.workspace';
+/** each workspace's team (rules, saved history, forecasts) lives in this browser under its own key */
+const teamKey = (ws: Workspace) => (ws === 'example' ? 'cfi.teamCache.example' : 'cfi.teamCache');
+function persistTeam(json: string) { lsSet(teamKey(useStore.getState().space), json); }
+function cachedTeam(ws: Workspace): TeamFile {
+  const cached = lsGet(teamKey(ws));
+  if (cached) { const r = parseTeamFile(cached); if (r.ok && r.team) return r.team; }
+  return emptyTeamFile(ws === 'example' ? 'Northbridge Council (example)' : undefined);
+}
+const initialWs: Workspace = lsGet('cfi.workspace') === 'example' ? 'example' : 'mine';
 
 function lsGet(k: string): string | null { try { return localStorage.getItem(k); } catch { return null; } }
 function lsSet(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } }
@@ -177,11 +200,10 @@ export function defaultSettings(basis: ForecastBasis | null): ForecastSettings {
 }
 
 export const useStore = create<State & Actions>((set, get) => ({
-  team: (() => {
-    const cached = lsGet(LS_TEAM);
-    if (cached) { const r = parseTeamFile(cached); if (r.ok && r.team) return r.team; }
-    return emptyTeamFile();
-  })(),
+  entered: false,
+  space: initialWs,
+  exampleBusy: false,
+  team: cachedTeam(initialWs),
   teamName: null,
   teamHandle: null,
   teamLoadedHash: null,
@@ -249,7 +271,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     const fresh = !!get().demo || get().sources.some((x) => x.demo) || !!r.team.cashHistory;
     set({ team: r.team, teamName: name, teamHandle: handle, teamLoadedHash: teamHash(text), teamLoadedSavedAt: r.team.savedAt, dirty: false, sessionChanges: [], activeScenarioId: r.team.forecasts[0]?.id ?? null, historyBase: r.team.cashHistory ?? null, historyReport: null, historyOnly: false });
     if (fresh) set((s) => ({ sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, ingestError: null, register: s.register?.example ? null : s.register }));
-    lsSet(LS_TEAM, text);
+    persistTeam(text);
     // re-match bank profiles for sources already added
     set((s) => ({ sources: s.sources.map((src) => applyProfile(src, r.team!)) }));
     if (get().ingest) void get().runCategorise();
@@ -262,7 +284,7 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   updateTeam: (fn, opts) => {
     set((s) => ({ team: fn(s.team), dirty: true }));
-    lsSet(LS_TEAM, JSON.stringify(get().team));
+    persistTeam(JSON.stringify(get().team));
     if (opts?.recategorise && get().ingest) void get().runCategorise();
   },
 
@@ -351,22 +373,62 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   /** The example as a returning user sees it: a saved history up to yesterday, and today's statement. */
   tryDayToDay: async () => {
-    // its own example team, so a real team's saved history is never touched
-    if (get().dirty && get().teamName && !confirm('Try the day-to-day example? Your team file has unsaved changes; save it first if you want to keep them.')) return;
-    get().startFresh('Northbridge Council (example)');
-    set({ historyBase: null });
-    await get().generateDemo({ ...DEFAULT_GENERATOR_OPTIONS });
-    const ing = get().ingest, h = get().team.cashHistory;
-    if (!ing || !h) return;
-    const today = ing.maxDay;
-    const base = historyBefore(h, today);
-    const st = await engine().exampleStatement(today);
-    set((s) => ({
-      historyBase: base, team: { ...s.team, cashHistory: base },
-      sources: [{ name: st.name, size: st.size, demo: true, report: st.report, mapping: st.report.mapping }],
-      demo: null, ingest: null, cat: null, agg: null, basis: null,
-    }));
+    await get().switchWorkspace('example');
+    get().goto('today');
+  },
+
+  enter: async (ws) => {
+    set({ entered: true });
+    get().goto('home');
+    await get().switchWorkspace(ws);
+  },
+
+  switchWorkspace: async (ws) => {
+    if (ws !== get().space) {
+      lsSet(LS_WS, ws);
+      const team = cachedTeam(ws);
+      set({
+        space: ws, team, teamName: null, teamHandle: null, dirty: false, sessionChanges: [], activeScenarioId: team.forecasts[0]?.id ?? null,
+        historyBase: team.cashHistory ?? null, historyReport: null, historyOnly: false,
+        sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, ingestError: null,
+      });
+    }
+    if (ws === 'example' && !get().team.cashHistory) await get().setupExample();
+  },
+
+  /** The example council's saved history: five years, up to the day before its last statement. */
+  setupExample: async () => {
+    if (get().exampleBusy) return;
+    set({ exampleBusy: true });
+    try {
+      set({ team: emptyTeamFile('Northbridge Council (example)'), historyBase: null });
+      await get().generateDemo({ ...EXAMPLE_OPTIONS });
+      const ing = get().ingest, h = get().team.cashHistory;
+      if (ing && h) {
+        const base = historyBefore(h, ing.maxDay);
+        set((s) => ({ team: { ...s.team, authorityName: 'Northbridge Council (example)', cashHistory: base }, historyBase: base, historyReport: null, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null }));
+        persistTeam(JSON.stringify(get().team));
+      }
+    } finally { set({ exampleBusy: false }); }
+  },
+
+  /** Example workspace: today's statement, ready to go. */
+  useExampleStatement: async () => {
+    set({ ingestBusy: { phase: 'Preparing the example statement…', frac: 0.1 } });
+    const st = await engine().exampleLastDayStatement({ ...EXAMPLE_OPTIONS });
+    set({ sources: [{ name: st.name, size: st.size, demo: true, report: st.report, mapping: st.report.mapping }], demo: null, ingest: null, cat: null, agg: null, basis: null });
     await get().runIngest();
+  },
+
+  /** Example workspace: its five years of statements, as if loaded. */
+  loadExampleHistory: async () => { await get().generateDemo({ ...EXAMPLE_OPTIONS }); },
+
+  /** Clear this workspace's saved work from the browser. */
+  forgetWorkspace: () => {
+    const ws = get().space;
+    try { localStorage.removeItem(teamKey(ws)); } catch { /* storage unavailable */ }
+    const team = emptyTeamFile(ws === 'example' ? 'Northbridge Council (example)' : undefined);
+    set({ team, historyBase: null, historyReport: null, historyOnly: false, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, activeScenarioId: null, sessionChanges: [] });
   },
 
   loadRegisterFile: async (f) => {
@@ -449,7 +511,7 @@ export const useStore = create<State & Actions>((set, get) => ({
         cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1, historyReport: keepSaved ? null : report, historyOnly: false,
         team: { ...s.team, cashHistory: keepSaved ? hb! : history, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
       }));
-      lsSet(LS_TEAM, JSON.stringify(get().team));
+      persistTeam(JSON.stringify(get().team));
       if (!get().activeScenarioId && !get().team.forecasts.length) {
         const wasDirty = get().dirty;
         const id = get().newScenario('Base');
@@ -472,7 +534,7 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   forgetHistory: () => {
     set((s) => ({ historyBase: null, historyReport: null, historyOnly: false, team: { ...s.team, cashHistory: undefined }, dirty: true }));
-    lsSet(LS_TEAM, JSON.stringify(get().team));
+    persistTeam(JSON.stringify(get().team));
   },
 
   saveTeam: async (mode = 'save') => {
@@ -509,7 +571,7 @@ export const useStore = create<State & Actions>((set, get) => ({
         set({ team, dirty: false, teamLoadedHash: teamHash(json), teamLoadedSavedAt: team.savedAt });
         get().toast(`Saved ${s.teamName}.`);
       }
-      lsSet(LS_TEAM, json);
+      persistTeam(json);
       set({ sessionChanges: [] });
     } catch (e) {
       if ((e as Error).name !== 'AbortError') get().toast(`Could not save: ${(e as Error).message}`, 'err');

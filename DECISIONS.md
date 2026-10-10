@@ -173,3 +173,11 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - step-number labels are gone, because the menu and strip already show where you are;
   - line cards show what we found and the proposal, with the edit tools behind "Change something";
   - lists under the result are folded.
+
+## Landing first; saved in the browser; the example as its own workspace
+
+- The landing page stands alone, with **Enter** or **Explore the example council**. The app's Home is the three jobs.
+- **No team files to manage.** Work is saved in the browser as it changes (`cfi.teamCache`), until the team file moves to the cloud. The settings menu keeps "Download a copy", "Load a copy" and "Clear saved work".
+- **The example council is a workspace of its own** (`cfi.teamCache.example`), switched from Home or the header, so it can never touch a real council's work.
+  - On first use it loads the example's five years and keeps its history up to the day before its last statement.
+  - Each job then has a ready-made main action in place of a file drop: the example's statement, its five years, its deal register.

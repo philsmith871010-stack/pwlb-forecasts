@@ -5,7 +5,6 @@ import { useStore, useEyebrow } from '../../state/store';
 import { StrategyView } from '../forecast/StrategyView';
 import { RegisterCard } from '../register/RegisterCard';
 import { SaveStep } from './SaveStep';
-import { useOpenTeamFile } from '../components/HeaderMenus';
 import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast } from '../forecast/useForecast';
@@ -275,22 +274,16 @@ function ScenarioBar() {
   );
 }
 
-/** The forecast needs a history first: from the team file, from statements, or the example. */
+/** The forecast needs a history first: the saved one, or statements loaded under History. */
 function ForecastStart() {
-  const { historyBase, useSavedHistory, goto, generateDemo } = useStore();
-  const { open, el } = useOpenTeamFile();
+  const { historyBase, useSavedHistory, goto, space, switchWorkspace } = useStore();
   return (
     <div className="page narrow">
-      {el}
-      <PageHead title="Forecast">A forecast is built from your cash history. Choose where it comes from.</PageHead>
+      <PageHead title="Forecast">A forecast is built from your cash history.</PageHead>
       <div className="start-choices">
-        {historyBase ? (
-          <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>From your team file. Nothing to load.</span></button>
-        ) : (
-          <button className="start-choice" onClick={() => void open()}><i className="bi bi-folder2-open" /><strong>Open your team file</strong><span>If your team has used the tool before.</span></button>
-        )}
-        <button className="start-choice" onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
-        <button className="start-choice" onClick={() => { goto('forecast'); void generateDemo({ seed: 'northbridge', startFY: 2021, years: 5, preset: 'small', accounts: 4, nastiness: 1 }); }}><i className="bi bi-stars" /><strong>Try the example</strong><span>A made-up council, ready to go.</span></button>
+        {historyBase && <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>Nothing to load.</span></button>}
+        <button className={`start-choice ${historyBase ? '' : 'primary'}`} onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
+        {space === 'mine' && <button className="start-choice" onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /><strong>Explore the example council</strong><span>See a finished forecast first.</span></button>}
       </div>
     </div>
   );

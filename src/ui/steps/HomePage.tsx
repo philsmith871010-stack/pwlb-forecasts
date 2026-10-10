@@ -1,8 +1,6 @@
 import { useStore } from '../../state/store';
 import { APP_NAME_PARTS } from '../../config';
-import { ago, day, int } from '../../lib/format';
-import { historySpan } from '../../lib/history/cashHistory';
-import { useOpenTeamFile } from '../components/HeaderMenus';
+
 
 const STAGES = [
   { icon: 'bi-calendar-day', title: 'Today’s statement', text: 'Drop in today’s bank statement. It’s sorted with your team’s rules in seconds, you sort anything new, and the day joins your history.' },
@@ -15,7 +13,7 @@ const BENEFITS = [
   { icon: 'bi-bank', title: 'The real borrowing question', text: 'Loans and investments are kept out, so you see your underlying cash — and exactly when and how much you may need to borrow.' },
   { icon: 'bi-journal-check', title: 'Works with your deal register', text: 'Add your PWLBtoday deal register and the forecast includes loan repayments and maturing investments, then sets out borrowing and investing options alongside your liability benchmark.' },
   { icon: 'bi-search', title: 'Every number explained', text: 'Each line records the rule that sorted it; each forecast figure traces back to history or to an assumption you made. Audit-friendly.' },
-  { icon: 'bi-people', title: 'Your team’s knowledge, kept', text: 'Rules, bank layouts and forecasts live in one shared team file, so the tool gets better every time anyone uses it.' },
+  { icon: 'bi-people', title: 'Your team’s knowledge, kept', text: 'Every sorting decision, payment pattern and forecast is remembered, so the tool gets better every time it’s used.' },
   { icon: 'bi-sliders', title: 'What-if in real time', text: 'Change a growth rate or add a one-off and the forecast, low point and plain-English summary update instantly — then download a ready-made report.' },
 ];
 
@@ -23,49 +21,27 @@ const SECURITY = [
   { icon: 'bi-pc-display', title: 'Runs on your computer', text: 'Bank files are read and processed inside this browser tab. There is no server behind this tool.' },
   { icon: 'bi-cloud-slash', title: 'Nothing is uploaded', text: 'No transaction data is sent anywhere — no uploads, no analytics, no tracking. The page is locked so it cannot contact any other website.' },
   { icon: 'bi-robot', title: 'No AI', text: 'Sorting uses clear, visible rules — never an AI service. You can see and change every rule.' },
-  { icon: 'bi-file-earmark-lock', title: 'The team file holds no transactions', text: 'It keeps rules, layouts and your forecast, plus (if you choose) a cash history: daily totals by category, and regular payments such as payroll. Never individual bank lines. Your deal register vanishes when you close the tab.' },
+  { icon: 'bi-file-earmark-lock', title: 'No bank lines are kept', text: 'Your work is saved in this browser: rules, forecasts and a cash history of daily totals by category and regular payments. Never individual bank lines. Your deal register is forgotten when you close the tab.' },
 ];
 
 export function HomePage() {
-  const { goto, setStepTab, generateDemo, team, teamName, ingest, cat, historyOnly, historyBase, basis } = useStore();
-  const { open, el } = useOpenTeamFile();
-  const span = historyBase ? historySpan(historyBase) : null;
-  const checked = team.forecasts.find((f) => f.reviewDone);
-  const start = () => goto('load');
-  const demo = () => { setStepTab('load', 'demo'); goto('load'); void generateDemo({ seed: 'northbridge', startFY: 2021, years: 5, preset: 'small', accounts: 4, nastiness: 1 }); };
+  const { enter } = useStore();
   return (
     <div className="home">
-      <section className="home-hero compact">
+      <section className="home-hero landing">
         <div className="home-hero-inner">
+          <div className="pill-live"><span className="dot ok" /> A PWLBtoday tool · runs entirely in your browser</div>
           <h1>{APP_NAME_PARTS[0]}<span>{APP_NAME_PARTS[1]}</span></h1>
-          <p className="home-lead">Your council’s cash: sorted, understood and forecast. What would you like to do?</p>
-          <div className="jobs">
-            <button className="job" onClick={() => goto('today')}>
-              <i className="bi bi-calendar-day" />
-              <strong>Today’s statement</strong>
-              <span>Sort today’s bank statement in seconds.</span>
-              <em>{span ? `History saved to ${day(span.to)}` : 'Best with your team file'}</em>
-            </button>
-            <button className="job" onClick={() => goto(cat || historyOnly ? 'history' : 'load')}>
-              <i className="bi bi-bar-chart-line" />
-              <strong>History</strong>
-              <span>Load years of statements and see how your cash behaves.</span>
-              <em>{cat ? `${int(ingest?.rows ?? 0)} bank lines loaded` : span ? `Saved: ${day(span.from)} to ${day(span.to)}` : 'Start here the first time'}</em>
-            </button>
-            <button className="job" onClick={() => goto('forecast')}>
-              <i className="bi bi-graph-up-arrow" />
-              <strong>Forecast</strong>
-              <span>See when you’d need to borrow, and your options.</span>
-              <em>{checked ? `“${checked.name}” checked` : basis || span ? 'Ready to build' : 'Needs your history first'}</em>
-            </button>
+          <p className="home-lead">Your council’s cash, sorted, understood and forecast: today’s bank statement in seconds, years of history at a glance, and when you’ll need to borrow.</p>
+          <div className="landing-ctas">
+            <button className="btn primary xl" onClick={() => void enter('mine')}>Enter <i className="bi bi-arrow-right" /></button>
+            <button className="btn xl on-dark" onClick={() => void enter('example')}><i className="bi bi-stars" /> Explore the example council</button>
           </div>
-          <div className="home-under">
-            {(teamName || team.savedAt)
-              ? <span><i className="bi bi-folder2" /> Team file: <strong>{team.authorityName}</strong>{team.savedAt ? ` · saved ${ago(team.savedAt)}` : ''}</span>
-              : <span><i className="bi bi-folder2" /> Used it before? <button className="link-btn" onClick={() => void open()}>Open your team file</button></span>}
-            <span>New here? <button className="link-btn" onClick={demo}>Try the example</button> or <button className="link-btn" onClick={() => { goto('today'); void useStore.getState().tryDayToDay(); }}>see today’s statement with it</button></span>
+          <div className="home-trust">
+            <span><i className="bi bi-shield-lock-fill" /> Bank data never leaves this computer</span>
+            <span><i className="bi bi-eye" /> Every number explained</span>
+            <span><i className="bi bi-stopwatch" /> Five years sorted in seconds</span>
           </div>
-          {el}
         </div>
       </section>
 
@@ -154,12 +130,12 @@ export function HomePage() {
           <div className="grid g2">
             <div className="home-card"><i className="bi bi-filetype-csv" /><h4>Bank statement exports</h4><p>CSV files downloaded from online banking — ideally three to five years. Any bank, any layout. Or use our example data.</p></div>
             <div className="home-card"><i className="bi bi-journal-text" /><h4>Your deal register (recommended)</h4><p>The PWLBtoday workbook of your loans and investments, so the forecast includes repayments, interest and maturities. Have schedules from other departments, such as grant dates? You can import those too.</p></div>
-            <div className="home-card"><i className="bi bi-folder2-open" /><h4>A team file (only if you have one)</h4><p>A small file a colleague may have saved last time. First time? You’ll create one at the end — nothing to prepare.</p></div>
-            <div className="home-card"><i className="bi bi-hourglass-split" /><h4>About 15 minutes the first time</h4><p>Most of it is checking a few items. After that, your team file remembers your history: add just today’s statement for day-to-day sorting, or the latest quarter for a review.</p></div>
+            <div className="home-card"><i className="bi bi-floppy" /><h4>Nothing to save</h4><p>Your work is saved in this browser as you go. You can download a copy from the settings menu at any time.</p></div>
+            <div className="home-card"><i className="bi bi-hourglass-split" /><h4>About 15 minutes the first time</h4><p>Most of it is checking a few items. After that it remembers your history: add just today’s statement, or the latest quarter for a review.</p></div>
           </div>
           <div className="home-cta">
             <div><h3 style={{ margin: 0 }}>Ready?</h3><div className="muted">Start with your own bank files, or explore with a realistic example council first.</div></div>
-            <div className="row"><button className="btn primary lg" onClick={start}><i className="bi bi-play-fill" /> Get started</button><button className="btn lg" onClick={demo}><i className="bi bi-stars" /> Try the example data</button></div>
+            <div className="row"><button className="btn primary lg" onClick={() => void enter('mine')}>Enter <i className="bi bi-arrow-right" /></button><button className="btn lg" onClick={() => void enter('example')}><i className="bi bi-stars" /> Explore the example council</button></div>
           </div>
         </section>
       </div>

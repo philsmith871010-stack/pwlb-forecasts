@@ -58,7 +58,7 @@ function AdvancedReview({ embedded }: { embedded?: boolean }) {
         <NextTab label="See your decisions" onClick={() => setTab('decisions')} />
       </>}
       {tab === 'decisions' && <>
-        <Explain compact what="Every confirmation you made this session. Each one became a rule or decision in your team file." why="Next time anyone loads data, these are applied automatically." todo="Use Undo if you made a mistake. Remember to save the team file at the end." />
+        <Explain compact what="Every confirmation you made this session. Each one became a rule or decision in your saved work." why="Next time anyone loads data, these are applied automatically." todo="Use Undo if you made a mistake. Remember to save the team file at the end." />
         <Decisions />
         {!embedded && <StepFooter nextLabel="See the historic analysis" />}
       </>}

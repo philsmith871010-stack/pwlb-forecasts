@@ -14,7 +14,7 @@ import { basisFromHistory } from '../../lib/history/cashHistory';
 
 const workingDays = (from: number, to: number) => { let n = 0; for (let d = from; d <= to; d++) if (isBusinessDay(d)) n++; return n; };
 
-/** The saved history, when a team file brought one and nothing has been loaded yet. */
+/** The saved history, when nothing has been loaded yet this session. */
 export function SavedHistoryCard({ h }: { h: CashHistory }) {
   const { useSavedHistory, goto, forgetHistory } = useStore();
   const span = historySpan(h);
@@ -27,12 +27,9 @@ export function SavedHistoryCard({ h }: { h: CashHistory }) {
           <h3 style={{ margin: 0 }}>Your saved cash history{h.example && <span className="badge navy" style={{ marginLeft: 8 }}>example</span>}</h3>
           <p className="small" style={{ margin: '4px 0 8px' }}>
             <strong>{day(span.from)}</strong> to <strong>{day(span.to)}</strong> across {h.accounts.length} bank account{h.accounts.length > 1 ? 's' : ''},
-            kept in your team file as daily totals (no bank lines).
+            saved in this browser as daily totals (no bank lines).
           </p>
-          <ul className="hc-list small">
-            <li><strong>For day-to-day:</strong> add today’s bank file below. We’ll sort it, show you the day, and add it to your history.</li>
-            <li><strong>For a periodic review:</strong> add the latest month, quarter or year, or go straight to your analysis with what’s saved.</li>
-          </ul>
+          <p className="small muted" style={{ margin: 0 }}>Add the latest period below, or go straight to your analysis with what’s saved.</p>
         </div>
         <div className="col-actions">
           <button className="btn primary" onClick={() => { useSavedHistory(); goto('history'); }}>Go straight to your analysis <i className="bi bi-arrow-right" /></button>
@@ -65,7 +62,7 @@ export function HistoryAddedNote() {
 
 /** For a day (or a few) of bank data: the sorted day, by category, with every line a click away. */
 export function DayCard({ onSort }: { onSort?: () => void } = {}) {
-  const { ingest, cat, team, goto, setStepTab, historyBase, activeScenarioId, register, saveTeam, teamName, dirty } = useStore();
+  const { ingest, cat, team, goto, setStepTab, historyBase, activeScenarioId, register } = useStore();
   const [rows, setRows] = useState<TxnRow[] | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const catVersion = useStore((s) => s.catVersion);
@@ -149,9 +146,8 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
         <span>Everyday cash {one ? 'on the day' : 'over these days'}: <strong>{money(everyday, { sign: true })}</strong>{expected !== null && <span className="muted"> · your forecast expected about {money(expected, { sign: true })}</span>}{register ? <span className="muted"> (loans and investments are shown separately above)</span> : ''}.</span>
       </div>
       <div className="done-next">
-        <span className="muted">{one ? 'This day is' : 'These days are'} now in your cash history. Save the team file to keep {one ? 'it' : 'them'}.</span>
+        <span className="muted"><i className="bi bi-check2-circle green" /> {one ? 'This day is' : 'These days are'} now in your cash history, saved in this browser.</span>
         <AddMoreFiles label="Add another statement" />
-        <button className="btn primary" disabled={!dirty && !!teamName} onClick={() => void saveTeam()}><i className="bi bi-save" /> Save team file</button>
       </div>
     </div>
   );

@@ -240,7 +240,7 @@ function FileMapping({ src, tab }: { src: Source; tab: string }) {
       </>}
       {tab === 'profile' && <>
         <Explain
-          what="Saves this file’s layout to your team file as a named bank profile."
+          what="Saves this file’s layout as a named bank profile, so next time it’s read automatically."
           why="Next time anyone loads an export with the same columns, it’s read correctly with no checking needed."
           todo="Give it a recognisable name (e.g. “Lloyds main account”) and click Save." />
         <div className="grid g2">

@@ -133,7 +133,7 @@ function CategoryTable() {
 const PIPELINE: { label: string; match: string; text: string }[] = [
   { label: 'Your decisions', match: 'Your decision on this transaction', text: 'Lines you individually confirmed in Review.' },
   { label: 'Transfers between your accounts', match: 'Internal transfer', text: 'Money moving between your own accounts — equal and opposite, same day. These cancel out and are ignored.' },
-  { label: 'Team rules', match: 'Team rules', text: 'Rules your team taught (saved in the team file). These always win.' },
+  { label: 'Team rules', match: 'Team rules', text: 'Rules your team taught (saved with your work). These always win.' },
   { label: 'Starter rules', match: 'Starter rules', text: 'Built-in patterns for council tax, NNDR, payroll, HMRC, PWLB, money market funds and so on.' },
   { label: 'Treasury dictionary', match: 'Treasury counterparty dictionary', text: 'Known banks, building societies and money market funds.' },
   { label: 'Other councils', match: 'Another local authority + round sum', text: 'Payments to or from other councils — round sums are likely loans; odd amounts likely recharges.' },

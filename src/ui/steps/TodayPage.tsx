@@ -7,16 +7,14 @@ import { SortCard, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
 import { historySpan } from '../../lib/history/cashHistory';
 import { day } from '../../lib/format';
-import { useOpenTeamFile } from '../components/HeaderMenus';
 
 export function TodayPage() {
   const s = useStore();
-  const { ingest, cat, historyBase, ingestBusy, catBusy, addFiles, runIngest, goto, tryDayToDay } = s;
+  const { ingest, cat, historyBase, ingestBusy, catBusy, addFiles, runIngest, goto, space, useExampleStatement, exampleBusy } = s;
   const busy = !!ingestBusy || (!!catBusy && !cat);
   const short = !!ingest && !!cat && ingest.maxDay - ingest.minDay <= 3;
   const long = !!ingest && !!cat && !short;
   const span = historyBase ? historySpan(historyBase) : null;
-  const { open, el } = useOpenTeamFile();
   const sortRef = useRef<HTMLDivElement>(null);
   const read = async (files: File[]) => {
     if (!files.length) return;
@@ -26,19 +24,24 @@ export function TodayPage() {
   };
   return (
     <div className="page narrow">
-      {el}
       <PageHead title="Today’s statement">
         {short ? <>Sorted with your team’s rules and added to your history.</>
           : span ? <>Your saved history runs to <strong>{day(span.to)}</strong>. Drop in the statement for the days since: we’ll sort it with your team’s rules and add it to your history.</>
           : <>Drop in a bank statement for a day or a few days. We’ll sort it with your team’s rules.</>}
       </PageHead>
 
-      {!historyBase && !busy && !short && (
+      {space === 'mine' && !historyBase && !busy && !short && (
         <div className="callout navy mb small">
-          <strong>Open your team file first</strong> so your rules and saved history are used.{' '}
-          <button className="link-btn" onClick={() => void open()}>Open team file</button>
-          <span className="muted"> · no team file yet? </span><button className="link-btn" onClick={() => void tryDayToDay()}>see it with the example</button>
+          <strong>Tip:</strong> load a few years of statements under <button className="link-btn" onClick={() => goto('load')}>History</button> first. Then today’s lines are sorted with everything learned from them.
         </div>
+      )}
+
+      {space === 'example' && !busy && !short && (
+        <button className="example-action" disabled={exampleBusy} onClick={() => void useExampleStatement()}>
+          <i className="bi bi-stars" />
+          <span><strong>Use the example council’s statement</strong><small>Its bank lines for 31 Mar 2026, as if you’d downloaded them this morning.</small></span>
+          <i className="bi bi-arrow-right" />
+        </button>
       )}
 
       {busy && (
@@ -46,7 +49,7 @@ export function TodayPage() {
           <div className="mt"><Progress frac={(ingestBusy ?? catBusy)?.frac ?? 0} /></div></div>
       )}
 
-      {!busy && !short && <TodayDrop onFiles={read} />}
+      {!busy && !short && <>{space === 'example' && <div className="or-line">or drop a statement of your own</div>}<TodayDrop onFiles={read} /></>}
 
       {!busy && long && (
         <div className="callout mt small">That covers <strong>{day(ingest!.minDay)}</strong> to <strong>{day(ingest!.maxDay)}</strong>, more than a few days, so it has gone into your history.{' '}

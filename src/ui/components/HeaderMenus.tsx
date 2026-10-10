@@ -96,7 +96,9 @@ export function TeamFileMenu() {
 }
 
 export function SettingsMenu() {
-  const { showTips, setShowTips, advanced, setAdvanced, goto, cat, step } = useStore();
+  const { showTips, setShowTips, advanced, setAdvanced, goto, cat, step, space, forgetWorkspace } = useStore();
+  const { open, el } = useOpenTeamFile();
+  const save = useSaveTeamFile();
   return (
     <Popover button={(o, toggle) => (
       <button className="icon-btn header-icon" aria-label="Settings" aria-expanded={o} onClick={toggle} title="Settings"><i className="bi bi-gear" /></button>
@@ -111,9 +113,25 @@ export function SettingsMenu() {
             <button className="menu-item" disabled={!cat} onClick={() => { close(); goto('data'); }}><i className="bi bi-list-ul" /> All transactions</button>
             <button className="menu-item" onClick={() => { close(); goto('settings'); }}><i className="bi bi-sliders" /> Rules and settings</button>
           </>}
-          <div className="menu-note xs muted"><i className="bi bi-shield-lock" /> Everything happens in this browser tab. Nothing is uploaded.</div>
+          <div className="menu-sep" />
+          <button className="menu-item" onClick={() => { close(); void save('download'); }}><i className="bi bi-download" /> Download a copy of your work</button>
+          <button className="menu-item" onClick={() => { close(); void open(); }}><i className="bi bi-upload" /> Load a copy…</button>
+          <button className="menu-item danger" onClick={() => { close(); if (confirm(`Clear ${space === 'example' ? 'the example council’s' : 'your council’s'} saved work from this browser? Rules, saved history and forecasts will be removed. Download a copy first if you might want them.`)) forgetWorkspace(); }}><i className="bi bi-trash" /> Clear saved work…</button>
+          <div className="menu-note xs muted"><i className="bi bi-shield-lock" /> Your work is saved in this browser as you go: rules, a cash history (daily totals, never bank lines) and forecasts. Nothing is uploaded.</div>
+          {el}
         </div>
       )}
     </Popover>
+  );
+}
+
+/** Whose cash: your council's, or the example council's. Each is kept separately in this browser. */
+export function SpaceSwitch() {
+  const { space, switchWorkspace, exampleBusy } = useStore();
+  return (
+    <div className="space-switch" role="tablist" aria-label="Whose cash">
+      <button role="tab" aria-selected={space === 'mine'} className={space === 'mine' ? 'on' : ''} onClick={() => void switchWorkspace('mine')}>Your council</button>
+      <button role="tab" aria-selected={space === 'example'} className={space === 'example' ? 'on' : ''} onClick={() => void switchWorkspace('example')}>{exampleBusy ? <span className="spinner sm" /> : <i className="bi bi-stars" />} Example</button>
+    </div>
   );
 }

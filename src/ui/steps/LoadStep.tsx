@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Progress, Counter, Explain } from '../components/common';
-import { openWithPicker, fsAccessSupported, downloadBlob } from '../../lib/teamfile';
-import { bytes, day, ago, int } from '../../lib/format';
+import { downloadBlob } from '../../lib/teamfile';
+import { bytes, day, int } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
 import { engine } from '../../worker/client';
 import { SavedHistoryCard, HistoryAddedNote } from '../history/HistoryCards';
@@ -39,17 +39,20 @@ export function LoadStep() {
             what={saved
               ? <>Bank statement exports (<strong>CSV files</strong>) for the days since your history ends, or any period you want to load again. One day is fine.</>
               : <>Bank statement exports — the <strong>CSV files</strong> you can download from your online banking. Three to five years is ideal.</>}
-            todo="Drag your files into the box below. Several files (different accounts or years) is fine. No files yet? Use the example data." />
-          <div className="choice-grid">
-            <UploadCard />
-            <DemoCard />
-          </div>
+            todo="Drag your files into the box below. Several files (different accounts or years) is fine." />
+          {s.space === 'example' && <>
+            <button className="example-action" onClick={() => void s.loadExampleHistory()}>
+              <i className="bi bi-stars" />
+              <span><strong>Load the example council’s five years of statements</strong><small>22,000 bank lines across four accounts, April 2021 to March 2026.</small></span>
+              <i className="bi bi-arrow-right" />
+            </button>
+            {s.advanced && <DemoCard />}
+            <div className="or-line">or drop statements of your own to try them here</div>
+          </>}
+          <UploadCard />
           {realSources.length > 0 && <FileList />}
         </>
       )}
-
-
-      <TeamFileLine />
     </div>
   );
 }
@@ -165,36 +168,4 @@ function DoneCard() {
   );
 }
 
-function TeamFileLine() {
-  const { team, teamName, loadTeamText, toast } = useStore();
-  const input = useRef<HTMLInputElement>(null);
-  const open = async () => {
-    if (fsAccessSupported()) {
-      try {
-        const r = await openWithPicker();
-        if (!r) return;
-        const res = loadTeamText(r.text, r.name, r.handle);
-        toast(res.ok ? `Opened ${r.name}` : res.message, res.ok ? 'ok' : 'err');
-      } catch (e) { if ((e as Error).name !== 'AbortError') toast((e as Error).message, 'err'); }
-    } else input.current?.click();
-  };
-  const onFile = async (f: File | undefined) => {
-    if (!f) return;
-    const res = loadTeamText(await f.text(), f.name, null);
-    toast(res.ok ? `Opened ${f.name}` : res.message, res.ok ? 'ok' : 'err');
-  };
-  const loaded = teamName || team.savedAt;
-  return (
-    <div className="team-line">
-      <i className="bi bi-people" />
-      {loaded ? (
-        <span>Using your team file <strong>{teamName ?? team.authorityName}</strong>{team.savedAt ? ` (saved ${ago(team.savedAt)})` : ''}. Your team’s past decisions are applied automatically.</span>
-      ) : (
-        <span><strong>Has a colleague given you a team file?</strong> Open it so the tool remembers your team’s past decisions and forecasts. First time? Skip this.</span>
-      )}
-      <button className="btn sm" onClick={() => void open()}><i className="bi bi-folder2-open" /> {loaded ? 'Open a different one' : 'Open team file'}</button>
-      <input ref={input} type="file" accept=".json,application/json" hidden onChange={(e) => void onFile(e.target.files?.[0])} />
-    </div>
-  );
-}
 

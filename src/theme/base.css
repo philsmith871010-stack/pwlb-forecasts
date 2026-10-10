@@ -753,3 +753,28 @@ details.fold[open] { padding-bottom: 12px; }
 .menu-fields .input.sm { padding: 5px 8px; font-size: 13px; }
 .popover { max-width: 340px; }
 .popover .history-choice { margin: 6px 0 0; }
+
+/* landing first, then the app; your council vs the example */
+.landing-shell { height: 100vh; overflow-y: auto; }
+.home-hero.landing { padding: 80px 32px 64px; }
+.landing-ctas { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 30px; }
+.btn.xl { font-size: 17px; padding: 14px 26px; border-radius: 12px; }
+.space-switch { display: inline-flex; border: 1px solid var(--pt-line); border-radius: var(--radius-pill); padding: 2px; background: #fff; }
+.space-switch button { border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--pt-muted-2); padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.space-switch button.on { background: var(--pt-navy); color: #fff; }
+.space-switch.big { border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.06); margin-bottom: 18px; }
+.space-switch.big button { color: rgba(255,255,255,.8); font-size: 14px; padding: 7px 16px; }
+.space-switch.big button.on { background: #fff; color: var(--pt-navy); }
+.jobs-title { font-size: clamp(30px, 3.6vw, 44px) !important; }
+.jobs-busy { display: flex; gap: 12px; align-items: center; margin-top: 26px; color: #fff; font-weight: 600; }
+.menu-sep { border-top: 1px solid var(--pt-line-soft); margin: 4px 0; }
+.menu-item.danger, .menu-item.danger i { color: var(--pt-red); }
+.jobs-page .home-hero { min-height: calc(100vh - var(--shell-header-h)); }
+.example-action { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; border: 2px solid var(--pt-orange); background: var(--pt-orange-soft); border-radius: var(--radius-card); padding: 18px 20px; cursor: pointer; font: inherit; margin-bottom: 4px; }
+.example-action:hover:not(:disabled) { box-shadow: 0 8px 22px rgba(253,126,20,.18); }
+.example-action > i:first-child { font-size: 26px; color: var(--pt-orange); }
+.example-action > i:last-child { margin-left: auto; font-size: 20px; color: var(--pt-orange-hover); }
+.example-action span { display: flex; flex-direction: column; gap: 2px; }
+.example-action strong { color: var(--pt-navy); font-size: 16px; }
+.example-action small { color: var(--pt-muted); font-size: 13px; }
+.or-line { text-align: center; color: var(--pt-muted); font-size: 12.5px; margin: 10px 0; }
