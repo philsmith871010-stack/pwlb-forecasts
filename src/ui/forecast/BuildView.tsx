@@ -113,7 +113,7 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
           {checked.length < all.length && (
             <button className="link-btn small accept-all" onClick={() => {
               const left = all.filter((e) => !done.has(e.id));
-              if (window.confirm(`Accept all ${left.length} remaining line${left.length > 1 ? 's' : ''} as proposed, without opening ${left.length > 1 ? 'them' : 'it'}? You can still open and change any line afterwards.`)) { mark(left.map((e) => e.id)); setOpen(null); }
+              void useStore.getState().askConfirm({ title: `Accept all ${left.length} remaining line${left.length > 1 ? 's' : ''}?`, body: `They’ll be marked as checked without being opened. You can still open and change any line afterwards.`, ok: 'Accept all' }).then((yes) => { if (yes) { mark(left.map((e) => e.id)); setOpen(null); } });
             }}>Accept all {all.length - checked.length} remaining as proposed</button>
           )}
           <button className="link-btn small accept-all" style={{ marginLeft: 16 }} onClick={() => setImporting(true)} title="Excel or CSV with dates, categories and amounts, e.g. from Finance or HR"><i className="bi bi-file-earmark-arrow-up" /> Import a schedule from another department</button>
@@ -296,7 +296,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
             <span className="xs muted">Replace this line entirely:</span>
             {manual
               ? <button className="link-btn small" onClick={() => setManual(false)}><i className="bi bi-arrow-counterclockwise" /> Bring our forecast back</button>
-              : <button className="link-btn small" onClick={() => { if (confirm(`Clear our forecast for ${e.name}? Only figures you add yourself will count. You can bring it back at any time.`)) setManual(true); }}>Clear our forecast</button>}
+              : <button className="link-btn small" onClick={() => { void useStore.getState().askConfirm({ title: `Clear our forecast for ${e.name}?`, body: 'Only figures you add yourself will count for this line. You can bring our forecast back at any time.', ok: 'Clear it', danger: true }).then((yes) => { if (yes) setManual(true); }); }}>Clear our forecast</button>}
             <span className="muted">·</span>
             <button className="link-btn small" onClick={() => setWizard('build')}>Build it yourself</button>
             <span className="muted">·</span>

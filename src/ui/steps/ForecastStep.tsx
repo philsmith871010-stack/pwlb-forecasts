@@ -273,7 +273,7 @@ function ScenarioBar() {
       <button className="btn sm" onClick={() => { setName(''); setDlg('new'); }}><i className="bi bi-plus-lg" /> New</button>
       {sc && <button className="btn sm" onClick={() => newScenario(`${sc.name} (copy)`, sc)}><i className="bi bi-copy" /> Duplicate</button>}
       {sc && <button className="btn sm ghost" onClick={() => { setName(sc.name); setDlg('rename'); }}><i className="bi bi-pencil" /></button>}
-      {sc && team.forecasts.length > 1 && <button className="btn sm ghost" aria-label="Delete scenario" onClick={() => { if (confirm(`Delete scenario “${sc.name}”?`)) deleteScenario(sc.id); }}><i className="bi bi-trash" /></button>}
+      {sc && team.forecasts.length > 1 && <button className="btn sm ghost" aria-label="Delete scenario" onClick={() => { void useStore.getState().askConfirm({ title: `Delete scenario “${sc.name}”?`, body: 'Its assumptions and figures will be removed.', ok: 'Delete', danger: true }).then((yes) => { if (yes) deleteScenario(sc.id); }); }}><i className="bi bi-trash" /></button>}
       {dlg && (
         <Modal title={dlg === 'new' ? 'New scenario' : 'Rename scenario'} onClose={() => setDlg(null)} footer={<><button className="btn" onClick={() => setDlg(null)}>Cancel</button>
           <button className="btn primary" disabled={!name.trim()} onClick={() => {

@@ -94,7 +94,21 @@ export function App() {
       </main>
       <Toasts />
       <MergeDialog />
+      <ConfirmDialog />
     </div>
+  );
+}
+
+/** The app's own "are you sure?" (browser pop-ups can be blocked, e.g. in embedded browsers). */
+function ConfirmDialog() {
+  const box = useStore((s) => s.confirmBox);
+  if (!box) return null;
+  return (
+    <Modal title={box.title} onClose={() => box.resolve(false)}
+      footer={<><button className="btn" onClick={() => box.resolve(false)}>Cancel</button>
+        <button className={`btn ${box.danger ? 'danger' : 'primary'}`} autoFocus onClick={() => box.resolve(true)}>{box.ok}</button></>}>
+      <p style={{ margin: 0 }}>{box.body}</p>
+    </Modal>
   );
 }
 

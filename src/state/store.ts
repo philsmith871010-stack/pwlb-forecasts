@@ -87,6 +87,8 @@ export const EXAMPLE_OPTIONS: GeneratorOptions = { seed: 'northbridge', startFY:
 interface State {
   /** past the landing page */
   entered: boolean;
+  /** an in-app confirmation waiting for an answer (the browser's own pop-ups can be blocked) */
+  confirmBox: { title: string; body: string; ok: string; danger?: boolean; resolve: (yes: boolean) => void } | null;
   /** every figure in pounds and pence, rather than £m / £k */
   exactAmounts: boolean;
   space: Workspace;
@@ -158,6 +160,7 @@ interface Actions {
   tryDayToDay: () => Promise<void>;
   enter: (ws: Workspace) => Promise<void>;
   setExactAmounts: (v: boolean) => void;
+  askConfirm: (o: { title: string; body: string; ok: string; danger?: boolean }) => Promise<boolean>;
   switchWorkspace: (ws: Workspace) => Promise<void>;
   setupExample: () => Promise<void>;
   useExampleStatement: () => Promise<void>;
@@ -207,6 +210,7 @@ export function defaultSettings(basis: ForecastBasis | null): ForecastSettings {
 
 export const useStore = create<State & Actions>((set, get) => ({
   entered: false,
+  confirmBox: null,
   exactAmounts: initialExact,
   space: initialWs,
   exampleBusy: false,
@@ -386,6 +390,10 @@ export const useStore = create<State & Actions>((set, get) => ({
     await get().switchWorkspace('example');
     get().goto('today');
   },
+
+  askConfirm: (o) => new Promise<boolean>((resolve) => {
+    set({ confirmBox: { ...o, resolve: (yes) => { set({ confirmBox: null }); resolve(yes); } } });
+  }),
 
   setExactAmounts: (v) => { lsSet('cfi.exact', v ? '1' : '0'); setExactAmountsFormat(v); set({ exactAmounts: v }); },
 

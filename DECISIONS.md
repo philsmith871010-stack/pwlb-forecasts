@@ -234,3 +234,4 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
 - **On a line card,** payment days read as text ("on or near the 28th") until "Change something". Dropdowns and remove buttons appear only then. Field hints are a few words each.
 - **The forecast chart's zoom slider** shows only with advanced tools; scroll-to-zoom still works.
 - **Step footers only go forward.** The strip and tabs handle going back, and the old back button could point across jobs or at a step that wasn't available.
+- **Confirmations use the app's own dialog** (`askConfirm`), never the browser's `confirm()`, which some embedded browsers block (it returns "cancel" without showing). This affects accept all, clear our forecast, clear saved work and delete scenario.
