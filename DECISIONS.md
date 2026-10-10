@@ -201,3 +201,4 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - the largest items, LOBO call dates, and the liability benchmark (shared chart with "What you could do");
   - a pointer to load statements, since only those show when cash runs short.
 - **"Accept all N remaining as proposed"** returns to Check each line at the user's request, behind a confirmation that says the lines haven't been opened. This reverses the earlier "every line opened individually" decision. Any line can still be opened and changed afterwards.
+- **The example council's deal register is always connected:** it loads on entering or switching to the example (including after a reload), and its card says "connected", with no upload, replace or remove.

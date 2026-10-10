@@ -394,6 +394,8 @@ export const useStore = create<State & Actions>((set, get) => ({
       });
     }
     if (ws === 'example' && !get().team.cashHistory) await get().setupExample();
+    // the example council's deal register is always connected
+    if (ws === 'example' && !get().register) await get().useExampleRegister();
   },
 
   /** The example council's saved history: five years, up to the day before its last statement. */

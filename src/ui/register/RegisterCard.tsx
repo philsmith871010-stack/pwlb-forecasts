@@ -13,12 +13,14 @@ export function RegisterCard() {
 
   if (register) {
     const m = cat?.registerMatch;
+    // in the example council the register is connected, not uploaded
+    const connected = register.example && space === 'example';
     return (
       <div className="card card-pad mt fade register-card on">
         <div className="row" style={{ alignItems: 'flex-start' }}>
           <i className="bi bi-journal-check reg-icon" />
           <div style={{ flex: 1 }}>
-            <h3 style={{ margin: 0 }}>Deal register added {register.example && <span className="badge navy">example</span>}</h3>
+            <h3 style={{ margin: 0 }}>{connected ? 'Deal register connected' : 'Deal register added'} {register.example && <span className="badge navy">example</span>}</h3>
             <p className="small" style={{ margin: '4px 0 0' }}>
               <strong>{money(register.stats.debt)}</strong> of loans, <strong>{money(register.investments.reduce((s, t) => s + t.principal, 0))}</strong> in fixed-term investments and <strong>{money(register.liquid.total)}</strong> in funds, as at {register.asAt ? day(register.asAt) : 'its date'}. Repayments, interest and maturities are in the forecast.
             </p>
@@ -34,10 +36,12 @@ export function RegisterCard() {
             {register.issues.length > 0 && <p className="xs muted" style={{ margin: '6px 0 0' }}><i className="bi bi-info-circle" /> The register notes {register.issues.length} thing{register.issues.length > 1 ? 's' : ''} to tidy up (for example a missing date). It was still read.</p>}
             </details>
           </div>
-          <div className="col-actions">
-            <button className="btn sm" disabled={registerBusy} onClick={() => input.current?.click()}><i className="bi bi-arrow-repeat" /> Replace</button>
-            <button className="btn sm ghost" disabled={registerBusy} onClick={() => void clearRegister()}>Remove</button>
-          </div>
+          {!connected && (
+            <div className="col-actions">
+              <button className="btn sm" disabled={registerBusy} onClick={() => input.current?.click()}><i className="bi bi-arrow-repeat" /> Replace</button>
+              <button className="btn sm ghost" disabled={registerBusy} onClick={() => void clearRegister()}>Remove</button>
+            </div>
+          )}
         </div>
         <input ref={input} type="file" accept=".xlsx" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
       </div>
