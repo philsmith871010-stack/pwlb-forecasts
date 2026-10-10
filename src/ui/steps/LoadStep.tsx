@@ -7,6 +7,7 @@ import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptio
 import { engine } from '../../worker/client';
 import { RegisterCard } from '../register/RegisterCard';
 import { SavedHistoryCard, HistoryAddedNote, DayCard } from '../history/HistoryCards';
+import { AddMoreFiles } from '../components/AddMoreFiles';
 
 export function LoadStep() {
   const s = useStore();
@@ -159,7 +160,7 @@ function DoneCard() {
         <span className="muted">{toCheck > 0 ? 'Next, you’ll confirm a few items we weren’t sure about.' : 'Everything was sorted confidently.'}</span>
         <button className="btn primary lg" onClick={() => { setStepTab('review', 'overview'); goto('review'); }}>Next: check the sorting <i className="bi bi-arrow-right" /></button>
       </div>
-      <div className="xs muted" style={{ marginTop: 12 }}>Want to use different files? <button className="link-btn" onClick={() => useStore.setState({ ingest: null, cat: null, agg: null, basis: null, sources: [], demo: null })}>Start again</button></div>
+      <div className="xs muted row" style={{ marginTop: 12, gap: 10 }}><AddMoreFiles /> <span>or use different files: <button className="link-btn" onClick={() => useStore.setState({ ingest: null, cat: null, agg: null, basis: null, sources: [], demo: null })}>Start again</button></span></div>
     </div>
   );
 }
@@ -196,3 +197,4 @@ function TeamFileLine() {
     </div>
   );
 }
+

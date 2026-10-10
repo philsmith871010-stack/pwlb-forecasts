@@ -9,6 +9,7 @@ import { money, day, int } from '../../lib/format';
 import { Money, CatBadge } from '../components/common';
 import { isBusinessDay } from '../../lib/dates';
 import { computeForecast } from '../forecast/useForecast';
+import { AddMoreFiles } from '../components/AddMoreFiles';
 import { basisFromHistory } from '../../lib/history/cashHistory';
 
 const workingDays = (from: number, to: number) => { let n = 0; for (let d = from; d <= to; d++) if (isBusinessDay(d)) n++; return n; };
@@ -149,6 +150,7 @@ export function DayCard() {
       </div>
       <div className="done-next">
         <span className="muted">{one ? 'This day is' : 'These days are'} now in your cash history. Save the team file to keep {one ? 'it' : 'them'}.</span>
+        <AddMoreFiles label="Add another statement" />
         <button className="btn primary" disabled={!dirty && !!teamName} onClick={() => void saveTeam()}><i className="bi bi-save" /> Save team file</button>
       </div>
     </div>

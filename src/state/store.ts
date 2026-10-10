@@ -222,7 +222,11 @@ export const useStore = create<State & Actions>((set, get) => ({
   loadTeamText: (text, name, handle = null) => {
     const r = parseTeamFile(text);
     if (!r.ok || !r.team) return { ok: false, message: r.errors.join(' ') };
+    // example data doesn't belong to a real team file, and a team file with its own cash history
+    // starts afresh: show what it holds and where to add new statements
+    const fresh = !!get().demo || get().sources.some((x) => x.demo) || !!r.team.cashHistory;
     set({ team: r.team, teamName: name, teamHandle: handle, teamLoadedHash: teamHash(text), teamLoadedSavedAt: r.team.savedAt, dirty: false, sessionChanges: [], activeScenarioId: r.team.forecasts[0]?.id ?? null, historyBase: r.team.cashHistory ?? null, historyReport: null, historyOnly: false });
+    if (fresh) set((s) => ({ sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, ingestError: null, register: s.register?.example ? null : s.register }));
     lsSet(LS_TEAM, text);
     // re-match bank profiles for sources already added
     set((s) => ({ sources: s.sources.map((src) => applyProfile(src, r.team!)) }));
@@ -314,7 +318,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       const r = await engine().generateDemo(o);
       const sources: Source[] = r.files.map((f) => applyProfile({ name: f.name, size: f.size, demo: true, report: f.report, mapping: f.report.mapping }, get().team));
       if (get().team.authorityName === 'My Council') set((st) => ({ team: { ...st.team, authorityName: 'Northbridge Council (example)' } }));
-      set({ sources, demo: { rows: r.rows, options: o }, hasTruth: true, historyBase: null });
+      set({ sources, demo: { rows: r.rows, options: o }, hasTruth: true });
       // the example council comes with its deal register, so the whole tool can be tried
       if (!get().register || get().register!.example) set({ register: await engine().useExampleRegister(), registerError: null });
       await get().runIngest();
@@ -325,6 +329,10 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   /** The example as a returning user sees it: a saved history up to yesterday, and today's statement. */
   tryDayToDay: async () => {
+    // its own example team, so a real team's saved history is never touched
+    if (get().dirty && get().teamName && !confirm('Try the day-to-day example? Your team file has unsaved changes; save it first if you want to keep them.')) return;
+    get().startFresh('Northbridge Council (example)');
+    set({ historyBase: null });
     await get().generateDemo({ ...DEFAULT_GENERATOR_OPTIONS });
     const ing = get().ingest, h = get().team.cashHistory;
     if (!ing || !h) return;
@@ -411,11 +419,13 @@ export const useStore = create<State & Actions>((set, get) => ({
       const { history, report } = mergeHistory(base, { ...session, example: example || undefined });
       history.example = example || undefined;
       if (base) basis = basisFromHistory(history, summary.catIds) ?? basis;
+      // a saved history these files can't join is left exactly as it was
+      const keepSaved = !!hb && !base;
       // record rule hit counts on team rules
       const hits = new Map(summary.ruleHits.map((h) => [h.id, h.hits]));
       set((s) => ({
-        cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1, historyReport: report, historyOnly: false,
-        team: { ...s.team, cashHistory: history, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
+        cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1, historyReport: keepSaved ? null : report, historyOnly: false,
+        team: { ...s.team, cashHistory: keepSaved ? hb! : history, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
       }));
       lsSet(LS_TEAM, JSON.stringify(get().team));
       if (!get().activeScenarioId && !get().team.forecasts.length) {
