@@ -87,10 +87,11 @@ export function SimpleItems({ sc, upd }: { sc: Scenario; upd: Upd }) {
       )}
       <div className="card card-pad">
         <h3 style={{ marginTop: 0 }}>Anything coming up that history can’t know?</h3>
-        <div className="big-choice">
-          <button className={`choice-card ${kind === 'oneoff' ? 'on' : ''}`} onClick={() => setKind('oneoff')}><i className="bi bi-pin-map" /><strong>A one-off amount</strong><span>e.g. a land sale, a capital grant, a big contract payment</span></button>
-          <button className={`choice-card ${kind === 'stop' ? 'on' : ''}`} onClick={() => setKind('stop')}><i className="bi bi-stop-circle" /><strong>Something will stop</strong><span>e.g. a grant ends, a contract finishes</span></button>
-          <button className={`choice-card ${kind === 'change' ? 'on' : ''}`} onClick={() => setKind('change')}><i className="bi bi-percent" /><strong>A rise or cut from a date</strong><span>e.g. a pay award, a council tax rise, a price increase</span></button>
+        <div className="add-row">
+          <button className={`btn sm ${kind === 'oneoff' ? 'primary' : ''}`} title="e.g. a land sale, a capital grant, a big contract payment" onClick={() => setKind(kind === 'oneoff' ? null : 'oneoff')}><i className="bi bi-plus-lg" /> A one-off amount</button>
+          <button className={`btn sm ${kind === 'stop' ? 'primary' : ''}`} title="e.g. a grant ends, a contract finishes" onClick={() => setKind(kind === 'stop' ? null : 'stop')}><i className="bi bi-plus-lg" /> Something stops</button>
+          <button className={`btn sm ${kind === 'change' ? 'primary' : ''}`} title="e.g. a pay award, a council tax rise, a price increase" onClick={() => setKind(kind === 'change' ? null : 'change')}><i className="bi bi-plus-lg" /> A rise or cut from a date</button>
+          <span className="xs muted">e.g. a land sale, a grant ending, a pay award</span>
         </div>
         {kind === 'oneoff' && <OneOffForm opCats={opCats} start={sc.settings.start} onAdd={(o) => { upd((s) => ({ ...s, oneOffs: [...s.oneOffs, o] })); setKind(null); }} />}
         {kind === 'stop' && <StopForm opCats={opCats} start={sc.settings.start} onAdd={(a) => { upd((s) => ({ ...s, assumptions: [...s.assumptions, a] })); setKind(null); }} />}

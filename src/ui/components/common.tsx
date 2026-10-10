@@ -138,16 +138,15 @@ export function InfoTip({ text }: { text: string }) {
   return <i className="bi bi-info-circle muted" title={text} aria-label={text} style={{ cursor: 'help', fontSize: 13 }} />;
 }
 
-export function StepFooter({ backLabel, nextLabel, onNext, nextDisabled, extra }: { backLabel?: string; nextLabel?: string; onNext?: () => void; nextDisabled?: boolean; extra?: ReactNode }) {
+export function StepFooter({ nextLabel, onNext, nextDisabled, extra }: { backLabel?: string; nextLabel?: string; onNext?: () => void; nextDisabled?: boolean; extra?: ReactNode }) {
   const step = useStore((s) => s.step);
-  const goto = useStore((s) => s.goto);
   const next = useStore((s) => s.next);
   const STEPS = stepsFor(useStore((s) => s.advanced));
   const i = STEPS.findIndex((s) => s.id === step);
   if (i < 0) return null;
   return (
     <div className="step-footer no-print">
-      <div>{i > 0 && <button className="btn" onClick={() => goto(STEPS[i - 1].id)}><i className="bi bi-arrow-left" /> {backLabel ?? STEPS[i - 1].label}</button>}</div>
+      <div />
       <div className="row">{extra}{i < STEPS.length - 1 && <button className="btn primary lg" disabled={nextDisabled} onClick={onNext ?? next}>{nextLabel ?? `Continue to ${STEPS[i + 1].label.toLowerCase()}`} <i className="bi bi-arrow-right" /></button>}</div>
     </div>
   );

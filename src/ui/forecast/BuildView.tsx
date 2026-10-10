@@ -228,7 +228,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                       <td title={s.signature} className="lc-name">{niceName(s.signature)}</td>
                       <td className="num">{money(Math.abs(s.level))}</td>
                       <td>{HOW_OFTEN[s.cadence] ?? s.cadence}</td>
-                      <td>{DAY_SET.includes(s.cadence) ? (
+                      <td>{!(editing || changed) ? <span className="small">{whenShown(sc, e.id, s)}</span> : DAY_SET.includes(s.cadence) ? (
                         <select className="select sm" aria-label={`When ${s.signature} is paid`} value={timingValue(sc, e.id, s)} onChange={(ev) => setTiming(s.signature, ev.target.value)}>
                           <option value="history">As before ({s.lastWorkingDay ? 'last working day' : `the ${ord(s.dayOfMonth)}`})</option>
                           <option value="lwd">Last working day</option>
@@ -240,8 +240,8 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                           {[1, 2, 3, 4, 5].map((w) => <option key={w} value={`w${w}`}>{WEEKDAYS[w]}s</option>)}
                         </select>
                       ) : <span className="small">{whenWords(s)}</span>}</td>
-                      <td><button className="icon-btn" title={removedSigs.has(s.signature) ? 'Bring this payment back' : 'Take this payment out of the forecast'} aria-label={removedSigs.has(s.signature) ? `Restore ${s.signature}` : `Remove ${s.signature}`} onClick={() => toggleSeries(s.signature)}>
-                        <i className={`bi ${removedSigs.has(s.signature) ? 'bi-arrow-counterclockwise' : 'bi-trash'}`} /></button></td>
+                      <td>{(editing || changed) && <button className="icon-btn" title={removedSigs.has(s.signature) ? 'Bring this payment back' : 'Take this payment out of the forecast'} aria-label={removedSigs.has(s.signature) ? `Restore ${s.signature}` : `Remove ${s.signature}`} onClick={() => toggleSeries(s.signature)}>
+                        <i className={`bi ${removedSigs.has(s.signature) ? 'bi-arrow-counterclockwise' : 'bi-trash'}`} /></button>}</td>
                     </tr>
                   ))}</tbody>
                 </table>
@@ -264,13 +264,13 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                 <span>Growth each year</span>
                 <span className="pct-input"><input className={`input ${growthA ? 'set' : ''}`} key={growthA?.id ?? 'g'} defaultValue={growthA ? String(growthA.pct) : ''} placeholder={e.historicCagr.toFixed(1)}
                   onBlur={(ev) => setGrowth(ev.target.value)} onKeyDown={(ev) => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} aria-label={`Growth each year for ${e.name}`} /><span>%</span></span>
-                <small>Past trend {e.historicCagr >= 0 ? '+' : ''}{e.historicCagr.toFixed(1)}%. E.g. type 3 for a 3% pay award.</small>
+                <small>Past trend {e.historicCagr >= 0 ? '+' : ''}{e.historicCagr.toFixed(1)}%</small>
               </label>
               <label className="lc-field">
                 <span>Make it bigger or smaller</span>
                 <span className="pct-input"><input className={`input ${levelA ? 'set' : ''}`} key={levelA?.id ?? 'l'} defaultValue={levelA ? String(levelA.pct) : ''} placeholder="0"
                   onBlur={(ev) => setLevel(ev.target.value)} onKeyDown={(ev) => { if (ev.key === 'Enter') (ev.target as HTMLInputElement).blur(); }} aria-label={`Change in size for ${e.name}`} /><span>%</span></span>
-                <small>From the start of the forecast. E.g. −10 if a service is being cut back.</small>
+                <small>e.g. −10 for a cut</small>
               </label>
               <label className="lc-field">
                 <span>It stops</span>
@@ -278,14 +278,14 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                   <input type="checkbox" checked={!!stopA} onChange={(ev) => setStop(ev.target.checked ? addDaysIso(sc.settings.start, 90) : null)} aria-label={`${e.name} stops`} />
                   {stopA ? <input className="input" type="date" value={stopA.from} onChange={(ev) => ev.target.value && setStop(ev.target.value)} style={{ width: 150 }} /> : <span className="small muted">only if this ends</span>}
                 </span>
-                <small>{stopA ? `Nothing after ${day(dayFromISO(stopA.from))}.` : 'For example, a grant that finishes.'}</small>
+                {stopA && <small>Nothing after {day(dayFromISO(stopA.from))}</small>}
               </label>
               <div className="lc-field">
                 <span>Every figure</span>
                 <button className="btn sm" onClick={() => setShowGrid(!showGrid)} aria-expanded={showGrid}>
                   <i className="bi bi-grid-3x3" /> {showGrid ? 'Hide the grid' : 'Edit by month or by day'}
                 </button>
-                <small>{overridesHere.length ? `${overridesHere.length} figure${overridesHere.length > 1 ? 's are' : ' is'} yours. ` : ''}Type over figures or paste dates from Excel.</small>
+                {overridesHere.length > 0 && <small>{overridesHere.length} figure{overridesHere.length > 1 ? 's are' : ' is'} yours</small>}
               </div>
             </div>
           </div>
@@ -301,7 +301,6 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
             <button className="link-btn small" onClick={() => setWizard('build')}>Build it yourself</button>
             <span className="muted">·</span>
             <button className="link-btn small" onClick={() => setWizard('import')}>Import a schedule</button>
-            <span className="xs muted">for figures another department gives you</span>
           </div>
           {wizard === 'build' && <LineWizard e={e} b={b} upd={upd} inflow={inflow} onClose={() => { setWizard(null); setShowGrid(true); }} />}
           {wizard === 'import' && <ImportWizard b={b} upd={upd} lockCategory={e.id} onClose={() => { setWizard(null); setShowGrid(true); }} />}
@@ -317,6 +316,15 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
       )}
     </div>
   );
+}
+
+/** When a payment is made, in words: as history shows, or as the user set it. */
+function whenShown(sc: Scenario, catId: string, s: SeriesX): string {
+  const v = timingValue(sc, catId, s);
+  if (v === 'history') return whenWords(s);
+  if (v === 'lwd') return 'on the last working day';
+  if (v.startsWith('w')) return `on ${WEEKDAYS[+v.slice(1)]}s`;
+  return `on the ${ord(+v)}`;
 }
 
 function timingValue(sc: Scenario, catId: string, s: SeriesX): string {

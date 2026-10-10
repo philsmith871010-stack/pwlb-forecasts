@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useStore } from '../../state/store';
 import { EChart, axisMoney } from '../components/EChart';
 import type { ForecastBundle } from './useForecast';
 import { money } from '../../lib/format';
@@ -8,6 +9,7 @@ import type { ECharts } from 'echarts/core';
 export function ForecastChart({ b, granularity, historyMonths = 24, height = 420, onReady, showTreasury = true }: {
   b: ForecastBundle; granularity: 'daily' | 'weekly' | 'monthly'; historyMonths?: number; height?: number; onReady?: (c: ECharts) => void; showTreasury?: boolean;
 }) {
+  const slider = useStore((s) => s.advanced);
   const option = useMemo(() => {
     const { fc, hist } = b;
     const histFrom = Math.max(hist.startDay, fc.start - Math.round(historyMonths * 30.44));
@@ -50,10 +52,10 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
         },
       },
       legend: { top: 0, right: 0, data: ['Past', fcName, 'Likely range', ...(before ? ['Everyday cash only'] : []), ...(tr ? ['After known loan repayments'] : [])] },
-      grid: { left: 72, right: 24, top: 36, bottom: 64 },
+      grid: { left: 72, right: 24, top: 36, bottom: slider ? 64 : 30 },
       xAxis: { type: 'category', data: x, axisLabel: { formatter: (v: string) => { const { y, m } = ymdFromDay(Math.floor(Date.parse(v) / 864e5)); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${String(y).slice(2)}`; } } },
       yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
-      dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 12, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }],
+      dataZoom: slider ? [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 12, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }] : [{ type: 'inside' }],
       series: [
         { name: '_lo', type: 'line', data: lo, stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
         { name: 'Likely range', type: 'line', data: width, stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(253,126,20,.14)' }, showSymbol: false, silent: true, itemStyle: { color: 'rgba(253,126,20,.4)' } },
@@ -82,6 +84,6 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
         },
       ],
     };
-  }, [b, granularity, historyMonths, showTreasury]);
+  }, [b, granularity, historyMonths, showTreasury, slider]);
   return <EChart option={option} height={height} onReady={onReady} ariaLabel="Cumulative operational cash position: history and forecast" />;
 }

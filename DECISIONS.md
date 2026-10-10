@@ -227,3 +227,10 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
 - **With a saved history there's nothing to choose:** History opens on Look back and Forecast on its build tabs, straight from the saved history. "Load statements" is just the upload, for adding more. The saved-history card (with its three competing actions) is gone; "Clear saved work" in settings covers forgetting it.
 - **The starting cash, minimum and horizon** are one compact form (a row each) instead of three numbered cards with paragraphs.
 - **Small fixes:** a stale "save & share" link removed; "(optional)" hidden once a register is in; the section is "Your starting point".
+
+## Fifth simplification pass
+
+- **"Anything coming up"** is one row of three small buttons (one-off, something stops, a rise or cut), not three large tiles.
+- **On a line card,** payment days read as text ("on or near the 28th") until "Change something". Dropdowns and remove buttons appear only then. Field hints are a few words each.
+- **The forecast chart's zoom slider** shows only with advanced tools; scroll-to-zoom still works.
+- **Step footers only go forward.** The strip and tabs handle going back, and the old back button could point across jobs or at a step that wasn't available.

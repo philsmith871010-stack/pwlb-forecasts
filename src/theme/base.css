@@ -817,3 +817,4 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 .start-form .sf-label small { color: var(--pt-muted); font-size: 12.5px; }
 .start-form .sf-note { display: block; margin-top: 6px; color: var(--pt-muted-2); font-size: 12.5px; }
 @media (max-width: 760px) { .start-form .sf-row { grid-template-columns: 1fr; gap: 6px; } }
+.add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
