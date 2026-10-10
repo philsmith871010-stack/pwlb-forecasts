@@ -86,7 +86,7 @@ describe('end to end with the example deal register', async () => {
     expect(m.interest.found / m.interest.estimated).toBeGreaterThan(0.9);
     const acc = computeAccuracy(ds, res, g.truth);
     expect(acc.deal.pctExcluded).toBeGreaterThan(0.995);
-    expect(acc.deal.wronglyExcludedValue).toBe(0);
+    expect(acc.deal.wronglyExcludedValue, JSON.stringify(acc.deal.wrongExclusions)).toBe(0);
   });
 
   it('carries the register into the forecast and the options', () => {

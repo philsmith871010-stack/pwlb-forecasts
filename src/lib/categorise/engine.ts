@@ -297,8 +297,10 @@ export function categorise(ds: Dataset, cfg: CatConfig, onProgress?: (phase: str
           let shared = 0; for (const w of want) if (clean.includes(w.slice(0, 6))) shared++;
           // the narrative must look like a deal: the counterparty's name, a treasury counterparty,
           // a council, or deal words. An inexact (interest) amount must name the counterparty or say interest.
-          const dealish = shared > 0 || TREASURY_COUNTERPARTIES.some((c) => c.pattern.test(clean)) || LA_PATTERN.test(clean);
-          if (diff > 0.011 ? !dealish && !/\bINT(EREST)?\b|DIVIDEND/.test(clean) : !dealish && !DEAL_WORDS.test(clean)) continue;
+          const named = shared > 0 || TREASURY_COUNTERPARTIES.some((c) => c.pattern.test(clean));
+          const dealish = named || LA_PATTERN.test(clean);
+          // (an inexact amount to some other council is far more likely a recharge than this deal's interest)
+          if (diff > 0.011 ? !named && !/\bINT(EREST)?\b|DIVIDEND/.test(clean) : !dealish && !DEAL_WORDS.test(clean)) continue;
           const score = shared * 10 - Math.abs(dd) - diff / Math.max(1, Math.abs(target)) * 100;
           if (score > bestScore) { bestScore = score; best = i; }
         }

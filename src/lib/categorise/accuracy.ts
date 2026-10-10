@@ -21,6 +21,8 @@ export interface AccuracyReport {
     leakedRows: number;
     wronglyExcludedValue: number;
     wronglyExcludedRows: number;
+    /** everyday lines taken for deals (the first 50) */
+    wrongExclusions: { narrative: string; amount: number; day: number; truthCat: string; predicted: string }[];
     topLeaks: { narrative: string; amount: number; day: number; truthCat: string; predicted: string }[];
   };
   recurring: { rows: number; agree: number; pct: number };
@@ -45,6 +47,7 @@ export function computeAccuracy(ds: Dataset, res: CatResult, truth: TruthFile): 
   let matched = 0, unmatched = 0, correct = 0, value = 0, valueCorrect = 0, wrongDates = 0;
   let truthDealValue = 0, excluded = 0, leaked = 0, leakedRows = 0, wrongEx = 0, wrongExRows = 0, recRows = 0, recAgree = 0, uncValue = 0;
   const leaks: AccuracyReport['deal']['topLeaks'] = [];
+  const wrongs: AccuracyReport['deal']['wrongExclusions'] = [];
   const internalPred = P.indexOf('internal_transfer');
   const seen = truth.files.map((f) => new Uint8Array(f.line.length));
   for (let i = 0; i < ds.n; i++) {
@@ -82,7 +85,10 @@ export function computeAccuracy(ds: Dataset, res: CatResult, truth: TruthFile): 
         leaked += a; leakedRows++;
         if (leaks.length < 200) leaks.push({ narrative: ds.narratives[ds.narr[i]], amount: ds.amount[i], day: ds.day[i], truthCat: tName, predicted: pName });
       }
-    } else if (pDeal && tName !== 'internal_transfer') { wrongEx += a; wrongExRows++; }
+    } else if (pDeal && tName !== 'internal_transfer') {
+      wrongEx += a; wrongExRows++;
+      if (wrongs.length < 50) wrongs.push({ narrative: ds.narratives[ds.narr[i]], amount: ds.amount[i], day: ds.day[i], truthCat: tName, predicted: pName });
+    }
     if (!tDeal && tName !== 'internal_transfer' && pc >= 0) {
       recRows++;
       const tRec = tf.recurring[k] === '1';
@@ -110,7 +116,7 @@ export function computeAccuracy(ds: Dataset, res: CatResult, truth: TruthFile): 
     confusion: { truth: T, predicted: predLabels, counts },
     deal: {
       truthDealValue, correctlyExcludedValue: excluded, pctExcluded: truthDealValue ? excluded / truthDealValue : 1,
-      leakedValue: leaked, leakedRows, wronglyExcludedValue: wrongEx, wronglyExcludedRows: wrongExRows, topLeaks: leaks.slice(0, 25),
+      leakedValue: leaked, leakedRows, wronglyExcludedValue: wrongEx, wronglyExcludedRows: wrongExRows, topLeaks: leaks.slice(0, 25), wrongExclusions: wrongs,
     },
     recurring: { rows: recRows, agree: recAgree, pct: recRows ? recAgree / recRows : 0 },
     uncategorisedValue: uncValue,

@@ -193,9 +193,9 @@ export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end:
     let level = base;
     const awards: Record<number, { pct: number; lateMonth?: number }> = {
       2021: { pct: 0.0175, lateMonth: 3 }, // agreed very late, paid in March with arrears
-      2022: { pct: 0.065, lateMonth: 11 },
-      2023: { pct: 0.06, lateMonth: 11 },
-      2024: { pct: 0.045, lateMonth: 10 },
+      2022: { pct: 0.045, lateMonth: 11 },
+      2023: { pct: 0.04, lateMonth: 11 },
+      2024: { pct: 0.035, lateMonth: 10 },
       2025: { pct: 0.032 },
       2026: { pct: 0.03 },
       2027: { pct: 0.03 },
@@ -209,7 +209,7 @@ export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end:
       if (fy !== currentFY) {
         currentFY = fy;
         const a = awards[fy] ?? { pct: 0.03 };
-        level *= 1.012; // incremental drift / headcount
+        level *= 1.004; // incremental drift / headcount
         if (a.lateMonth) { pending = a.pct; lateMonth = a.lateMonth; arrearsMonths = 0; }
         else { level *= 1 + a.pct; pending = 0; lateMonth = undefined; }
       }
@@ -263,8 +263,8 @@ export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end:
       if (d0 < dayFromYMD(2022, 1, 1)) add(nextBusinessDay(dom(y, m, 11)), 10e6 / 9, acct.general, 'COVID ADDITIONAL RELIEF FUND', 'grants_general');
       // Household Support Fund: starts Oct 2021, quarterly
       if (d0 >= dayFromYMD(2021, 10, 1) && (m === 10 || m === 1 || m === 4 || m === 7)) add(nextBusinessDay(dom(y, m, 14)), 3.2e6 / 4, acct.general, 'DWP HOUSEHOLD SUPPORT FUND', 'grants_general');
-      // Extended producer responsibility: starts Nov 2025, quarterly, sizeable
-      if (d0 >= dayFromYMD(2025, 11, 1) && (m === 11 || m === 2 || m === 5 || m === 8)) add(nextBusinessDay(dom(y, m, 16)), 1.6e6, acct.general, 'DEFRA PACKAGING EPR PAYMENT', 'grants_general');
+      // Extended producer responsibility: starts Nov 2024, quarterly, sizeable
+      if (d0 >= dayFromYMD(2024, 11, 1) && (m === 11 || m === 2 || m === 5 || m === 8)) add(nextBusinessDay(dom(y, m, 16)), 1.6e6, acct.general, 'DEFRA PACKAGING EPR PAYMENT', 'grants_general');
       // DSG: 24 instalments
       const dfe = d0 >= dayFromYMD(2025, 4, 1) ? 'DFE' : 'ESFA';
       for (const dd of [1, 15]) add(nextBusinessDay(dom(y, m, dd)), (120e6 / 24) * stepGrowth(d0, 0.04), acct.general, !styleB('dsg', d0) ? `${dfe} DSG ${rng.digits(7)}` : `${dfe} DEDICATED SCHOOLS GRANT`, 'dsg');
@@ -336,7 +336,7 @@ export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end:
     let d = start; while (weekday(d) !== 4) d++;
     for (; d <= end; d += 28) {
       const day = prevBusinessDay(d);
-      const total = (A * 0.25 / 13) * contGrowth(day, 0.07);
+      const total = (A * 0.25 / 13) * contGrowth(day, 0.05);
       const n = Math.max(3, Math.round(4 * Math.min(V, 10)));
       const w = rng.splitWeights(n, 0.6);
       for (let i = 0; i < n; i++) add(day, -total * w[i], acct.general, `ASC PROVIDER PAYMENTS ${rng.pick(N.WORDS_A).toUpperCase()} CARE`, 'suppliers');
@@ -411,11 +411,11 @@ export function runEngine(o: EngineOptions): { txns: TrueTxn[]; start: Day; end:
     for (const { y, m } of monthsIter) {
       for (let i = 0; i < 4; i++) {
         const c = N.CONTRACTORS[i];
-        add(prevBusinessDay(dom(y, m, 10 + 5 * i)), -(42e6 / 48) * contGrowth(dom(y, m, 1), 0.06) * rng.lognormal(0, 0.35), acct.general, `${c} CERT ${rng.digits(3)}`, 'capital_spend');
+        add(prevBusinessDay(dom(y, m, 10 + 5 * i)), -(36e6 / 48) * contGrowth(dom(y, m, 1), 0.03) * rng.lognormal(0, 0.35), acct.general, `${c} CERT ${rng.digits(3)}`, 'capital_spend');
       }
     }
     for (let fy = o.startFY; fy < o.startFY + o.years; fy++) {
-      for (let i = 0; i < 4; i++) add(prevBusinessDay(dayFromYMD(fy, 4, 1) + rng.int(10, 355)), -rng.range(1e6, 6e6), acct.general, `${rng.pick(N.CONTRACTORS.slice(4))} ${rng.pick(['FINAL ACCT', 'STAGE PAYMENT', 'RETENTION RELEASE'])}`, 'capital_spend', false);
+      for (let i = 0; i < 3; i++) add(prevBusinessDay(dayFromYMD(fy, 4, 1) + rng.int(10, 355)), -rng.range(1e6, 4e6), acct.general, `${rng.pick(N.CONTRACTORS.slice(4))} ${rng.pick(['FINAL ACCT', 'STAGE PAYMENT', 'RETENTION RELEASE'])}`, 'capital_spend', false);
       const nr = rng.int(3, 6);
       for (let i = 0; i < nr; i++) add(nextBusinessDay(dayFromYMD(fy, 4, 1) + rng.int(5, 355)), rng.range(0.3e6, 3.5e6), acct.general, `COMPLETION ${rng.pick(N.SITES)} ${rng.pick(N.SOLICITORS)}`, 'capital_receipts', false);
     }

@@ -38,13 +38,16 @@ export function exampleSignOffs(h: CashHistory, categories: Category[], buffer: 
       }
       if (best >= 1e6) oneOffs.push({ id: 'oo_example_depot', date: isoFromDay(bestDay), amount: Math.round(best / 1e5) * 1e5, categoryId: 'capital_receipts', description: 'Sale of the old depot', confidence: 'firm' });
     }
+    // the agreed pay award, not the last few years' higher ones: what a treasury team would set
+    const assumptions: Scenario['assumptions'] = ['salaries', 'hmrc_paye', 'pensions'].filter((id) => catIds.includes(id))
+      .map((id) => ({ id: `as_example_${id}`, kind: 'growth' as const, categoryId: id, pct: 3, mode: 'annual_step' as const, note: 'Agreed pay award' }));
     const sc: Scenario = {
       id: `fc_example_${isoFromDay(p.cutoff)}`, name: p.name, updatedAt: isoFromDay(p.cutoff),
       settings: { start: isoFromDay(p.cutoff), end: isoFromDay(addMonths(p.cutoff, 24) - 1), granularity: 'monthly', openingPosition: null, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: true, bandZ: 1.645 },
-      assumptions: [], oneOffs, pastedSchedules: [], treasurySchedule: [],
+      assumptions, oneOffs, pastedSchedules: [], treasurySchedule: [],
     };
     const bank = positions(basis.agg).actual;
-    const fc = runForecast({ basis, categories, settings: sc.settings, assumptions: [], oneOffs, pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: buffer, defaultOpening: bank[bank.length - 1] });
+    const fc = runForecast({ basis, categories, settings: sc.settings, assumptions, oneOffs, pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: buffer, defaultOpening: bank[bank.length - 1] });
     out.push(signForecast(fc, sc, {
       id: `so_example_${isoFromDay(p.cutoff)}`, signedAt: `${isoFromDay(p.cutoff + 1)}T10:30:00.000Z`, signedBy: 'Treasury team (example)',
       note: p.note, knownItems: knownItemsOf(sc, categories),

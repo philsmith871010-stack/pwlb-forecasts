@@ -382,3 +382,20 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
   - adding a register confirms it ("Deal register added: 17 loans and 4 investments").
 - **Signing off in the example** is pre-filled "You (practice)", which isn't kept as your name.
 - **The deal register is now kept in this browser**, per workspace (the file itself, or a marker for the example's), and read again when the workspace opens. Before, a reload silently dropped it: the forecast changed (£278.2m became £192.8m) and the options asked for the register again. It's removed with Remove and with "Clear saved work". Like the cash history it stays on this computer.
+
+## A milder example council
+
+- **The example's numbers tell a believable story.** History runs roughly in balance (a £23.8m surplus in 2021/22, then between £17.8m short and £9.6m over). The forecast says "may need to borrow about £97m by March 2028", with cash first dipping below the £10m minimum at the end of March 2026. Before, it said £278m, from a deficit of about £40m a year that kept widening. Changes to the generator:
+  - pay awards of 4.5%, 4% and 3.5% (were 6.5%, 6% and 4.5%), with less drift;
+  - capital spend of £36m a year growing 3% (was £42m growing 6%), and smaller one-off capital payments;
+  - adult social care providers growing 5% (was 7%);
+  - the new packaging (EPR) grant starts in Nov 2024, so it's established as a regular payment rather than paid only twice.
+
+  The deal register's loans are sized from that shortfall, so they're smaller too (13 loan questions before adding the register, 1 after).
+- **The example's treasury team set the agreed pay award (+3%)** in its two signed-off forecasts, as a real team would. It shows under "Added by hand".
+- **Forecast vs actual judges what a forecast could have known.** The verdict uses the closer of the gap including one-offs and the gap excluding them, and the sentence says so ("Leaving those aside, it was out by £9.1m"). Bands: very close under 1.5% of the cash that flowed, close under 3.5%, otherwise some way out (were 2% and 5%, too generous once one-offs are set aside). In the example the Budget forecast was cautious (some way out) and the Mid-year review came close.
+- **"Test the method" counts back from the month after the history ends**, so a year back from 30 Mar 2026 is 1 Apr 2025, not 1 Mar.
+
+## Fix found by the new example
+
+- **An inexact amount to another council was taken as a loan's interest.** Estimated interest matches within 1%, and any line naming a council counted as plausible, so a £417,832 recharge to Bramford Borough Council was taken as interest on a loan from Bramford County Council. As the code's own comment intended, an inexact amount now needs the counterparty's name, a treasury counterparty, or the word interest. An exact amount still only needs to look like a deal. The accuracy report now lists everyday lines taken for deals (`wrongExclusions`), so a failure says which.

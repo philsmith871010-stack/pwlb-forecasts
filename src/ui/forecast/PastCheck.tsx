@@ -18,12 +18,13 @@ import type { Scenario } from '../../lib/model';
 /** A forecast needs a year of history behind it to learn from. */
 const LEARN_DAYS = 365;
 
-/** The first of the month `months` before the history ends, if there's a year of history before it. */
+/** The first of the month `months` before the month after the history ends, if there's a year of history before it. */
 export function pastCutoff(h: CashHistory | null, months: number): number | null {
   const span = h ? historySpan(h) : null;
   if (!span) return null;
-  const { y, m } = ymdFromDay(addMonths(span.to + 1, -months));
-  const cutoff = dayFromYMD(y, m, 1);
+  // counted back from the start of the month after the history ends (30 Mar → 1 Apr)
+  const { y: ey, m: em } = ymdFromDay(span.to);
+  const cutoff = addMonths(addMonths(dayFromYMD(ey, em, 1), 1), -months);
   return cutoff - span.from >= LEARN_DAYS && cutoff <= span.to ? cutoff : null;
 }
 
@@ -127,7 +128,12 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: Backtest
   for (let d = 0; d <= end; d++) gross += Math.abs(r.actualCum[d] - (d ? r.actualCum[d - 1] : 0));
   const share = gross ? Math.abs(gap) / gross : 0;
   const oneOffs = r.actualCum[end] - r.actualCoreCum[end];
-  const verdict = share < 0.02 ? { word: 'Very close', cls: 'green' } : share < 0.05 ? { word: 'Close', cls: 'green' } : { word: 'Some way out', cls: 'soft' };
+  // judged on what it could have known: one-offs (a land sale, an unexpected grant) are set aside
+  // when that's closer, and the sentence says so
+  const coreGap = r.actualCoreCum[end] - fc;
+  const judged = Math.min(Math.abs(gap), Math.abs(coreGap));
+  const judgedShare = gross ? judged / gross : 0;
+  const verdict = judgedShare < 0.015 ? { word: 'Very close', cls: 'green' } : judgedShare < 0.035 ? { word: 'Close', cls: 'green' } : { word: 'Some way out', cls: 'soft' };
   const move = (v: number, past = false) => (v < 0 ? `${past ? 'fell' : 'fall'} by ${money(-v)}` : `${past ? 'rose' : 'rise'} by ${money(v)}`);
   const months = Math.max(1, Math.round((end + 1) / 30.44));
 
@@ -163,6 +169,7 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: Backtest
         {Math.abs(oneOffs) >= 1e6 && (handAdded
           ? <> One-off items account for {money(oneOffs, { sign: true })} of what happened; only those added by hand were in the forecast.</>
           : <> One-off items, which no forecast from history can see, account for {money(oneOffs, { sign: true })} of what happened.</>)}
+        {Math.abs(oneOffs) >= 1e6 && Math.abs(coreGap) < Math.abs(gap) && <> Leaving those aside, it was out by <strong>{money(Math.abs(coreGap))}</strong>.</>}
       </div>
 
       <div className="grid g3">
