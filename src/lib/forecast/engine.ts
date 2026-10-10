@@ -118,6 +118,39 @@ function median(a: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+const CADENCE_DAYS: Partial<Record<string, number>> = { monthly: 30.4, quarterly: 91.3, half_yearly: 182.6, annual: 365.25 };
+
+/**
+ * A stopped regular payment that carries on under another name: after its last payment, amounts
+ * in its recent range keep arriving in the same category on the same rhythm, right
+ * up to the end of the data. Only for monthly or less frequent payments, where such amounts stand
+ * out. Returns the matching [day, amount] pairs, or null.
+ */
+function continuation(s: SeriesBasis, residual: Float64Array, startDay: Day, dataEnd: Day): [Day, number][] | null {
+  const I = CADENCE_DAYS[s.cadence];
+  if (!I || !s.amounts.length) return null;
+  const last = s.days[s.days.length - 1];
+  const expected = Math.floor((dataEnd - last) / I);
+  if (expected < 1) return null;
+  const recent = Array.from(s.amounts.slice(-6));
+  const typical = median(recent);
+  // as small as it has recently been, with some room: VAT repayments, say, vary month to month
+  const floor = 0.6 * Math.min(...recent.map(Math.abs));
+  const hits: [Day, number][] = [];
+  let prev = last;
+  for (let day = last + 1; day <= dataEnd; day++) {
+    const v = residual[day - startDay];
+    if (!v || Math.sign(v) !== Math.sign(typical) || Math.abs(v) < floor) continue;
+    const gap = day - prev;
+    if (gap < 0.65 * I) continue;
+    if (gap > 1.35 * I) return null; // a missed payment: not a steady continuation
+    // on a busy day it may have arrived with something else: take only its usual size
+    hits.push([day, Math.abs(v) > 1.5 * Math.max(...recent.map(Math.abs)) ? typical : v]);
+    prev = day;
+  }
+  return hits.length >= Math.max(1, expected - 1) && dataEnd - prev <= 1.35 * I ? hits : null;
+}
+
 function growthFactor(g: number, mode: GrowthMode, from: Day, to: Day, fyStartMonth: number): number {
   if (!g) return 1;
   if (mode === 'annual_step') return Math.pow(1 + g, fyOf(to, fyStartMonth) - fyOf(from, fyStartMonth));
@@ -220,14 +253,24 @@ export function runForecast(req: ForecastRequest): ForecastResult {
     const G = (from: Day, to: Day) => growthFactor(g, mode, from, to, fyM);
 
     // ---------- series (subtract from history; project active ones) ----------
-    const catSeries: SeriesBasis[] = method === 'series' ? basis.series.filter((s) => s.catIdx === c) : [];
+    let catSeries: SeriesBasis[] = method === 'series' ? basis.series.filter((s) => s.catIdx === c) : [];
     let residual = row;
+    const renamed: { signature: string; from: Day }[] = [];
     if (catSeries.length) {
       residual = row.slice();
       for (const s of catSeries) for (let k = 0; k < s.days.length; k++) {
         const d = s.days[k] - agg.startDay;
         if (d >= 0 && d < agg.D) residual[d] -= s.amounts[k];
       }
+      // a payment that "stopped" but carries on under a new name (a department renamed, say)
+      catSeries = catSeries.map((s) => {
+        if (s.active) return s;
+        const cont = continuation(s, residual, agg.startDay, dataEnd);
+        if (!cont) return s;
+        for (const [day, v] of cont) residual[day - agg.startDay] -= v;
+        renamed.push({ signature: s.signature, from: cont[0][0] });
+        return { ...s, active: true, lastDay: cont[cont.length - 1][0], days: Int32Array.from([...s.days, ...cont.map((x) => x[0])]), amounts: Float64Array.from([...s.amounts, ...cont.map((x) => x[1])]) };
+      });
     }
 
     // ---------- within-month distribution ----------
@@ -430,6 +473,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
         forecastTotal += projected;
         seriesExplain.push({ signature: s.signature, cadence: s.cadence, level, next, projected, active: s.active, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, regularity: s.regularity, lastDay: last, timing: tm ? 'user' : 'history' });
       }
+      for (const x of renamed) notes.push(`${x.signature} stopped under that name, but the same payment carries on from ${fmtDay(x.from)} (probably a new name), so it is still projected.`);
       const stopped = catSeries.filter((s) => !s.active);
       if (stopped.length) notes.push(`${stopped.length} series stopped before the end of the data and are not projected: ${stopped.map((s) => s.signature).slice(0, 3).join('; ')}.`);
     }

@@ -19,6 +19,7 @@ import { money, day, ago } from '../../lib/format';
 import { historyDays, MIN_HISTORY_DAYS } from '../../lib/history/cashHistory';
 import type { Scenario } from '../../lib/model';
 import { buildResultsSnapshot } from '../../lib/analysis/snapshot';
+import { PastCheck } from '../forecast/PastCheck';
 
 const FC_TABS: TabDef[] = [
   { id: 'lines', label: 'Check each line' },
@@ -28,6 +29,7 @@ const FC_TABS: TabDef[] = [
   { id: 'schedules', label: 'Schedules' },
   { id: 'setup', label: 'Starting point' },
   { id: 'result', label: 'Result' },
+  { id: 'past', label: 'Forecast vs actual' },
   { id: 'options', label: 'What you could do' },
   { id: 'breakdown', label: 'Breakdown' },
   { id: 'report', label: 'Report & Excel' },
@@ -38,6 +40,7 @@ const FC_TABS_SIMPLE: TabDef[] = [
   { id: 'lines', label: 'Check each line' },
   { id: 'before', label: 'Known items and cash' },
   { id: 'result', label: 'Your forecast' },
+  { id: 'past', label: 'Forecast vs actual' },
   { id: 'options', label: 'What you could do' },
   { id: 'report', label: 'Report & Excel' },
 ];
@@ -46,6 +49,7 @@ const FC_TABS_SIMPLE: TabDef[] = [
 const RESULT_TABS = ['result', 'options', 's-breakdown', 'breakdown', 'scenarios', 'report'];
 
 const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
+  past: { what: <>What this forecast would have said a while ago, using only the history up to then, against what actually happened. The <strong>orange dashed line</strong> is the forecast made then, the <strong>navy line</strong> what happened.</>, why: 'The best way to judge a forecast is to see how it would have done before. It also shows which lines need your knowledge, such as one-off items.', todo: 'Pick how long ago. Open “Where it was out” to see which categories differed most.' },
   before: { what: 'Three short things before you see the result: anything coming up (a land sale, a grant ending, a pay award), your starting cash and minimum, and, if you have it, your deal register.', todo: 'Add anything you know about and check the starting cash. Your forecast updates as you go.' },
   lines: { what: 'Our proposal for each kind of income and spending, worked out from your history: how big it is, how it is growing, and when it is paid.', why: 'A forecast is only as good as its parts. Checking each line takes a few minutes and means every figure is one you have agreed.', todo: <>Open each line, check what we found, change anything you know better (e.g. salaries <strong>+3%</strong> for a pay award, or paid on the <strong>last working day</strong>), then click <strong>Looks right</strong>.</> },
   report: { what: 'Take the forecast away: a ready-made report (print or save as PDF) and an Excel workbook with every number.', todo: 'Click View and download for the report, or Download Excel.' },
@@ -139,7 +143,7 @@ export function ForecastStep() {
             : <><h3>Your forecast appears once every line is checked</h3><p><strong>{rv.left.length}</strong> of {rv.main.length + rv.small.length} still to check. It takes a few minutes: open each line and click <strong>Looks right</strong>, or change it first.</p><button className="btn primary lg" onClick={() => setTab('lines')}>Check the lines <i className="bi bi-arrow-right" /></button></>}
         </div>
       )}
-      {!locked && !RESULT_TABS.includes(tab) && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
+      {!locked && !RESULT_TABS.includes(tab) && tab !== 'past' && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
       {!(locked && RESULT_TABS.includes(tab)) && <Explain compact what={help.what} why={help.why} todo={help.todo} />}
 
       {tab === 'result' && !locked && (
@@ -191,6 +195,7 @@ export function ForecastStep() {
           )}
         </div>
       )}
+      {tab === 'past' && <PastCheck sc={sc} />}
       {tab === 'options' && !locked && <StrategyView b={b} />}
       {tab === 'report' && !locked && <SaveStep embedded />}
       {tab === 's-start' && <><RegisterCard /><SimpleStart sc={sc} upd={upd} b={b} /></>}

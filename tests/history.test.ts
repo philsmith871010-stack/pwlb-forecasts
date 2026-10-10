@@ -10,6 +10,7 @@ import { DEFAULT_CATEGORIES } from '../src/lib/categories';
 import { runForecast } from '../src/lib/forecast/engine';
 import { fromSession, mergeHistory, basisFromHistory, historySpan, historyBytes, historyBefore } from '../src/lib/history/cashHistory';
 import { isoFromDay, addMonths, dayFromISO } from '../src/lib/dates';
+import { runBacktest, backtestFromHistory } from '../src/lib/forecast/backtest';
 
 const cfg = { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true };
 
@@ -34,6 +35,20 @@ describe('cash history', async () => {
   const fc = (basis: NonNullable<ReturnType<typeof basisFromHistory>>) => runForecast({ basis, categories: DEFAULT_CATEGORIES, settings, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 0 });
   const net12 = (f: ReturnType<typeof fc>) => f.net.reduce((t, v) => t + v, 0);
   const catIds = res.catIds;
+
+  it('tests the forecast a year back from the saved history alone, as the files do', () => {
+    const h = fromSession(ds, res);
+    const cutoff = addMonths(full.dataEnd + 1, -12);
+    const o = { cutoff, horizonMonths: 12, categories: DEFAULT_CATEGORIES, settings: { lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {} }, includeActualOneOffs: false, fyStartMonth: 4 };
+    const fromFiles = runBacktest(ds, res, full.agg, o);
+    const fromHist = backtestFromHistory(h, o)!;
+    expect(fromHist.H).toBe(fromFiles.H);
+    const end = fromHist.H - 1;
+    // what actually happened is the same to the penny; the forecast within a small margin of the year's flow
+    expect(fromHist.actualCum[end]).toBeCloseTo(fromFiles.actualCum[end], 0);
+    const gross = fromFiles.errorAt.find((e) => e.months === 12)!.actualAbsFlow;
+    expect(Math.abs(fromHist.forecastCum[end] - fromFiles.forecastCum[end]) / gross).toBeLessThan(0.01);
+  });
 
   it('holds no bank lines, and forecasts exactly as the files do', () => {
     const h = fromSession(ds, res);

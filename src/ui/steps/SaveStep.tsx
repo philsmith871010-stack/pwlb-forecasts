@@ -10,8 +10,8 @@ import { buildHistorySummary } from '../../lib/analysis/snapshot';
 import { buildWorkbook } from '../../lib/export/xlsx';
 import { ReportView } from '../report/ReportView';
 import type { BacktestResult } from '../../lib/forecast/backtest';
+import { pastForecast } from '../forecast/PastCheck';
 import { ago, money, day } from '../../lib/format';
-import { addMonths, ymdFromDay, dayFromYMD } from '../../lib/dates';
 import { APP_NAME } from '../../config';
 
 export function SaveStep({ embedded }: { embedded?: boolean } = {}) {
@@ -21,7 +21,7 @@ export function SaveStep({ embedded }: { embedded?: boolean } = {}) {
 
 function SimpleSave({ embedded }: { embedded?: boolean }) {
   const s = useStore();
-  const { team, agg, cat, dirty, teamName, saveTeam, updateTeam, user, setUser } = s;
+  const { team, agg, dirty, teamName, saveTeam, updateTeam, user, setUser } = s;
   const sc = team.forecasts.find((f) => f.id === s.activeScenarioId) ?? team.forecasts[0];
   const b0 = useForecast(sc);
   // nothing is shared until the forecast has been checked line by line
@@ -29,11 +29,9 @@ function SimpleSave({ embedded }: { embedded?: boolean }) {
   const eyebrow = useEyebrow('save');
   const [busy, setBusy] = useState<string | null>(null);
   const [view, setView] = useState<'cards' | 'report'>('cards');
-  const defaultBacktest = async (): Promise<BacktestResult | null> => {
-    if (!cat || !s.ingest) return null;
-    const { y, m } = ymdFromDay(addMonths(s.ingest.maxDay + 1, -24));
-    return engine().backtest({ cutoff: dayFromYMD(y, m, 1), horizonMonths: 12, categories: team.categories, settings: sc.settings, includeActualOneOffs: false, fyStartMonth: +team.settings.financialYearStart.split('-')[0] || 4 });
-  };
+  // the same check as "Forecast vs actual": the forecast a year ago against what happened
+  const defaultBacktest = async (): Promise<BacktestResult | null> =>
+    sc ? pastForecast(team.cashHistory ?? s.historyBase, 12, team.categories, sc, +team.settings.financialYearStart.split('-')[0] || 4) : null;
   const save = async () => {
     if (agg && team.settings.includeHistorySummary) updateTeam((t) => ({ ...t, historySummary: buildHistorySummary(agg) }));
     await saveTeam(fsAccessSupported() && teamName ? 'save' : fsAccessSupported() ? 'saveAs' : 'download');
@@ -144,11 +142,9 @@ function AdvancedSave() {
     if (agg && team.settings.includeHistorySummary) updateTeam((t) => ({ ...t, historySummary: buildHistorySummary(agg) }));
   };
   const doSave = async (mode: 'save' | 'saveAs' | 'download') => { prepareSnapshot(); await saveTeam(mode); };
-  const defaultBacktest = async (): Promise<BacktestResult | null> => {
-    if (!cat || !s.ingest) return null;
-    const { y, m } = ymdFromDay(addMonths(s.ingest.maxDay + 1, -24));
-    return engine().backtest({ cutoff: dayFromYMD(y, m, 1), horizonMonths: 12, categories: team.categories, settings: sc.settings, includeActualOneOffs: false, fyStartMonth: +team.settings.financialYearStart.split('-')[0] || 4 });
-  };
+  // the same check as "Forecast vs actual": the forecast a year ago against what happened
+  const defaultBacktest = async (): Promise<BacktestResult | null> =>
+    sc ? pastForecast(team.cashHistory ?? s.historyBase, 12, team.categories, sc, +team.settings.financialYearStart.split('-')[0] || 4) : null;
 
   return (
     <div className="page">

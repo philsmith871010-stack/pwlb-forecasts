@@ -266,3 +266,16 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - A line asked about as a possible loan isn't also listed as an item to sort.
 - **History's "over these N years"** uses the span actually held (it said 4 for nearly 5).
 - **Wording:** the "not advice" note no longer repeats "Options to discuss"; "section 151" is lower case; a few dashes became plain punctuation.
+
+## Forecast vs actual
+
+- **A new Forecast tab, "Forecast vs actual".** It shows what the method would have forecast 6 months, a year or 2 years ago (default a year), using only the history up to then, against what actually happened. The page has:
+  - one sentence with a plain verdict ("very close" under 2% of the cash that flowed, "close" under 5%, otherwise "some way out");
+  - one chart (the forecast then with its likely range, and the actual line);
+  - three figures;
+  - "Where it was out" (the categories that differed most, with one-offs named, since no method can foresee them).
+- **It works from the saved history alone** (`backtestFromHistory`): the history before the cut-off is what the forecast learns from, the history after it is what happened. The original backtest needed the bank lines loaded this session, so day-to-day users never saw it. A test checks the two agree: actuals to the penny, the forecast within 1% of the year's flow.
+- **Everyday cash only, with nothing added by hand.** It uses the method you'd use today (your lookback and methods), without your known items, which you couldn't have known then. Loans and investments are left out, as in the forecast.
+- **It needs a year and a half of history:** a year to learn from, six months to compare with. Below that, the tab says so.
+- **The report and Excel use the same check** (a year ago), so the report's "Backtest not available" is gone.
+- **The comparison exposed a weakness, now fixed: payments that change name.** A regular payment whose bank reference changes looked like it had stopped, and its replacement hadn't paid often enough to be recognised. Real examples are a department renamed (DLUHC to MHCLG in 2024) or "VAT REPAYMENT" becoming "VAT REFUND". In the example, a year back, about £14m a year of grants and the whole of VAT reclaims (forecast £0) dropped out of the forecast. Now a "stopped" payment is kept going when amounts in its recent range keep arriving in the same category on the same rhythm, right up to the end of the data. This applies to monthly or less frequent payments only, where such amounts stand out. The line's notes say so. A payment that really stops is still treated as stopped, the cautious default. In the example a year back, the gap fell from £40.2m to £26.1m, and six months back from £22.6m to £11.2m. The current forecast is unchanged.

@@ -273,7 +273,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           <thead><tr><th>After</th><th>Date</th><th className="n">Central forecast</th><th className="n">Likely range</th><th className="n">Width</th></tr></thead>
           <tbody>{rangeAt.map((x) => <tr key={x.mo}><td>{x.mo} months</td><td>{fmtDay(x.day)}</td><td className="n"><strong>{m(x.mid)}</strong></td><td className="n">{m(x.lo)} to {m(x.hi)}</td><td className="n">{m(x.hi - x.lo)}</td></tr>)}</tbody>
         </table>
-        <h3>Backtest</h3>
+        <h3>Forecast vs actual: a year ago</h3>
         {bt ? (
           <>
             <p className="r-intro">The same forecast, produced as if it were <strong>{fmtDay(bt.cutoff)}</strong> using only the data available then, against what actually happened over the following year.</p>
@@ -293,7 +293,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
             </table>
             <p className="r-caption">The forecast captures the regular cash rhythm; one-off items (land sales, ad hoc grants) need judgement and should be entered as known items when they are expected.</p>
           </>
-        ) : <p className="r-muted">A backtest replays the method on past bank statements and compares it with what actually happened. It needs the statements themselves loaded in History; this report was built from the saved daily totals.</p>}
+        ) : <p className="r-muted">This compares the forecast the method would have made a year ago with what actually happened. It needs at least a year and a half of history: a year to learn from, and six months to compare with.</p>}
         <div className="r-two" style={{ marginTop: 10 }}>
           <div>
             <h3>Data quality</h3>

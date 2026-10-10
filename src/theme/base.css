@@ -876,3 +876,4 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
   .streambar::-webkit-scrollbar { display: none; }
   .streambar button { flex: none; white-space: nowrap; }
 }
+@media (max-width: 640px) { .g3 { grid-template-columns: 1fr; } }

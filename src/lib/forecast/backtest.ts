@@ -3,7 +3,8 @@ import type { Dataset } from '../ingest/ingest';
 import type { CatResult } from '../categorise/engine';
 import type { Category } from '../categories';
 import type { ForecastSettings } from '../model';
-import { buildBasisAsOf, Aggregates } from '../analysis/aggregates';
+import { buildBasisAsOf, Aggregates, ForecastBasis } from '../analysis/aggregates';
+import { basisFromHistory, historyBefore, type CashHistory } from '../history/cashHistory';
 import { runForecast } from './engine';
 import { Day, isoFromDay, addMonths, monthIndex, MONTH_NAMES, monthFromIndex } from '../dates';
 
@@ -37,8 +38,24 @@ export interface BacktestResult {
 }
 
 export function runBacktest(ds: Dataset, res: CatResult, full: Aggregates, o: BacktestOptions): BacktestResult {
+  return backtestFromBasis(buildBasisAsOf(ds, res, o.cutoff), full, o);
+}
+
+/**
+ * The same test from the saved cash history alone (no bank lines needed): the history before the
+ * cut-off is what the forecast learns from; the history after it is what actually happened.
+ */
+export function backtestFromHistory(h: CashHistory, o: BacktestOptions): BacktestResult | null {
+  const catIds = o.categories.map((c) => c.id);
+  const full = basisFromHistory(h, catIds);
+  const before = basisFromHistory(historyBefore(h, o.cutoff), catIds);
+  if (!full || !before) return null;
+  return backtestFromBasis(before, full.agg, o);
+}
+
+/** Forecast from `basis` (data up to the cut-off) and compare with `full` (what happened). */
+export function backtestFromBasis(basis: ForecastBasis, full: Aggregates, o: BacktestOptions): BacktestResult {
   const t0 = performance.now();
-  const basis = buildBasisAsOf(ds, res, o.cutoff);
   const end = Math.min(addMonths(o.cutoff, o.horizonMonths) - 1, full.startDay + full.D - 1);
   const fc = runForecast({
     basis,

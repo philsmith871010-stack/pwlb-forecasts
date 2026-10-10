@@ -63,3 +63,40 @@ describe('money format', async () => {
     setExactAmounts(false);
   });
 });
+
+describe('a regular payment under a new name', async () => {
+  const { basisFromHistory } = await import('../src/lib/history/cashHistory');
+  const { runForecast } = await import('../src/lib/forecast/engine');
+  const { DEFAULT_CATEGORIES } = await import('../src/lib/categories');
+  const { dayFromYMD, addMonths } = await import('../src/lib/dates');
+  const catIds = DEFAULT_CATEGORIES.map((c) => c.id);
+  const ci = catIds.indexOf('grants_general');
+  /** A quarterly £3.5m grant for three years; then, if `renamed`, the same grant under a new name. */
+  const history = (renamed: boolean) => {
+    const cells: number[] = [], occ: [number, number, number][] = [];
+    const from = dayFromYMD(2022, 4, 10), end = dayFromYMD(2025, 3, 31);
+    for (let k = 0; k < 12; k++) {
+      const d = addMonths(from, 3 * k);
+      if (d > end) break;
+      const paidUnderOldName = d < dayFromYMD(2024, 8, 1);
+      if (!paidUnderOldName && !renamed) continue;
+      cells.push(d, ci, 0, 350_000_000);
+      if (paidUnderOldName) occ.push([d, 350_000_000, 0]);
+    }
+    cells.push(end, ci, 0, 1); // the statement runs to the end of March
+    return { v: 1 as const, updatedAt: '', cats: [...catIds, 'uncategorised'], accounts: [{ key: 'a', ranges: [[dayFromYMD(2022, 4, 1), end]] as [number, number][], opening: 0, openingDay: dayFromYMD(2022, 4, 1), closing: null, closingDay: null }], cells: [cells], series: [{ sig: 'DLUHC S# GRANT', cat: 'grants_general', dir: 1 as const, occ }] };
+  };
+  const grantsNextYear = (renamed: boolean) => {
+    const basis = basisFromHistory(history(renamed), catIds)!;
+    const fc = runForecast({ basis, categories: DEFAULT_CATEGORIES, settings: { start: '2025-04-01', end: '2026-03-31', granularity: 'monthly', openingPosition: 0, lookbackYears: 3, recencyWeight: 0.7, methodByCategory: {}, includePossible: false, bandZ: 1.645 }, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 0, defaultOpening: 0 });
+    return fc.explain.find((e) => e.id === 'grants_general')!;
+  };
+  it('keeps projecting it when the same amount carries on under the new name', () => {
+    const e = grantsNextYear(true);
+    expect(e.forecastTotal).toBeGreaterThan(12e6);
+    expect(e.notes.some((n) => n.includes('carries on'))).toBe(true);
+  });
+  it('treats it as stopped when nothing replaces it', () => {
+    expect(grantsNextYear(false).forecastTotal).toBeLessThan(1e6);
+  });
+});
