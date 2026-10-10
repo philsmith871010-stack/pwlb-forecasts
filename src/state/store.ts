@@ -103,6 +103,8 @@ export const EXAMPLE_OPTIONS: GeneratorOptions = { seed: 'northbridge', startFY:
 interface State {
   /** past the landing page */
   entered: boolean;
+  /** the example's practice run: the screens visited so far (kept in this browser) */
+  practiceSeen: string[];
   /** an in-app confirmation waiting for an answer (the browser's own pop-ups can be blocked) */
   confirmBox: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput; resolve: (yes: boolean) => void } | null;
   /** every figure in pounds and pence, rather than £m / £k */
@@ -174,6 +176,7 @@ interface Actions {
   saveProfile: (name: string, profileName: string) => void;
   generateDemo: (o: GeneratorOptions) => Promise<void>;
   enter: (ws: Workspace) => Promise<void>;
+  markSeen: (key: string) => void;
   setExactAmounts: (v: boolean) => void;
   askConfirm: (o: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput }) => Promise<boolean>;
   switchWorkspace: (ws: Workspace) => Promise<void>;
@@ -183,6 +186,8 @@ interface Actions {
   loadRegisterFile: (f: File) => Promise<void>;
   useExampleRegister: () => Promise<void>;
   clearRegister: () => Promise<void>;
+  /** the deal register kept in this browser for this workspace, read again */
+  restoreRegister: () => Promise<void>;
   runIngest: () => Promise<boolean>;
   runCategorise: () => Promise<void>;
   useSavedHistory: () => void;
@@ -192,7 +197,7 @@ interface Actions {
   setMergeChoice: (key: string, v: 'mine' | 'theirs') => void;
   newScenario: (name: string, from?: Scenario) => string;
   /** freeze this forecast as it stands, to compare with what actually happens */
-  signOff: (fc: ForecastResult, sc: Scenario, note?: string) => SignedForecast;
+  signOff: (fc: ForecastResult, sc: Scenario, note?: string, by?: string) => SignedForecast;
   updateScenario: (id: string, fn: (s: Scenario) => Scenario) => void;
   deleteScenario: (id: string) => void;
   setActiveScenario: (id: string | null) => void;
@@ -208,6 +213,14 @@ const LS_WS = 'cfi.workspace';
 const teamKey = (ws: Workspace) => (ws === 'example' ? 'cfi.teamCache.example2' : 'cfi.teamCache');
 // the ready-made example of earlier versions: the example is now set up step by step
 try { localStorage.removeItem('cfi.teamCache.example'); } catch { /* storage unavailable */ }
+/** The deal register is kept in this browser like the rest: the file itself (or, in the example, a marker). */
+const registerKey = (ws: Workspace) => (ws === 'example' ? 'cfi.register.example' : 'cfi.register');
+function keepRegister(ws: Workspace, v: string | null) {
+  try { if (v === null) localStorage.removeItem(registerKey(ws)); else localStorage.setItem(registerKey(ws), v); } catch { /* storage full or unavailable: it's read again next time */ }
+}
+const toBase64 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+const fromBase64 = (t: string) => Uint8Array.from(atob(t), (c) => c.charCodeAt(0));
+
 function persistTeam(json: string) { lsSet(teamKey(useStore.getState().space), json); }
 function cachedTeam(ws: Workspace): TeamFile {
   const cached = lsGet(teamKey(ws));
@@ -231,6 +244,7 @@ export function defaultSettings(basis: ForecastBasis | null): ForecastSettings {
 
 export const useStore = create<State & Actions>((set, get) => ({
   entered: false,
+  practiceSeen: (() => { try { return JSON.parse(lsGet('cfi.practice') ?? '[]') as string[]; } catch { return []; } })(),
   confirmBox: null,
   exactAmounts: initialExact,
   space: initialWs,
@@ -289,6 +303,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     const list = stepsFor(get().advanced);
     const i = list.findIndex((s) => s.id === step);
     set((s) => ({ step, reached: Math.max(s.reached, i) }));
+    get().markSeen(step);
     document.querySelector('.main')?.scrollTo({ top: 0 });
   },
   next: () => {
@@ -412,6 +427,13 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setExactAmounts: (v) => { lsSet('cfi.exact', v ? '1' : '0'); setExactAmountsFormat(v); set({ exactAmounts: v }); },
 
+  markSeen: (key) => {
+    if (get().space !== 'example' || get().practiceSeen.includes(key)) return;
+    const seen = [...get().practiceSeen, key];
+    lsSet('cfi.practice', JSON.stringify(seen));
+    set({ practiceSeen: seen });
+  },
+
   enter: async (ws) => {
     set({ entered: true });
     get().goto('home');
@@ -428,7 +450,9 @@ export const useStore = create<State & Actions>((set, get) => ({
         sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, ingestError: null,
       });
     }
-    // the example starts empty and is set up step by step, exactly as your own council would be
+    // the example starts empty and is set up step by step, exactly as your own council would be;
+    // a deal register chosen before is read again
+    await get().restoreRegister();
     // stay on the same job, now working from this workspace's saved history
     const st = get().step;
     if (st === 'forecast' || st === 'history' || st === 'load' || st === 'review') get().goto(st === 'forecast' ? 'forecast' : 'history');
@@ -460,15 +484,19 @@ export const useStore = create<State & Actions>((set, get) => ({
     const ws = get().space;
     try { localStorage.removeItem(teamKey(ws)); } catch { /* storage unavailable */ }
     const team = emptyTeamFile(ws === 'example' ? 'Northbridge Council (example)' : undefined);
+    if (ws === 'example') { lsSet('cfi.practice', '[]'); set({ practiceSeen: [] }); }
+    keepRegister(ws, null);
     set({ team, historyBase: null, historyReport: null, historyOnly: false, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, activeScenarioId: null, sessionChanges: [] });
   },
 
   loadRegisterFile: async (f) => {
     set({ registerBusy: true, registerError: null });
     try {
-      const info = await engine().loadRegister(new Uint8Array(await f.arrayBuffer()), f.name);
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const info = await engine().loadRegister(bytes.slice(), f.name);
       set({ register: info, registerBusy: false });
-      get().toast(`Deal register read: ${info.stats.loans} loans, ${info.stats.deals} deals`, 'ok');
+      keepRegister(get().space, JSON.stringify({ name: f.name, data: toBase64(bytes) }));
+      get().toast(`Deal register added: ${info.loans.length} loans and ${info.investments.length} investments`, 'ok');
       if (get().ingest) await get().runCategorise();
     } catch (e) {
       set({ registerBusy: false, registerError: (e as Error).message });
@@ -478,7 +506,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   useExampleRegister: async () => {
     set({ registerBusy: true, registerError: null });
     try {
-      set({ register: await engine().useExampleRegister(), registerBusy: false });
+      const info = await engine().useExampleRegister();
+      set({ register: info, registerBusy: false });
+      keepRegister(get().space, JSON.stringify({ example: true }));
+      get().toast(`Deal register added: ${info.loans.length} loans and ${info.investments.length} investments`, 'ok');
       if (get().ingest) await get().runCategorise();
     } catch (e) {
       set({ registerBusy: false, registerError: (e as Error).message });
@@ -487,8 +518,20 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   clearRegister: async () => {
     await engine().clearRegister();
+    keepRegister(get().space, null);
     set({ register: null, registerError: null });
     if (get().ingest) await get().runCategorise();
+  },
+
+  restoreRegister: async () => {
+    const ws = get().space;
+    let kept: { name?: string; data?: string; example?: boolean } | null = null;
+    try { kept = JSON.parse(localStorage.getItem(registerKey(ws)) ?? 'null'); } catch { kept = null; }
+    if (!kept || get().register) return;
+    try {
+      const info = kept.example ? await engine().useExampleRegister() : await engine().loadRegister(fromBase64(kept.data ?? ''), kept.name ?? 'register.xlsx');
+      if (get().space === ws) set({ register: info });
+    } catch { keepRegister(ws, null); }
   },
 
   runIngest: async () => {
@@ -643,8 +686,8 @@ export const useStore = create<State & Actions>((set, get) => ({
     }
   },
 
-  signOff: (fc, sc, note) => {
-    const rec = signForecast(fc, sc, { id: uid('so'), signedAt: new Date().toISOString(), signedBy: get().user || 'Not named', note: note || undefined, knownItems: knownItemsOf(sc, get().team.categories) });
+  signOff: (fc, sc, note, by) => {
+    const rec = signForecast(fc, sc, { id: uid('so'), signedAt: new Date().toISOString(), signedBy: by || get().user || 'Not named', note: note || undefined, knownItems: knownItemsOf(sc, get().team.categories) });
     get().updateTeam((t) => ({ ...t, signedOff: [...(t.signedOff ?? []), rec] }));
     return rec;
   },

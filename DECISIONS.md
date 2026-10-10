@@ -359,3 +359,26 @@ New features should stay on this side of the line. Signing off and monitoring a 
 
 - **The day's statement replaced the history when both happened in one session.** The saved history the new files join was captured only when a workspace opened, so loading years of statements and then today's statement, without a reload, kept only the day. Each read now starts from the history as saved at that moment.
 - **A forecast is judged only after a month of actuals** (`MIN_COMPARE_DAYS`). Home and Today's statement feature the newest sign-off with at least that much. A newer one says "too early to tell" and gives the first month end it'll be judged at, instead of a one-day verdict.
+
+## A first-time evaluator's ten minutes
+
+Walked through as someone deciding in ten minutes whether to buy. Changes:
+- **Landing:** the outcome first ("Know when your council will need to borrow, and how much, straight from its bank statements"). The main button is "Try it with an example council", noted as about five minutes with no files; "Start with my council's data" is the other.
+- **A practice guide bar** (`PracticeBar`) under the header throughout the example. It shows eight steps as dots, "n of 8", what to do on this screen, and a Go button when you're elsewhere. For a step that's just a look, it has the way on ("On to the forecast", "See the board report", "On to today's statement"). It ends with what was done, the board report, and "Start with my council". The steps:
+  1. load the history;
+  2. check the sorting;
+  3. look back;
+  4. check the forecast;
+  5. see it and sign it off;
+  6. what you could do, and the board report;
+  7. today's statement;
+  8. forecast vs actual.
+
+  Progress comes from the data where it can (history loaded, lines checked, your sign-off, statement added) and otherwise from screens visited, kept in this browser and reset with "Start the practice again". The example's Home takes its next step from the same guide, and its job cards' ticks follow it, so they never disagree. The page-level practice notes that only repeated the bar are gone. The ones that add something stay: the register card, Known items, Monitor.
+- **The example's file boxes say what the click does** ("Click to choose the example council's files", with "With your own council: drag your bank's CSV files here" underneath). "Add more files" isn't offered in the example.
+- **Check the sorting:**
+  - the deal register is offered at the top when there are five or more loan questions;
+  - "Done for now" is also in the progress bar, so nobody scrolls past every card to move on;
+  - adding a register confirms it ("Deal register added: 17 loans and 4 investments").
+- **Signing off in the example** is pre-filled "You (practice)", which isn't kept as your name.
+- **The deal register is now kept in this browser**, per workspace (the file itself, or a marker for the example's), and read again when the workspace opens. Before, a reload silently dropped it: the forecast changed (£278.2m became £192.8m) and the options asked for the register again. It's removed with Remove and with "Clear saved work". Like the cash history it stays on this computer.

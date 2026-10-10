@@ -1,7 +1,7 @@
 // Today's statement: drop it in, see the day sorted, sort anything new, save. One screen.
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Progress, PracticeNote } from '../components/common';
+import { PageHead, Progress } from '../components/common';
 import { DayCard } from '../history/HistoryCards';
 import { SortCard, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
@@ -36,9 +36,6 @@ export function TodayPage() {
         </div>
       )}
 
-      {space === 'example' && !busy && !short && (
-        <PracticeNote>Each morning you’d download yesterday’s statement from online banking and drop it in the box below. Here, clicking the box picks the example council’s statement for 31 Mar 2026: nothing is uploaded.</PracticeNote>
-      )}
 
       {busy && (
         <div className="card card-pad"><div className="row"><span className="spinner" /><strong className="navy">{ingestBusy ? 'Reading your statement…' : 'Sorting…'}</strong></div>
@@ -77,8 +74,9 @@ function TodayDrop({ onFiles, onPick }: { onFiles: (f: File[]) => void; onPick?:
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); onFiles([...e.dataTransfer.files]); }}>
       <i className="bi bi-file-earmark-arrow-up big-icon" />
-      <h3>Drop today’s statement here</h3>
-      <p>or <span className="link">click to choose it</span>. One file per account is fine: CSV from your online banking.</p>
+      {onPick
+        ? <><h3>Click to choose the example’s statement for 31 Mar 2026</h3><p>With your own council: drop the day’s statement here, or click to choose it</p></>
+        : <><h3>Drop today’s statement here</h3><p>or <span className="link">click to choose it</span>. One file per account is fine: CSV from your online banking.</p></>}
       <input ref={input} type="file" accept=".csv,.txt,.tsv,text/csv" multiple hidden onChange={(e) => { onFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
     </div>
   );

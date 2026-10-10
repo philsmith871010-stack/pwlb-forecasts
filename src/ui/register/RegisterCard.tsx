@@ -6,7 +6,8 @@ import { PracticeNote } from '../components/common';
 const TEMPLATE_URL = `${import.meta.env.BASE_URL}templates/pwlb-register.xlsx`;
 
 /** Step 1: add the council's deal register (the PWLBtoday workbook), optional but recommended. */
-export function RegisterCard() {
+/** `quiet`: no practice note of its own (the page has one); `hint`: what the register does here. */
+export function RegisterCard({ quiet, hint }: { quiet?: boolean; hint?: string } = {}) {
   const { register, registerBusy, registerError, loadRegisterFile, clearRegister, cat, ingest, space, useExampleRegister } = useStore();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -54,10 +55,10 @@ export function RegisterCard() {
         <div style={{ flex: 1 }}>
           <h3 style={{ margin: 0 }}>Add your deal register</h3>
           <p className="small" style={{ margin: '4px 0 0' }}>
-            The spreadsheet of your loans and investments (the one used for PWLBtoday reports). With it, repayments, maturities and
-            interest are in the forecast, and the options say how much to borrow and for how long.
+            {hint ?? <>The spreadsheet of your loans and investments (the one used for PWLBtoday reports). With it, repayments, maturities and
+            interest are in the forecast, and the options say how much to borrow and for how long.</>}
           </p>
-          {space === 'example' && <div className="mt"><PracticeNote>With your own council you’d choose your deal register spreadsheet. Here, <strong>Choose register</strong> picks the example council’s: nothing is uploaded.</PracticeNote></div>}
+          {space === 'example' && !quiet && <div className="mt"><PracticeNote>With your own council you’d choose your deal register spreadsheet. Here, <strong>Choose register</strong> picks the example council’s: nothing is uploaded.</PracticeNote></div>}
           {registerError && <div className="callout red mt"><strong>We couldn’t read that register.</strong> {registerError}</div>}
           <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
             <button className="btn navy" disabled={registerBusy} onClick={() => (space === 'example' ? void useExampleRegister() : input.current?.click())}>

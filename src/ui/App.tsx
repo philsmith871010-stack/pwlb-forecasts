@@ -3,6 +3,7 @@ import { useStore, StepId, STREAMS, streamOf, streamSteps, type StreamId } from 
 import { Toasts, Modal } from './components/common';
 import { LoadStep } from './steps/LoadStep';
 import { MonitorPage } from './steps/MonitorPage';
+import { PracticeBar } from './components/PracticeBar';
 import { MappingStep } from './steps/MappingStep';
 import { CategoriseStep } from './steps/CategoriseStep';
 import { ReviewStep } from './steps/ReviewStep';
@@ -74,6 +75,7 @@ export function App() {
       </header>
 
       <main className="main" id="main">
+        <PracticeBar />
         {current && streamSteps(current, advanced).length > 1 && (
           <div className="streambar">
             {streamSteps(current, advanced).map((x, i) => (

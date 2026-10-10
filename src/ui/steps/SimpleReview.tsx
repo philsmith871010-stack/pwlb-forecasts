@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RegisterCard } from '../register/RegisterCard';
 import { useStore, useEyebrow } from '../../state/store';
-import { PageHead, StepFooter, Money, PracticeNote } from '../components/common';
+import { PageHead, StepFooter, Money } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
 import { money, pctDone, day, int } from '../../lib/format';
@@ -76,13 +76,15 @@ export function SimpleReview() {
         <div style={{ flex: 1 }}>
           <div className="meter" style={{ height: 12 }}><div style={{ width: `${cat.valueCategorisedPct * 100}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
           <div className="small muted" style={{ marginTop: 8 }}>
-            {allDone ? 'Nothing left to check. Well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to check</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. You don’t have to do them all: small amounts make little difference.</>}
+            {allDone ? 'Nothing left to check. Well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to check</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. You don’t have to do them all: small amounts make little difference. <button className="link-btn" onClick={() => goto('history')}>Done for now: look back</button></>}
           </div>
         </div>
         {catBusy && <span className="spinner" title="Updating" />}
       </div>
 
-      {useStore.getState().space === 'example' && !allDone && <PracticeNote>The rules sorted almost everything. These are the few they weren’t sure about. Choose what each one is and click <strong>Save</strong>: your choice becomes a rule, so next time it’s sorted for you.</PracticeNote>}
+      {!register && questions.length >= 5 && !allDone && (
+        <section className="review-sec"><RegisterCard quiet hint={`Quicker than answering the ${questions.length} loan questions below: the register lists your loans and investments, so most are recognised for you.`} /></section>
+      )}
       {useStore.getState().advanced && <RegisterNote />}
 
       {allDone ? (
@@ -104,12 +106,6 @@ export function SimpleReview() {
             <section className="review-sec">
               <h3>Possible loans or investments <span className="muted">({questions.length})</span></h3>
               <p className="small muted">Loans and investments are left out of the everyday forecast, so it matters which these are. Each says why we’re asking.</p>
-              {!register && questions.length >= 5 && (
-                <div className="mb">
-                  <p className="small" style={{ margin: '0 0 4px' }}><strong>Quicker: add your deal register.</strong> It lists your loans and investments, so most of these are recognised without asking.</p>
-                  <RegisterCard />
-                </div>
-              )}
               <div className="stack" style={{ gap: 12 }}>{questions.slice(0, 12).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</div>
             </section>
           )}

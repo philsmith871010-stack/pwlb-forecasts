@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
-import { PageHead, Progress, Counter, Explain, PracticeNote } from '../components/common';
+import { PageHead, Progress, Counter, Explain } from '../components/common';
 import { downloadBlob } from '../../lib/teamfile';
 import { bytes, day, int, pctDone } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
@@ -11,7 +11,6 @@ import { AddMoreFiles } from '../components/AddMoreFiles';
 export function LoadStep() {
   const s = useStore();
   const eyebrow = useEyebrow('load');
-  const realSources = s.sources.filter((x) => !x.demo);
   const busy = !!s.ingestBusy || (!!s.catBusy && !s.cat);
   const done = !!s.ingest && !!s.cat && !busy;
   const saved = s.historyBase;
@@ -39,11 +38,6 @@ export function LoadStep() {
               ? <>Bank statement exports (<strong>CSV files</strong>) for the days since your history ends, or any period you want to load again. One day is fine.</>
               : <>Bank statement exports — the <strong>CSV files</strong> you can download from your online banking. Three to five years is ideal.</>}
             todo="Drag your files into the box below. Several files (different accounts or years) is fine." />
-          {s.space === 'example' && realSources.length === 0 && (
-            <PracticeNote>{s.sources.length
-              ? <>These are the example council’s statement files, listed just as yours will be once chosen. Next, click <strong>Read my files</strong>.</>
-              : <>With your own council you’d drag your bank’s CSV files into the box below, or click it to choose them. Here, clicking the box picks the example council’s files instead: nothing is uploaded.</>}</PracticeNote>
-          )}
           {s.space === 'example' && s.advanced && !s.sources.length && <DemoCard />}
           {!(s.space === 'example' && s.sources.length) && <UploadCard />}
           {s.sources.length > 0 && <FileList />}
@@ -66,8 +60,9 @@ function UploadCard() {
       onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
       onDrop={(e) => { e.preventDefault(); setOver(false); void addFiles([...e.dataTransfer.files]); }}>
       <i className="bi bi-file-earmark-arrow-up big-icon" />
-      <h3>Use my bank files</h3>
-      <p>Drag CSV files here, or <span className="link">click to choose them</span></p>
+      {space === 'example'
+        ? <><h3>Click to choose the example council’s files</h3><p>With your own council: drag your bank’s CSV files here, or click to choose them</p></>
+        : <><h3>Use my bank files</h3><p>Drag CSV files here, or <span className="link">click to choose them</span></p></>}
       <input ref={input} type="file" accept=".csv,.txt,.tsv,text/csv" multiple hidden onChange={(e) => { void addFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
     </div>
   );
@@ -157,7 +152,7 @@ function DoneCard() {
         <span className="muted">{toCheck > 0 ? 'Next, you’ll confirm a few items we weren’t sure about.' : 'Everything was sorted confidently.'}</span>
         <button className="btn primary lg" onClick={() => { setStepTab('review', 'overview'); goto('review'); }}>Next: check the sorting <i className="bi bi-arrow-right" /></button>
       </div>
-      <div className="xs muted row" style={{ marginTop: 12, gap: 10 }}><AddMoreFiles /> <span>or use different files: <button className="link-btn" onClick={() => useStore.setState({ ingest: null, cat: null, agg: null, basis: null, sources: [], demo: null })}>Start again</button></span></div>
+      {!demo && <div className="xs muted row" style={{ marginTop: 12, gap: 10 }}><AddMoreFiles /> <span>or use different files: <button className="link-btn" onClick={() => useStore.setState({ ingest: null, cat: null, agg: null, basis: null, sources: [], demo: null })}>Start again</button></span></div>}
     </div>
   );
 }

@@ -85,6 +85,9 @@ export function ForecastStep() {
   const TABS = advanced ? FC_TABS : FC_TABS_SIMPLE;
   const [tab, setTab] = useStepTab(advanced ? 'forecast' : 'forecast-simple', TABS);
   const chartRef = useRef<ECharts | null>(null);
+  // the practice run notes which forecast screens have been seen
+  const markSeen = useStore((st) => st.markSeen);
+  useEffect(() => { markSeen(`fc:${tab}`); }, [tab, markSeen]);
 
   // keep a results snapshot on the scenario so it can be viewed without the CSV (debounced)
   useEffect(() => {
@@ -155,7 +158,6 @@ export function ForecastStep() {
               {fc.breaches.length > 0 ? <>Cash first drops below {money(fc.buffer)} on <strong>{day(fc.breaches[0].from)}</strong>.</> : <>Cash stays above {money(fc.buffer)} throughout.</>}
             </p>
           )}
-          {space === 'example' && <PracticeNote>Happy with it? Sign it off, as your treasury lead would. A signed-off forecast is kept exactly as it stands and compared with what happens under <strong>Monitor</strong>.</PracticeNote>}
           <SignOffRow b={b} sc={sc} onSee={() => useStore.getState().goto('monitor')} />
           <Panel title={fc.register ? 'Your cash, with your loans and investments: past and forecast' : 'Your everyday cash: past and forecast'} sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
             right={advanced ? <>
@@ -200,7 +202,6 @@ export function ForecastStep() {
           <section><h3>Loans and investments {!useStore.getState().register && <span className="muted small">(optional)</span>}</h3><RegisterCard /></section>
         </div>
       )}
-      {tab === 'lines' && space === 'example' && rv.left.length > 0 && <PracticeNote>We’ve proposed each line from the example’s history. Open a few, see what we found, change anything if you like (try salaries +3% for a pay award), and click <strong>Looks right</strong>. When you’re happy, <strong>Accept all</strong> does the rest.</PracticeNote>}
       {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
       {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}
       {tab === 's-breakdown' && !locked && <SimpleBreakdown b={b} />}
@@ -331,7 +332,7 @@ function ForecastStart() {
 
 /** Sign off the forecast as it stands, or show that this version already has been. */
 function SignOffRow({ b, sc, onSee }: { b: ForecastBundle; sc: Scenario; onSee: () => void }) {
-  const { team, user, setUser, askConfirm, signOff, toast } = useStore();
+  const { team, user, setUser, askConfirm, signOff, toast, space } = useStore();
   const fc = b.fc;
   const mine = (team.signedOff ?? []).filter((x) => x.scenarioId === sc.id).sort((a, z) => a.signedAt.localeCompare(z.signedAt));
   const latest = mine[mine.length - 1];
@@ -343,11 +344,12 @@ function SignOffRow({ b, sc, onSee }: { b: ForecastBundle; sc: Scenario; onSee: 
       title: 'Sign off this forecast?',
       body: `It’s kept exactly as it stands (may need to borrow ${money(fc.borrowingRequirement)} by ${day(fc.low.day)}), and compared with what actually happens as new statements come in. You can still change the forecast afterwards; the signed-off version stays as it was.`,
       ok: 'Sign off',
-      input: { label: 'Signed off by', value: user, placeholder: 'Your name', onValue: (v) => { name = v; } },
+      // the practice run signs as "You (practice)", and doesn't keep it as your name
+      input: { label: 'Signed off by', value: space === 'example' ? user || 'You (practice)' : user, placeholder: 'Your name', onValue: (v) => { name = v; } },
     });
     if (!yes) return;
-    if (name !== user) setUser(name);
-    signOff(fc, sc);
+    if (name !== user && space !== 'example') setUser(name);
+    signOff(fc, sc, undefined, name);
     toast(`Signed off. See it against what happens under Forecast vs actual.`);
   };
   return current ? (

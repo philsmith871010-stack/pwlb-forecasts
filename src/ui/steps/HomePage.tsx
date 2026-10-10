@@ -19,11 +19,12 @@ export function HomePage() {
             <div>
               <div className="pill-live"><span className="dot ok" /> A PWLBtoday tool · runs entirely in your browser</div>
               <h1>{APP_NAME_PARTS[0]}<span>{APP_NAME_PARTS[1]}</span></h1>
-              <p className="home-lead">Your council’s bank statements, sorted, understood and forecast.</p>
+              <p className="home-lead">Know when your council will need to borrow, and how much, straight from its bank statements.</p>
               <div className="landing-ctas">
-                <button className="btn primary xl" onClick={() => void enter('mine')}>Enter <i className="bi bi-arrow-right" /></button>
-                <button className="btn xl on-dark" onClick={() => void enter('example')}><i className="bi bi-mortarboard" /> Practise on an example council</button>
+                <button className="btn primary xl" onClick={() => void enter('example')}><i className="bi bi-play-fill" /> Try it with an example council</button>
+                <button className="btn xl on-dark" onClick={() => void enter('mine')}>Start with my council’s data <i className="bi bi-arrow-right" /></button>
               </div>
+              <p className="landing-try">The example takes about five minutes and needs no files: you go through every step, just as with your own council.</p>
             </div>
             <Preview />
           </div>
