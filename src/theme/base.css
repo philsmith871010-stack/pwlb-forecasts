@@ -796,3 +796,7 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 .register-start > h3 { margin: 0 0 6px; color: var(--pt-navy); }
 .register-only { margin-top: 14px; }
 .build-progress .accept-all { margin-top: 6px; }
+.day-tbl tr.clickable { cursor: pointer; }
+.day-tbl tr.clickable:hover td { background: var(--pt-line-soft); }
+.day-tbl td.chev { width: 28px; color: var(--pt-muted); text-align: right; }
+.why-line { margin: 0; font-size: 15px; color: var(--pt-text); }

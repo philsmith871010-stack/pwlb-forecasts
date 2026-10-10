@@ -62,7 +62,7 @@ export function HistoryAddedNote({ gapsOnly }: { gapsOnly?: boolean } = {}) {
 
 /** For a day (or a few) of bank data: the sorted day, by category, with every line a click away. */
 export function DayCard({ onSort }: { onSort?: () => void } = {}) {
-  const { ingest, cat, team, goto, setStepTab, historyBase, activeScenarioId, register } = useStore();
+  const { ingest, cat, team, goto, setStepTab, historyBase, activeScenarioId } = useStore();
   const [rows, setRows] = useState<TxnRow[] | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const catVersion = useStore((s) => s.catVersion);
@@ -109,7 +109,7 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
         <i className="bi bi-calendar-check" />
         <div>
           <h2>{one ? <>Your day: {day(ingest.minDay)}</> : <>Your days: {day(ingest.minDay)} to {day(ingest.maxDay)}</>}</h2>
-          <p>{int(ingest.rows)} bank lines, sorted with your team’s rules, across {ingest.accounts.length} account{ingest.accounts.length > 1 ? 's' : ''}.</p>
+          <p>{int(ingest.rows)} bank lines across {ingest.accounts.length} account{ingest.accounts.length > 1 ? 's' : ''}. Click a category to see its lines.</p>
         </div>
       </div>
       {unsorted > 0 && (
@@ -117,22 +117,21 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
           <button className="link-btn" onClick={() => { if (onSort) onSort(); else { setStepTab('review-simple', 'unsorted'); goto('review'); } }}>Sort {unsorted > 1 ? 'them' : 'it'} now</button></div>
       )}
       <table className="tbl day-tbl">
-        <thead><tr><th>Category</th><th className="num">Lines</th><th className="num">In</th><th className="num">Out</th><th /></tr></thead>
+        <thead><tr><th>Category</th><th className="num">In</th><th className="num">Out</th><th /></tr></thead>
         <tbody>
           {list.map(([idx, g]) => {
             const h = head(idx);
             const showHead = h && h !== lastHead; lastHead = h;
             return [
-              showHead ? <tr key={`h${idx}`} className="grp"><td colSpan={5}>{h}</td></tr> : null,
-              <tr key={idx} className={idx < 0 ? 'warn' : ''}>
-                <td>{idx >= 0 ? <CatBadge cat={team.categories.find((c) => c.id === cat.catIds[idx])} /> : <strong>{catName(idx)}</strong>}</td>
-                <td className="num">{int(g.n)}</td>
+              showHead ? <tr key={`h${idx}`} className="grp"><td colSpan={4}>{h}</td></tr> : null,
+              <tr key={idx} className={`clickable ${idx < 0 ? 'warn' : ''} ${open === idx ? 'open' : ''}`} onClick={() => setOpen(open === idx ? null : idx)} title="Show the lines">
+                <td>{idx >= 0 ? <CatBadge cat={team.categories.find((c) => c.id === cat.catIds[idx])} /> : <strong>{catName(idx)}</strong>} <span className="xs muted">· {int(g.n)} line{g.n > 1 ? 's' : ''}</span></td>
                 <td className="num">{g.inn ? <Money v={g.inn} /> : ''}</td>
                 <td className="num">{g.out ? <Money v={g.out} /> : ''}</td>
-                <td><button className="link-btn xs" onClick={() => setOpen(open === idx ? null : idx)}>{open === idx ? 'Hide lines' : 'See lines'}</button></td>
+                <td className="chev"><i className={`bi ${open === idx ? 'bi-chevron-up' : 'bi-chevron-down'}`} /></td>
               </tr>,
               open === idx ? (
-                <tr key={`l${idx}`} className="lines"><td colSpan={5}>
+                <tr key={`l${idx}`} className="lines"><td colSpan={4}>
                   <table className="tbl tbl-sm"><tbody>{g.rows.slice(0, 200).map((r) => (
                     <tr key={r.i}><td className="xs muted" style={{ width: 90 }}>{day(r.day)}</td><td className="xs">{r.narrative}</td><td className="xs muted">{r.account}</td><td className="num xs"><Money v={r.amount} /></td></tr>
                   ))}</tbody></table>
@@ -143,7 +142,7 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
         </tbody>
       </table>
       <div className="day-foot small">
-        <span>Everyday cash {one ? 'on the day' : 'over these days'}: <strong>{money(everyday, { sign: true })}</strong>{expected !== null && <span className="muted"> · your forecast expected about {money(expected, { sign: true })}</span>}{register ? <span className="muted"> (loans and investments are shown separately above)</span> : ''}.</span>
+        <span>Everyday cash {one ? 'on the day' : 'over these days'}: <strong>{money(everyday, { sign: true })}</strong>{expected !== null && <span className="muted"> · your forecast expected about {money(expected, { sign: true })}</span>}.</span>
       </div>
       <div className="done-next">
         <span className="muted"><i className="bi bi-check2-circle green" /> {one ? 'This day is' : 'These days are'} now in your cash history, saved in this browser.</span>

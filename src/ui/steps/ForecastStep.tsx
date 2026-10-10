@@ -113,9 +113,7 @@ export function ForecastStep() {
   return (
     <div className="page">
       <PageHead eyebrow={eyebrow} title={locked ? 'Build your forecast' : 'Your cash forecast'} actions={advanced ? <ScenarioBar /> : undefined}>
-        {locked
-          ? <>We’ve drafted it from your history. Check each line, add what you know is coming, then see the result.</>
-          : <>Your regular cash pattern carried forward, plus what you know is coming. The lowest point is how much you may need to borrow.</>}
+        {locked ? <>We’ve drafted it from your history. Check each line, add what you know is coming, then see the result.</> : null}
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />
       {locked && tab !== 'lines' && !RESULT_TABS.includes(tab) && rv.left.length > 0 && (
@@ -138,10 +136,17 @@ export function ForecastStep() {
             <Kpi label="You may need to borrow" value={money(fc.borrowingRequirement)} sub={fc.borrowingRequirement > 0 ? `by ${day(fc.low.day)}, to keep at least ${money(fc.buffer)} in the bank` : `you stay above ${money(fc.buffer)} throughout`} />
             <Kpi light label="Lowest point" value={money(fc.low.amount)} sub={`on ${day(fc.low.day)}`} />
           </div>
-          <div className="summary-box" aria-live="polite">
-            <div className="eyebrow">In plain English{advanced ? ` · ${sc.name}` : ''}</div>
-            <SummaryText text={fc.summary} />
-          </div>
+          {advanced ? (
+            <div className="summary-box" aria-live="polite">
+              <div className="eyebrow">In plain English · {sc.name}</div>
+              <SummaryText text={fc.summary} />
+            </div>
+          ) : (
+            <p className="why-line" aria-live="polite">
+              {fc.drivers.length > 0 && <>Biggest calls on cash: <strong>{fc.drivers.map((d) => d.name.replace(/ \(.*\)$/, '').toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}</strong>. </>}
+              {fc.breaches.length > 0 ? <>Cash first drops below {money(fc.buffer)} on <strong>{day(fc.breaches[0].from)}</strong>.</> : <>Cash stays above {money(fc.buffer)} throughout.</>}
+            </p>
+          )}
           <Panel title={fc.register ? 'Your cash, with your loans and investments: past and forecast' : 'Your everyday cash: past and forecast'} sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
             right={advanced ? <>
               <Seg dark value={histMonths} onChange={setHistMonths} options={[{ v: 12, label: '1y' }, { v: 24, label: '2y' }, { v: 60, label: 'all' }]} ariaLabel="History shown" />
@@ -150,11 +155,11 @@ export function ForecastStep() {
               <button className="btn sm on-dark" title="Download chart as SVG" onClick={() => chartRef.current && void exportChart(chartRef.current, `forecast-${sc.name}`, 'svg')}>SVG</button>
             </> : <button className="btn sm on-dark" title="Download this chart as a picture" onClick={() => chartRef.current && void exportChart(chartRef.current, `forecast-${sc.name}`, 'png')}><i className="bi bi-image" /> Save picture</button>}>
             <ForecastChart b={b} granularity={gran} historyMonths={histMonths} height={460} onReady={(c) => { chartRef.current = c; }} />
-            <div className="row xs muted">
+            {advanced && <div className="row xs muted">
               <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(253,126,20,.3)' }} />shaded: the likely range — it widens because the further ahead, the less certain</span>
               <span className="legend-dot"><span style={{ color: 'var(--pt-orange)' }}>◆</span> a change or one-off you added</span>
               {fc.breaches.length > 0 && <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(176,70,50,.25)' }} />below your minimum cash</span>}
-            </div>
+            </div>}
           </Panel>
           <details className="fold">
             <summary>See it by category</summary>

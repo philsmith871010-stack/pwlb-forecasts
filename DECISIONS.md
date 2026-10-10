@@ -202,3 +202,13 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - a pointer to load statements, since only those show when cash runs short.
 - **"Accept all N remaining as proposed"** returns to Check each line at the user's request, behind a confirmation that says the lines haven't been opened. This reverses the earlier "every line opened individually" decision. Any line can still be opened and changed afterwards.
 - **The example council's deal register is always connected:** it loads on entering or switching to the example (including after a reload), and its card says "connected", with no upload, replace or remove.
+
+## Third simplification pass
+
+- **Today's statement:**
+  - "sorted and added to your history" is said once, not three times;
+  - categories are clickable rows (with line counts) instead of a Lines column and "See lines" links;
+  - "Load a different statement" is gone.
+- **Look back:** the year cards stay and the duplicate bar chart below them goes. View tabs are unnumbered, so they don't read as steps under the History strip.
+- **Check each line:** the progress card is the count, "Accept all", and "Import a schedule from another department"; the separate import banner is gone.
+- **Your forecast:** the two figures and one "why" sentence (biggest calls on cash, first dip below the minimum) replace the plain-English paragraph, which repeated the figures. The paragraph remains with advanced tools and in the report. No subtitle once unlocked, and the chart's extra key line shows only with advanced tools.

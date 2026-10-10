@@ -82,7 +82,7 @@ export function HistoryStep() {
         actions={advanced ? <Seg value={mode} onChange={setMode} options={[{ v: 'fy', label: 'Financial years' }, { v: 'calendar', label: 'Calendar years' }]} /> : undefined}>
         The patterns in your past cash that the forecast will build on. Years run April to March.
       </PageHead>
-      <StepTabs tabs={TABS} value={tab} onChange={setTab} />
+      <StepTabs tabs={TABS} value={tab} onChange={setTab} numbered={false} />
       <Explain compact what={help.what} why={help.why} todo={help.todo} />
       {h && tab === 'simple-years' && <SimpleYears h={h} />}
       {h && tab === 'years' && <Overview h={h} part="years" />}
@@ -577,19 +577,6 @@ function SimpleYears({ h }: { h: H }) {
           </div>
         ))}
       </div>
-      <Panel title="Money in and money out each year" sub="everyday money only — loans and investments are left out">
-        <EChart height={320} ariaLabel="Money in and out by year" option={{
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: number) => money(v) },
-          legend: { top: 0, right: 0 },
-          grid: { left: 70, right: 16, top: 34, bottom: 30 },
-          xAxis: { type: 'category', data: rows.map((r) => r.y.label + (r.y.complete ? '' : ' (part)')) },
-          yAxis: { type: 'value', min: 0, axisLabel: { formatter: axisMoney } },
-          series: [
-            { name: 'Money in', type: 'bar', data: rows.map((r) => r.inn), itemStyle: { color: '#2caffe', borderRadius: [4, 4, 0, 0] } },
-            { name: 'Money out', type: 'bar', data: rows.map((r) => -r.out), itemStyle: { color: '#fd7e14', borderRadius: [4, 4, 0, 0] } },
-          ],
-        }} />
-      </Panel>
     </div>
   );
 }

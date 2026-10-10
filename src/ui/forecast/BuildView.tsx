@@ -108,7 +108,7 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
           <div className="small muted" style={{ marginTop: 6 }}>
             {checked.length === all.length
               ? <><strong className="navy">Every line is checked.</strong> Next: anything you know is coming, and your starting cash.</>
-              : <>Open each line below and click <strong>Looks right</strong> when it is. Your forecast appears once every line is checked.</>}
+              : null}
           </div>
           {checked.length < all.length && (
             <button className="link-btn small accept-all" onClick={() => {
@@ -116,13 +116,10 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
               if (window.confirm(`Accept all ${left.length} remaining line${left.length > 1 ? 's' : ''} as proposed, without opening ${left.length > 1 ? 'them' : 'it'}? You can still open and change any line afterwards.`)) { mark(left.map((e) => e.id)); setOpen(null); }
             }}>Accept all {all.length - checked.length} remaining as proposed</button>
           )}
+          <button className="link-btn small accept-all" style={{ marginLeft: 16 }} onClick={() => setImporting(true)} title="Excel or CSV with dates, categories and amounts, e.g. from Finance or HR"><i className="bi bi-file-earmark-arrow-up" /> Import a schedule from another department</button>
         </div>
       </div>
 
-      <div className="build-actions">
-        <span className="small"><strong>Had figures from another department?</strong> Import their schedule (Excel or CSV, with dates, categories and amounts) and we’ll put each figure in the right line.</span>
-        <button className="btn" onClick={() => setImporting(true)}><i className="bi bi-file-earmark-arrow-up" /> Import a schedule</button>
-      </div>
       {importing && <ImportWizard b={b} upd={upd} onClose={() => setImporting(false)} />}
 
       {main.map(card)}

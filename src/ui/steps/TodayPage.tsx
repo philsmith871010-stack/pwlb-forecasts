@@ -25,7 +25,7 @@ export function TodayPage() {
   return (
     <div className="page narrow">
       <PageHead title="Today’s statement">
-        {short ? <>Sorted with your team’s rules and added to your history.</>
+        {short ? null
           : span ? <>Your saved history runs to <strong>{day(span.to)}</strong>. Drop in the statement for the days since: we’ll sort it with your team’s rules and add it to your history.</>
           : <>Drop in a bank statement for a day or a few days. We’ll sort it with your team’s rules.</>}
       </PageHead>
@@ -60,9 +60,6 @@ export function TodayPage() {
         <>
           <DayCard onSort={() => sortRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           <div ref={sortRef}><TodaySorting /></div>
-          <div className="row mt" style={{ justifyContent: 'center' }}>
-            <button className="link-btn small" onClick={() => useStore.setState({ sources: [], ingest: null, cat: null })}>Load a different statement</button>
-          </div>
         </>
       )}
     </div>
