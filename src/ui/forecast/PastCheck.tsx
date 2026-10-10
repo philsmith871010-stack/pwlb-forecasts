@@ -1,11 +1,12 @@
 // Forecast vs actual: the forecast this method would have made a while ago, from the history
 // up to then, against what actually happened. Works from the saved history alone.
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { Kpi, Panel, Seg } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, pct, day } from '../../lib/format';
-import { addMonths, dayFromYMD, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
+import { addMonths, dayFromYMD, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
+import { compareSigned, fullMonthsLabel } from '../../lib/forecast/signoff';
 import { backtestFromHistory, type BacktestResult } from '../../lib/forecast/backtest';
 import { historySpan, type CashHistory } from '../../lib/history/cashHistory';
 import type { Category } from '../../lib/categories';
@@ -32,7 +33,54 @@ export function pastForecast(h: CashHistory | null, months: number, categories: 
 
 const CHOICES = [{ v: 6, label: '6 months ago' }, { v: 12, label: 'A year ago' }, { v: 24, label: '2 years ago' }];
 
+/** "Forecast vs actual": your signed-off forecasts against what happened, or a test of the method. */
 export function PastCheck({ sc }: { sc: Scenario }) {
+  const signed = useStore((s) => s.team.signedOff ?? []);
+  const [view, setView] = useState<'signed' | 'method'>('signed');
+  const v = signed.length ? view : 'method';
+  return (
+    <div className="stack">
+      {signed.length > 0 && <Seg value={v} onChange={setView} options={[{ v: 'signed', label: `Signed-off forecasts (${signed.length})` }, { v: 'method', label: 'Test the method' }]} ariaLabel="What to compare" />}
+      {v === 'signed' ? <SignedView /> : <MethodCheck sc={sc} />}
+      {!signed.length && <p className="xs muted" style={{ margin: 0 }}>When you sign off a forecast (on <strong>Your forecast</strong>), it’s kept exactly as it stands and compared here with what actually happens as new statements come in.</p>}
+    </div>
+  );
+}
+
+/** Your signed-off forecasts, newest first, each against what has happened since. */
+function SignedView() {
+  const { team, historyBase } = useStore();
+  const h = team.cashHistory ?? historyBase;
+  const list = [...(team.signedOff ?? [])].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+  const [id, setId] = useState(list[0]?.id);
+  const rec = list.find((x) => x.id === id) ?? list[0];
+  const r = useMemo(() => (rec && h ? compareSigned(rec, h, team.categories) : null), [rec, h, team.categories]);
+  if (!rec) return null;
+  const signedOn = day(dayFromISO(rec.signedAt.slice(0, 10)));
+  return (
+    <>
+      <div className="signed-list" role="radiogroup" aria-label="Signed-off forecast">
+        {list.map((x) => (
+          <button key={x.id} role="radio" aria-checked={x.id === rec.id} className={x.id === rec.id ? 'on' : ''} onClick={() => setId(x.id)}>
+            <strong>{x.scenarioName}</strong>
+            <span>Signed off {day(dayFromISO(x.signedAt.slice(0, 10)))} · {x.signedBy}</span>
+          </button>
+        ))}
+      </div>
+      <div className="signed-meta small">
+        <div><i className="bi bi-patch-check-fill" /> Signed off on <strong>{signedOn}</strong> by <strong>{rec.signedBy}</strong>. At the time: may need to borrow <strong>{money(rec.borrowingNeed)}</strong>, lowest point {money(rec.low)} on {day(dayFromISO(rec.lowDay))}.</div>
+        {rec.note && <div className="muted">“{rec.note}”</div>}
+        {rec.knownItems.length > 0 && <div className="muted">Added by hand: {rec.knownItems.join('; ')}.</div>}
+      </div>
+      {r ? <PastResult r={r} intro={<>Signed off on {signedOn}, the forecast said</>} sofar={dayFromISO(rec.end) > r.end} handAdded={rec.knownItems.length > 0}
+        chartNote="Exactly as signed off, including anything added by hand. Everyday cash only: loans, investments and transfers between your own accounts are left out."
+        catsLabel={fullMonthsLabel(r) ? `over the complete months so far, ${fullMonthsLabel(r)}` : ''} />
+        : <div className="callout navy small">Nothing to compare yet: no statements from {day(dayFromISO(rec.start))} onwards have come in. As each new statement arrives, it’s compared with this forecast.</div>}
+    </>
+  );
+}
+
+function MethodCheck({ sc }: { sc: Scenario }) {
   const { team, historyBase } = useStore();
   const h = team.cashHistory ?? historyBase;
   const fy = +team.settings.financialYearStart.split('-')[0] || 4;
@@ -50,28 +98,31 @@ export function PastCheck({ sc }: { sc: Scenario }) {
 
   if (!choices.length) return <div className="callout navy small">This needs at least a year and a half of history: a year to learn from, and six months to compare with.</div>;
   return (
-    <div className="stack">
+    <>
       <div className="row">
         <span className="small muted">What the forecast would have said</span>
         <Seg value={m} onChange={setMonths} options={choices} ariaLabel="When the forecast was made" />
         {busy && <span className="spinner sm" />}
       </div>
-      {r && <PastResult r={r} months={m} />}
-    </div>
+      {r && <PastResult r={r} intro={<>{m === 12 ? 'A year ago' : `${m === 6 ? 'Six months' : 'Two years'} ago`}, on {day(r.cutoff)}, using only the history up to then, the forecast said</>}
+        chartNote="Everyday cash only: loans, investments and transfers between your own accounts are left out, as in the forecast. The forecast used the method you’d use today, with nothing added by hand." />}
+    </>
   );
 }
 
-function PastResult({ r, months }: { r: BacktestResult; months: number }) {
+function PastResult({ r, intro, chartNote, sofar, catsLabel, handAdded }: { r: BacktestResult; intro: ReactNode; chartNote: string; sofar?: boolean; catsLabel?: string; handAdded?: boolean }) {
   const end = r.H - 1;
   const fc = r.forecastCum[end], act = r.actualCum[end], gap = act - fc;
-  const gross = r.errorAt.find((e) => e.months === months)?.actualAbsFlow ?? r.monthly.actualNet.reduce((t, v) => t + Math.abs(v), 0);
+  // the cash that flowed in and out over the period, for scale
+  let gross = 0;
+  for (let d = 0; d < r.H; d++) gross += Math.abs(r.actualCum[d] - (d ? r.actualCum[d - 1] : 0));
   const share = gross ? Math.abs(gap) / gross : 0;
   let inside = 0;
   for (let d = 0; d < r.H; d++) if (r.actualCum[d] >= r.lowerCum[d] && r.actualCum[d] <= r.upperCum[d]) inside++;
   const oneOffs = r.actualCum[end] - r.actualCoreCum[end];
   const verdict = share < 0.02 ? { word: 'Very close', cls: 'green' } : share < 0.05 ? { word: 'Close', cls: 'green' } : { word: 'Some way out', cls: 'soft' };
   const move = (v: number, past = false) => (v < 0 ? `${past ? 'fell' : 'fall'} by ${money(-v)}` : `${past ? 'rose' : 'rise'} by ${money(v)}`);
-  const ago = months === 12 ? 'A year ago' : `${months === 6 ? 'Six months' : 'Two years'} ago`;
+  const months = Math.round(r.H / 30.44);
 
   const option = useMemo(() => {
     const x: string[] = [], f: number[] = [], a: number[] = [], lo: number[] = [], w: number[] = [];
@@ -101,24 +152,26 @@ function PastResult({ r, months }: { r: BacktestResult; months: number }) {
     <>
       <div className="summary-box">
         <div className="eyebrow">In a sentence <span className={`badge ${verdict.cls}`} style={{ marginLeft: 8 }}>{verdict.word}</span></div>
-        {ago}, on {day(r.cutoff)}, using only the history up to then, the forecast said everyday cash would <strong>{move(fc)}</strong> by {day(r.end)}. It actually <strong>{move(act, true)}</strong>: {Math.abs(gap) < 0.05e6 ? 'almost exactly as forecast' : <>a difference of <strong>{money(Math.abs(gap))}</strong>, {pct(share)} of the {money(gross)} that flowed in and out</>}.
-        {Math.abs(oneOffs) >= 1e6 && <> One-off items, which no forecast from history can see, account for {money(oneOffs, { sign: true })} of what happened.</>}
+        {intro} everyday cash would <strong>{move(fc)}</strong> by {day(r.end)}{sofar ? ' (the latest statement)' : ''}. It actually <strong>{move(act, true)}</strong>: {Math.abs(gap) < 0.05e6 ? 'almost exactly as forecast' : <>a difference of <strong>{money(Math.abs(gap))}</strong>, {pct(share)} of the {money(gross)} that flowed in and out</>}.
+        {Math.abs(oneOffs) >= 1e6 && (handAdded
+          ? <> One-off items account for {money(oneOffs, { sign: true })} of what happened; only those added by hand were in the forecast.</>
+          : <> One-off items, which no forecast from history can see, account for {money(oneOffs, { sign: true })} of what happened.</>)}
       </div>
 
       <div className="grid g3">
         <Kpi label="Forecast made then" value={money(fc, { sign: true })} sub={`change in everyday cash to ${day(r.end)}`} />
-        <Kpi light label="What actually happened" value={money(act, { sign: true })} sub={`over the same ${months} months`} />
+        <Kpi light label="What actually happened" value={money(act, { sign: true })} sub={`over the same ${months === 1 ? 'month' : `${months} months`}`} />
         <Kpi light label="Inside the likely range" value={pct(inside / r.H, 0)} sub="of the days" />
       </div>
 
       <Panel title="Forecast made then, against what happened" sub={`change in everyday cash since ${day(r.cutoff)}`}>
         <EChart option={option} height={340} ariaLabel="A past forecast against what actually happened" />
-        <p className="xs muted" style={{ margin: '6px 0 0' }}>Everyday cash only: loans, investments and transfers between your own accounts are left out, as in the forecast. The forecast used the method you’d use today, with nothing added by hand.</p>
+        <p className="xs muted" style={{ margin: '6px 0 0' }}>{chartNote}</p>
       </Panel>
 
       {rows.length > 0 && (
         <details className="fold">
-          <summary>Where it was out</summary>
+          <summary>Where it was out{catsLabel ? <span className="muted" style={{ fontWeight: 400 }}> · {catsLabel}</span> : null}</summary>
           <table className="tbl simple-tbl">
             <thead><tr><th>Category</th><th className="num">Forecast</th><th className="num">Actual</th><th className="num">Difference</th><th /></tr></thead>
             <tbody>{rows.map((c) => {

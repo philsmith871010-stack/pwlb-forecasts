@@ -5,6 +5,9 @@ import type { TeamFile, Rule, Scenario, TxnOverride, SeriesOverride, ForecastSet
 import { uid } from '../lib/model';
 import { emptyTeamFile, parseTeamFile, serialiseTeamFile, teamHash, fsAccessSupported, readHandle, writeHandle, saveAsWithPicker, downloadText, mergeTeamFiles, MergeConflict } from '../lib/teamfile';
 import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
+import { signForecast, knownItemsOf, type SignedForecast } from '../lib/forecast/signoff';
+import { exampleSignOffs } from '../lib/forecast/exampleSignoffs';
+import type { ForecastResult } from '../lib/forecast/engine';
 import { mergeHistory, basisFromHistory, historyBefore, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
@@ -88,7 +91,7 @@ interface State {
   /** past the landing page */
   entered: boolean;
   /** an in-app confirmation waiting for an answer (the browser's own pop-ups can be blocked) */
-  confirmBox: { title: string; body: string; ok: string; danger?: boolean; resolve: (yes: boolean) => void } | null;
+  confirmBox: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput; resolve: (yes: boolean) => void } | null;
   /** every figure in pounds and pence, rather than £m / £k */
   exactAmounts: boolean;
   space: Workspace;
@@ -160,7 +163,7 @@ interface Actions {
   tryDayToDay: () => Promise<void>;
   enter: (ws: Workspace) => Promise<void>;
   setExactAmounts: (v: boolean) => void;
-  askConfirm: (o: { title: string; body: string; ok: string; danger?: boolean }) => Promise<boolean>;
+  askConfirm: (o: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput }) => Promise<boolean>;
   switchWorkspace: (ws: Workspace) => Promise<void>;
   setupExample: () => Promise<void>;
   useExampleStatement: () => Promise<void>;
@@ -177,11 +180,16 @@ interface Actions {
   resolveMerge: (apply: boolean) => Promise<void>;
   setMergeChoice: (key: string, v: 'mine' | 'theirs') => void;
   newScenario: (name: string, from?: Scenario) => string;
+  /** freeze this forecast as it stands, to compare with what actually happens */
+  signOff: (fc: ForecastResult, sc: Scenario, note?: string) => SignedForecast;
   updateScenario: (id: string, fn: (s: Scenario) => Scenario) => void;
   deleteScenario: (id: string) => void;
   setActiveScenario: (id: string | null) => void;
   setCompare: (ids: string[]) => void;
 }
+
+/** an optional box in the confirm dialog (e.g. your name); `onValue` gets what was typed on OK */
+export interface ConfirmInput { label: string; value: string; placeholder?: string; onValue: (v: string) => void }
 
 const LS_USER = 'cfi.user';
 const LS_WS = 'cfi.workspace';
@@ -414,6 +422,11 @@ export const useStore = create<State & Actions>((set, get) => ({
       });
     }
     if (ws === 'example' && !get().team.cashHistory) await get().setupExample();
+    // an example saved before sign-offs existed gets its two signed-off forecasts
+    else if (ws === 'example' && !get().team.signedOff?.length && get().team.cashHistory) {
+      const h = get().team.cashHistory!;
+      get().updateTeam((t) => ({ ...t, signedOff: exampleSignOffs(h, t.categories, t.settings.liquidityBuffer) }));
+    }
     // the example council's deal register is always connected
     if (ws === 'example' && !get().register) await get().useExampleRegister();
     // stay on the same job, now working from this workspace's saved history
@@ -431,7 +444,8 @@ export const useStore = create<State & Actions>((set, get) => ({
       const ing = get().ingest, h = get().team.cashHistory;
       if (ing && h) {
         const base = historyBefore(h, ing.maxDay);
-        set((s) => ({ team: { ...s.team, authorityName: 'Northbridge Council (example)', cashHistory: base }, historyBase: base, historyReport: null, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null }));
+        const signedOff = exampleSignOffs(base, get().team.categories, get().team.settings.liquidityBuffer);
+        set((s) => ({ team: { ...s.team, authorityName: 'Northbridge Council (example)', cashHistory: base, signedOff }, historyBase: base, historyReport: null, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null }));
         persistTeam(JSON.stringify(get().team));
       }
     } finally { set({ exampleBusy: false }); }
@@ -628,6 +642,12 @@ export const useStore = create<State & Actions>((set, get) => ({
     } catch (e) {
       get().toast(`Could not save merged file: ${(e as Error).message}`, 'err');
     }
+  },
+
+  signOff: (fc, sc, note) => {
+    const rec = signForecast(fc, sc, { id: uid('so'), signedAt: new Date().toISOString(), signedBy: get().user || 'Not named', note: note || undefined, knownItems: knownItemsOf(sc, get().team.categories) });
+    get().updateTeam((t) => ({ ...t, signedOff: [...(t.signedOff ?? []), rec] }));
+    return rec;
   },
 
   newScenario: (name, from) => {

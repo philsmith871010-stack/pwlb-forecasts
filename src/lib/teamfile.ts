@@ -1,3 +1,4 @@
+import type { SignedForecast } from './forecast/signoff';
 import { mergeHistory, type CashHistory } from './history/cashHistory';
 // The shared team JSON file: everything the team needs except transaction data.
 import { DEFAULT_CATEGORIES } from './categories';
@@ -51,6 +52,7 @@ export function parseTeamFile(text: string): ValidationResult {
     historySummary: (o.historySummary as TeamFile['historySummary']) ?? undefined,
     cashHistory: validHistory(o.cashHistory) ? (o.cashHistory as CashHistory) : undefined,
     forecasts: arr<Scenario>('forecasts').filter((f) => f && f.id && f.settings),
+    signedOff: arr<SignedForecast>('signedOff').filter((x) => x && x.v === 1 && x.id && x.everyday && Array.isArray(x.everyday.cum)),
     changeLog: arr<TeamFile['changeLog'][number]>('changeLog'),
   };
   if (!team.categories.length) { team.categories = base.categories; warnings.push('No categories found — default categories added.'); }
@@ -122,6 +124,8 @@ export function mergeTeamFiles(mine: TeamFile, theirs: TeamFile): MergeResult {
     rules: unionBy('rule', mine.rules, theirs.rules, (r) => `${r.type} “${r.pattern}” → ${r.categoryId}`),
     bankProfiles: unionBy('bankProfile', mine.bankProfiles, theirs.bankProfiles, (p) => p.name),
     forecasts: unionBy('forecast', mine.forecasts, theirs.forecasts, (f) => f.name),
+    // sign-offs never change once made: everyone's are kept
+    signedOff: unionByKey(mine.signedOff ?? [], theirs.signedOff ?? [], (x) => x.id).sort((a, b) => a.signedAt.localeCompare(b.signedAt)),
     aliases: unionAliases(mine.aliases, theirs.aliases),
     seriesOverrides: unionByKey(mine.seriesOverrides, theirs.seriesOverrides, (s) => s.signature),
     txnOverrides: unionByKey(mine.txnOverrides, theirs.txnOverrides, (t) => t.key),

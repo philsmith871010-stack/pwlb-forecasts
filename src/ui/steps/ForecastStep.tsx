@@ -8,7 +8,8 @@ import { RegisterOverview } from '../register/RegisterOverview';
 import { SaveStep } from './SaveStep';
 import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
-import { useForecast } from '../forecast/useForecast';
+import { useForecast, type ForecastBundle } from '../forecast/useForecast';
+import { isoFromDay, dayFromISO } from '../../lib/dates';
 import { ForecastChart } from '../forecast/ForecastChart';
 import { SetupSection, MethodsSection, AssumptionsSection, OneOffsSection, PasteSection } from '../forecast/Controls';
 import { StackedView, CategoryExplorer, ForecastTable, CompareView } from '../forecast/Views';
@@ -163,6 +164,7 @@ export function ForecastStep() {
               {fc.breaches.length > 0 ? <>Cash first drops below {money(fc.buffer)} on <strong>{day(fc.breaches[0].from)}</strong>.</> : <>Cash stays above {money(fc.buffer)} throughout.</>}
             </p>
           )}
+          <SignOffRow b={b} sc={sc} onSee={() => setTab('past')} />
           <Panel title={fc.register ? 'Your cash, with your loans and investments: past and forecast' : 'Your everyday cash: past and forecast'} sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
             right={advanced ? <>
               <Seg dark value={histMonths} onChange={setHistMonths} options={[{ v: 12, label: '1y' }, { v: 24, label: '2y' }, { v: 60, label: 'all' }]} ariaLabel="History shown" />
@@ -331,6 +333,40 @@ function ForecastStart() {
         <RegisterCard />
         {register && <RegisterOverview r={register} />}
       </section>
+    </div>
+  );
+}
+
+/** Sign off the forecast as it stands, or show that this version already has been. */
+function SignOffRow({ b, sc, onSee }: { b: ForecastBundle; sc: Scenario; onSee: () => void }) {
+  const { team, user, setUser, askConfirm, signOff, toast } = useStore();
+  const fc = b.fc;
+  const mine = (team.signedOff ?? []).filter((x) => x.scenarioId === sc.id).sort((a, z) => a.signedAt.localeCompare(z.signedAt));
+  const latest = mine[mine.length - 1];
+  // the same forecast as the last sign-off: same period and the same headline
+  const current = latest && latest.start === isoFromDay(fc.start) && latest.end === isoFromDay(fc.start + fc.H - 1) && latest.borrowingNeed === Math.round(fc.borrowingRequirement) && latest.low === Math.round(fc.low.amount);
+  const sign = async () => {
+    let name = user;
+    const yes = await askConfirm({
+      title: 'Sign off this forecast?',
+      body: `It’s kept exactly as it stands (may need to borrow ${money(fc.borrowingRequirement)} by ${day(fc.low.day)}), and compared with what actually happens as new statements come in. You can still change the forecast afterwards; the signed-off version stays as it was.`,
+      ok: 'Sign off',
+      input: { label: 'Signed off by', value: user, placeholder: 'Your name', onValue: (v) => { name = v; } },
+    });
+    if (!yes) return;
+    if (name !== user) setUser(name);
+    signOff(fc, sc);
+    toast(`Signed off. See it against what happens under Forecast vs actual.`);
+  };
+  return current ? (
+    <div className="signoff-row on">
+      <i className="bi bi-patch-check-fill" /> <span>Signed off on <strong>{day(dayFromISO(latest.signedAt.slice(0, 10)))}</strong> by <strong>{latest.signedBy}</strong>.</span>
+      <button className="link-btn" onClick={onSee}>See it against what happens</button>
+    </div>
+  ) : (
+    <div className="signoff-row">
+      <span className="muted">{latest ? <>Changed since it was signed off on {day(dayFromISO(latest.signedAt.slice(0, 10)))}.</> : <>Happy with it? Sign it off to keep it as it stands and track it against what actually happens.</>}</span>
+      <button className="btn sm navy" onClick={() => void sign()}><i className="bi bi-patch-check" /> Sign off this forecast</button>
     </div>
   );
 }

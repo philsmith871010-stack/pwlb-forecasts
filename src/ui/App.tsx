@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useStore, StepId, STREAMS, streamOf, streamSteps, type StreamId } from '../state/store';
 import { Toasts, Modal } from './components/common';
 import { LoadStep } from './steps/LoadStep';
@@ -102,12 +103,21 @@ export function App() {
 /** The app's own "are you sure?" (browser pop-ups can be blocked, e.g. in embedded browsers). */
 function ConfirmDialog() {
   const box = useStore((s) => s.confirmBox);
+  const [v, setV] = useState('');
+  useEffect(() => { setV(box?.input?.value ?? ''); }, [box]);
   if (!box) return null;
+  const ok = () => { if (box.input) box.input.onValue(v.trim()); box.resolve(true); };
   return (
     <Modal title={box.title} onClose={() => box.resolve(false)}
       footer={<><button className="btn" onClick={() => box.resolve(false)}>Cancel</button>
-        <button className={`btn ${box.danger ? 'danger' : 'primary'}`} autoFocus onClick={() => box.resolve(true)}>{box.ok}</button></>}>
+        <button className={`btn ${box.danger ? 'danger' : 'primary'}`} autoFocus={!box.input} disabled={!!box.input && !v.trim()} onClick={ok}>{box.ok}</button></>}>
       <p style={{ margin: 0 }}>{box.body}</p>
+      {box.input && (
+        <div className="field" style={{ marginTop: 14 }}>
+          <label htmlFor="confirm-input">{box.input.label}</label>
+          <input id="confirm-input" className="input" autoFocus value={v} placeholder={box.input.placeholder} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) ok(); }} />
+        </div>
+      )}
     </Modal>
   );
 }

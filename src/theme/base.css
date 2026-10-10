@@ -877,3 +877,16 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
   .streambar button { flex: none; white-space: nowrap; }
 }
 @media (max-width: 640px) { .g3 { grid-template-columns: 1fr; } }
+/* signed-off forecasts */
+.signoff-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px dashed var(--pt-line); border-radius: 12px; background: #fff; font-size: 14px; }
+.signoff-row > span { flex: 1; min-width: 200px; }
+.signoff-row.on { border-style: solid; border-color: #b7e4c7; background: #f1faf4; }
+.signoff-row.on > i { color: #1e7b34; font-size: 18px; }
+.signed-list { display: flex; gap: 10px; flex-wrap: wrap; }
+.signed-list button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; font: inherit; cursor: pointer; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--pt-line); background: #fff; color: var(--pt-navy); min-width: 200px; }
+.signed-list button span { font-size: 12.5px; color: var(--pt-muted-2); }
+.signed-list button.on { border-color: var(--pt-navy); box-shadow: 0 0 0 1px var(--pt-navy) inset; }
+.signed-list button:hover:not(.on) { border-color: var(--pt-orange); }
+.signed-meta { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--pt-line-soft); }
+.signed-meta .bi-patch-check-fill { color: #1e7b34; margin-right: 4px; }
+@media (max-width: 640px) { .signed-list button { min-width: 0; flex: 1 1 100%; } }

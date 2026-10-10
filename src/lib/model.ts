@@ -1,3 +1,4 @@
+import type { SignedForecast } from './forecast/signoff';
 // Shared types: rules, bank profiles, forecasts and the team file.
 import type { Category, ForecastMethod } from './categories';
 import type { ColumnMapping } from './ingest/detect';
@@ -196,6 +197,8 @@ export interface TeamFile {
   /** daily totals by category per bank account, and regular payments: never bank lines */
   cashHistory?: CashHistory;
   forecasts: Scenario[];
+  /** forecasts as they stood when signed off: never edited, only added (see lib/forecast/signoff) */
+  signedOff?: SignedForecast[];
   changeLog: ChangeLogEntry[];
 }
 

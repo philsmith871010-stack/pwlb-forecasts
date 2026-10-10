@@ -11,6 +11,9 @@ import { runForecast } from '../src/lib/forecast/engine';
 import { fromSession, mergeHistory, basisFromHistory, historySpan, historyBytes, historyBefore } from '../src/lib/history/cashHistory';
 import { isoFromDay, addMonths, dayFromISO } from '../src/lib/dates';
 import { runBacktest, backtestFromHistory } from '../src/lib/forecast/backtest';
+import { signForecast, compareSigned } from '../src/lib/forecast/signoff';
+import { exampleSignOffs } from '../src/lib/forecast/exampleSignoffs';
+import { emptyTeamFile, parseTeamFile, serialiseTeamFile, mergeTeamFiles } from '../src/lib/teamfile';
 
 const cfg = { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true };
 
@@ -48,6 +51,38 @@ describe('cash history', async () => {
     expect(fromHist.actualCum[end]).toBeCloseTo(fromFiles.actualCum[end], 0);
     const gross = fromFiles.errorAt.find((e) => e.months === 12)!.actualAbsFlow;
     expect(Math.abs(fromHist.forecastCum[end] - fromFiles.forecastCum[end]) / gross).toBeLessThan(0.01);
+  });
+
+  it('keeps a signed-off forecast and compares it with what happened', () => {
+    const h = fromSession(ds, res);
+    const cutoff = addMonths(full.dataEnd + 1, -12);
+    const before = basisFromHistory(historyBefore(h, cutoff), catIds)!;
+    const st = { ...settings, start: isoFromDay(cutoff), end: isoFromDay(addMonths(cutoff, 24) - 1), openingPosition: 0, includePossible: false };
+    const f = runForecast({ basis: before, categories: DEFAULT_CATEGORIES, settings: st, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 0 });
+    const sc = { id: 'fc1', name: 'Base', updatedAt: '', settings: st, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [] };
+    const rec = signForecast(f, sc, { id: 'so1', signedAt: '2025-04-02T10:00:00Z', signedBy: 'Test', knownItems: [] });
+    expect(rec.everyday.cum).toHaveLength(f.H);
+    // small enough to keep many in the team file (and, later, in a database row)
+    expect(JSON.stringify(rec).length).toBeLessThan(40_000);
+    const r = compareSigned(rec, h, DEFAULT_CATEGORIES)!;
+    expect(r.H).toBe(full.dataEnd - cutoff + 1); // compared up to the latest statement
+    // the same answer as testing the method from that date
+    const bt = backtestFromHistory(h, { cutoff, horizonMonths: 12, categories: DEFAULT_CATEGORIES, settings: st, includeActualOneOffs: false, fyStartMonth: 4 })!;
+    const end = r.H - 1;
+    expect(r.actualCum[end]).toBeCloseTo(bt.actualCum[end], 0);
+    expect(Math.abs(r.forecastCum[end] - bt.forecastCum[end])).toBeLessThan(2);
+    // nothing to compare until statements after the start come in
+    expect(compareSigned({ ...rec, start: isoFromDay(full.dataEnd + 1) }, h, DEFAULT_CATEGORIES)).toBeNull();
+  });
+
+  it('keeps everyone’s sign-offs when team files are saved and merged', () => {
+    const h = fromSession(ds, res);
+    const recs = exampleSignOffs(h, DEFAULT_CATEGORIES, 10e6);
+    expect(recs.map((x) => x.scenarioName)).toEqual(['Budget forecast', 'Mid-year review']);
+    const mine = { ...emptyTeamFile('X'), signedOff: [recs[0]] }, theirs = { ...emptyTeamFile('X'), signedOff: [recs[1]] };
+    const back = parseTeamFile(serialiseTeamFile(mine, 'me', 'test').json).team!;
+    expect(back.signedOff).toEqual([recs[0]]);
+    expect(mergeTeamFiles(mine, theirs).merged.signedOff!.map((x) => x.id)).toEqual(recs.map((x) => x.id));
   });
 
   it('holds no bank lines, and forecasts exactly as the files do', () => {
