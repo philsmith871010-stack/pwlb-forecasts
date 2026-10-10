@@ -4,16 +4,19 @@ import { fmtDay, isoFromDay, Day } from './dates';
 let exactAmounts = false;
 export function setExactAmounts(v: boolean) { exactAmounts = v; }
 
-export function money(x: number, opts: { dp?: number; compact?: boolean; sign?: boolean } = {}): string {
-  const { dp, compact = true, sign = false } = opts;
+/** `unit: 'm'` keeps a whole table column in £m (so −£92k shows as −£0.1m beside £9.7m). */
+export function money(x: number, opts: { dp?: number; compact?: boolean; sign?: boolean; unit?: 'm' } = {}): string {
+  const { dp, compact = true, sign = false, unit } = opts;
   if (!isFinite(x)) return '–';
   if (exactAmounts && compact) { const f = moneyFull(x); return sign && x > 0 ? `+${f}` : f; }
   const a = Math.abs(x);
   let s: string;
-  if (compact && a >= 1e9) s = `£${(a / 1e9).toFixed(dp ?? 2)}bn`;
+  if (compact && unit === 'm' && a < 1e9) s = `£${(a / 1e6).toFixed(dp ?? 1)}m`;
+  else if (compact && a >= 1e9) s = `£${(a / 1e9).toFixed(dp ?? 2)}bn`;
   else if (compact && a >= 1e6) s = `£${(a / 1e6).toFixed(dp ?? 1)}m`;
   else if (compact && a >= 1e4) s = `£${(a / 1e3).toFixed(dp ?? 0)}k`;
   else s = `£${a.toLocaleString('en-GB', { minimumFractionDigits: dp ?? (a < 100 && a % 1 ? 2 : 0), maximumFractionDigits: dp ?? (a < 100 ? 2 : 0) })}`;
+  if (/^£0(\.0+)?m$/.test(s)) return s; // rounds to nothing: no sign
   if (x < 0) return `−${s}`;
   return sign && x > 0 ? `+${s}` : s;
 }

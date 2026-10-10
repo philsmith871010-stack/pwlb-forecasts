@@ -404,7 +404,7 @@ textarea.input { min-height: 120px; font-family: var(--font-mono); font-size: 12
 .r-tbl-tight td { padding: 3px 6px; font-size: 8.5pt; }
 .r-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
 .r-two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.r-list { margin: 0; padding-left: 16px; line-height: 1.55; font-size: 9.5pt; }
+.r-list { margin: 0; padding-left: 16px; line-height: 1.55; font-size: 10pt; }
 .r-cover { padding: 0; }
 .r-cover .r-foot { margin: 0 15mm 10mm; }
 .r-cover-band { background: radial-gradient(600px 220px at 90% 0%, rgba(253,126,20,.25), transparent 60%), var(--pt-navy-grad); color: #fff; padding: 18mm 15mm 14mm; }

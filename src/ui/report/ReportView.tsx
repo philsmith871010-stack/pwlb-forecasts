@@ -8,6 +8,7 @@ import { annualTotals, yearsOf, cagr } from '../../lib/analysis/history';
 import type { BacktestResult } from '../../lib/forecast/backtest';
 import type { Assumption } from '../../lib/model';
 import { money, pct, day, int } from '../../lib/format';
+import { historySpan } from '../../lib/history/cashHistory';
 import { fmtDay, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
 import { APP_NAME, PARENT_BRAND } from '../../config';
 import { UNCATEGORISED_COLOUR } from '../../lib/categories';
@@ -18,7 +19,8 @@ import { UNCATEGORISED_COLOUR } from '../../lib/categories';
  */
 export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () => Promise<BacktestResult | null> }) {
   const s = useStore();
-  const { team, agg, ingest, cat, basis } = s;
+  const { team, agg, ingest, cat, basis, historyBase } = s;
+  const m = (x: number, sign?: boolean) => money(x, { unit: 'm', sign }); // table figures: all in £m
   const sc = team.forecasts.find((f) => f.id === s.activeScenarioId) ?? team.forecasts[0];
   const fc = b.fc;
   const [bt, setBt] = useState<BacktestResult | null>(null);
@@ -54,6 +56,9 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
     const per = fyLabels.map((l) => { let t = 0; for (let d = 0; d < fc.H; d++) if (fyOfDay(fc.start + d) === l) t += fc.daily[e.catIdx * fc.H + d]; return t; });
     return { e, per };
   }).sort((a, z) => Math.abs(z.e.forecastTotal) - Math.abs(a.e.forecastTotal)), [fc, fyLabels]); // eslint-disable-line react-hooks/exhaustive-deps
+  // keep the table on its page: the 18 largest categories, the rest in one line
+  const shownCats = catRows.length > 19 ? catRows.slice(0, 18) : catRows;
+  const restCats = catRows.slice(shownCats.length);
   const fyNet = fyLabels.map((l) => { let t = 0; for (let d = 0; d < fc.H; d++) if (fyOfDay(fc.start + d) === l) t += fc.net[d]; return t; });
 
   // ---------- history ----------
@@ -74,6 +79,10 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
   const register = useStore((s) => s.register);
   const compare = useMemo(() => (basis && team.forecasts.length > 1 ? team.forecasts.slice(0, 4).map((f) => ({ f, r: computeForecast(basis, f, team.categories, team.settings.liquidityBuffer, fyStart, register) })) : []), [basis, team, fyStart, register]);
 
+  const span = historyBase ? historySpan(historyBase) : null;
+  // how wide the likely range gets further ahead
+  const rangeAt = [3, 6, 12, 24].map((mo) => ({ mo, k: Math.round((mo * 365.25) / 12) - 1 })).filter((x) => x.k < fc.H)
+    .map(({ mo, k }) => ({ mo, day: fc.start + k, mid: fc.cumulative[k], lo: fc.lower[k], hi: fc.upper[k] }));
   const firstBreach = fc.breaches[0];
   const horizonEnd = fc.start + fc.H - 1;
   const assumptionText = (a: Assumption): string => {
@@ -91,7 +100,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
     fc.borrowingRequirement > 0
       ? <>To keep at least <strong>{money(fc.buffer)}</strong> in the bank, the council may need to borrow about <strong>{money(fc.borrowingRequirement)}</strong> by then.</>
       : <>Cash stays above the <strong>{money(fc.buffer)}</strong> minimum throughout, so no new borrowing should be needed.</>,
-    firstBreach ? <>Cash first falls below that minimum on <strong>{fmtDay(firstBreach.from)}</strong>{fc.breaches.length > 1 ? `, and does so ${fc.breaches.length} times over the period` : ''}.</> : null,
+    firstBreach ? <>Cash first falls below that minimum on <strong>{fmtDay(firstBreach.from)}</strong>{fc.breaches.length > 1 ? `, and dips below it ${fc.breaches.length === 2 ? 'twice' : `${fc.breaches.length} times`} over the period` : ''}.</> : null,
     fc.borrowingRequirement > 0
       ? <>The highest point is <strong>{money(fc.high.amount)}</strong> on {fmtDay(fc.high.day)}, before cash falls.</>
       : <>The highest point is <strong>{money(fc.high.amount)}</strong> on {fmtDay(fc.high.day)}, the best time to invest any spare cash.</>,
@@ -113,7 +122,9 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           <div><div className="l">Lowest point</div><div className="v">{money(fc.low.amount)}</div><div className="s">{fmtDay(fc.low.day)}</div></div>
           <div className="hl"><div className="l">May need to borrow</div><div className="v">{money(fc.borrowingRequirement)}</div><div className="s">to keep {money(fc.buffer)} in the bank</div></div>
           <div><div className="l">Highest point</div><div className="v">{money(fc.high.amount)}</div><div className="s">{fmtDay(fc.high.day)}</div></div>
-          <div><div className="l">Position at end</div><div className="v">{money(fc.cumulative[fc.H - 1])}</div><div className="s">{fmtDay(horizonEnd)}</div></div>
+          {firstBreach
+            ? <div><div className="l">Below minimum from</div><div className="v">{fmtDay(firstBreach.from)}</div><div className="s">first dip below {money(fc.buffer)}</div></div>
+            : <div><div className="l">Position at end</div><div className="v">{money(fc.cumulative[fc.H - 1])}</div><div className="s">{fmtDay(horizonEnd)}</div></div>}
         </div>
         <div className="r-cover-summary">
           <div className="r-label">Summary</div>
@@ -124,7 +135,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
         </div>
         <div className="r-cover-foot">
           <div><strong>Prepared</strong> {prepared}{s.user ? ` by ${s.user}` : ''}</div>
-          <div><strong>Based on</strong> {ingest ? `${int(ingest.rows)} bank transactions, ${fmtDay(ingest.minDay)} – ${fmtDay(ingest.maxDay)}` : 'saved history'}</div>
+          <div><strong>Based on</strong> {ingest ? `${int(ingest.rows)} bank transactions, ${fmtDay(ingest.minDay)} to ${fmtDay(ingest.maxDay)}` : span ? `bank history, ${fmtDay(span.from)} to ${fmtDay(span.to)}` : 'saved history'}{register ? ' and the deal register' : ''}</div>
           <div><strong>Opening position</strong> {money(fc.opening)}</div>
         </div>
       </RPage>
@@ -132,8 +143,8 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
       {/* 2 ---------------------------------------------------------------- executive summary */}
       <RPage {...common} n={2} title="1. Executive summary">
         {register
-          ? <p className="r-intro">This forecast shows the council’s <strong>cash position</strong>: normal income and spending projected from bank history, plus the loans, investments and interest recorded in the deal register ({register.name}), and money held in funds. It shows when the council may need to borrow and when it will have spare cash to invest.</p>
-          : <p className="r-intro">This forecast shows the council’s <strong>everyday cash</strong> — normal income and spending, leaving out borrowing and investments — so you can see when the council may need to borrow and when it will have spare cash to invest.</p>}
+          ? <p className="r-intro">This forecast shows the council’s <strong>cash position</strong>: normal income and spending projected from bank history, plus the loans, investments and interest recorded in the council’s deal register, and money held in funds. It shows when the council may need to borrow and when it will have spare cash to invest.</p>
+          : <p className="r-intro">This forecast shows the council’s <strong>everyday cash</strong> (normal income and spending, leaving out borrowing and investments) so you can see when the council may need to borrow and when it will have spare cash to invest.</p>}
         <div className="r-callout">
           <div className="r-label">Key points</div>
           <ul>{keyPoints.map((k, i) => <li key={i}>{k}</li>)}</ul>
@@ -159,7 +170,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           <div className="hl"><div className="l">Borrowing needed</div><div className="v">{money(b.strategy.shortfall)}</div><div className="s">{b.strategy.shortfallDay ? `by ${fmtDay(b.strategy.shortfallDay)}` : 'none'}</div></div>
           <div><div className="l">Lasting (over a year)</div><div className="v">{money(b.strategy.lasting)}</div><div className="s">does not recover in 12 months</div></div>
           <div><div className="l">Short term</div><div className="v">{money(b.strategy.shortTerm)}</div><div className="s">recovers within 12 months</div></div>
-          <div><div className="l">Could invest 12 months</div><div className="v">{money(b.strategy.ladder.find((r) => r.months === 12)?.amount ?? 0)}</div><div className="s">on the cautious line</div></div>
+          <div><div className="l">Could invest a year</div><div className="v">{money(b.strategy.ladder.find((r) => r.months === 12)?.amount ?? 0)}</div><div className="s">on the cautious line</div></div>
         </div>
         <ol className="r-options">{b.strategy.options.map((o, i) => <li key={i} className={o.tone}><strong>{o.title}.</strong> {o.body}</li>)}</ol>
         {register?.lb && b.strategy.benchmark && (
@@ -167,16 +178,18 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
             <h3>The long-term view: liability benchmark</h3>
             <p className="r-caption" style={{ marginTop: 0 }}>The forecast is <strong>bottom up</strong> (bank history: when cash runs short); the benchmark is <strong>top down</strong> (balance sheet projections: how much long-term borrowing is needed, and for how long).</p>
             <table className="r-tbl r-tbl-tight">
-              <thead><tr><th>Year</th><th className="n">Capital financing requirement</th><th className="n">Liability benchmark</th><th className="n">Existing loans</th><th className="n">Room to borrow</th><th className="n">Above benchmark</th></tr></thead>
-              <tbody>{register.lb.filter((r) => !r.actual).slice(0, 5).map((r) => <tr key={r.fy}><td>{r.fy}</td><td className="n">{money(r.cfr * 1e6)}</td><td className="n"><strong>{money(r.lb * 1e6)}</strong></td><td className="n">{money(r.existingLoans * 1e6)}</td><td className="n">{money(r.need * 1e6)}</td><td className="n">{money(r.over * 1e6)}</td></tr>)}</tbody>
+              <thead><tr><th>Year</th><th className="n">CFR</th><th className="n">Benchmark</th><th className="n">Existing loans</th><th className="n">Room to borrow</th><th className="n">Over benchmark</th></tr></thead>
+              <tbody>{register.lb.filter((r) => !r.actual).slice(0, 5).map((r) => <tr key={r.fy}><td>{r.fy}</td><td className="n">{m(r.cfr * 1e6)}</td><td className="n"><strong>{m(r.lb * 1e6)}</strong></td><td className="n">{m(r.existingLoans * 1e6)}</td><td className="n">{m(r.need * 1e6)}</td><td className="n">{m(r.over * 1e6)}</td></tr>)}</tbody>
             </table>
+            <p className="r-caption">CFR: capital financing requirement. Room to borrow: benchmark less existing loans. Over benchmark: existing loans above what the balance sheet needs.</p>
           </>
         )}
         {b.strategy.ladder.length > 0 && (
           <>
-            <h3>Cash that could be invested for longer <span className="r-muted" style={{ fontWeight: 400, fontSize: '9pt' }}>(stays above the {money(fc.buffer)} minimum that long, even at the bottom of the likely range)</span></h3>
-            <table className="r-tbl r-tbl-tight"><thead><tr>{b.strategy.ladder.map((r) => <th key={r.months} className="n">{r.months} months</th>)}</tr></thead>
-              <tbody><tr>{b.strategy.ladder.map((r) => <td key={r.months} className="n">{money(r.amount)}</td>)}</tr></tbody></table>
+            <h3>Cash that could be invested for longer</h3>
+            <table className="r-tbl r-tbl-tight"><thead><tr><th>Could be invested for</th>{b.strategy.ladder.map((r) => <th key={r.months} className="n">{r.months} month{r.months > 1 ? 's' : ''}</th>)}</tr></thead>
+              <tbody><tr><td>Amount</td>{b.strategy.ladder.map((r) => <td key={r.months} className="n">{m(r.amount)}</td>)}</tr></tbody></table>
+            <p className="r-caption">Cash that stays above the {money(fc.buffer)} minimum for that long, even at the bottom of the likely range.</p>
           </>
         )}
       </RPage>
@@ -194,8 +207,8 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           <thead><tr><th>Month</th><th className="n">Money in</th><th className="n">Money out</th><th className="n">Difference</th><th className="n">Cash at month end</th><th className="n">Lowest in month</th><th className="n">Likely range</th></tr></thead>
           <tbody>{monthly.labels.slice(0, 24).map((l, k) => (
             <tr key={l} className={monthly.minIn[k] < fc.buffer ? 'warn' : ''}>
-              <td>{l}</td><td className="n">{money(monthly.inflow[k])}</td><td className="n">{money(monthly.outflow[k])}</td><td className="n">{money(monthly.net[k], { sign: true })}</td>
-              <td className="n"><strong>{money(monthly.close[k])}</strong></td><td className="n">{money(monthly.minIn[k])}</td><td className="n r-muted">{money(monthly.lo[k])} to {money(monthly.hi[k])}</td>
+              <td>{l}</td><td className="n">{m(monthly.inflow[k])}</td><td className="n">{m(monthly.outflow[k])}</td><td className="n">{m(monthly.net[k], true)}</td>
+              <td className="n"><strong>{m(monthly.close[k])}</strong></td><td className="n">{m(monthly.minIn[k])}</td><td className="n r-muted">{m(monthly.lo[k])} to {m(monthly.hi[k])}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -208,16 +221,17 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
         <table className="r-tbl r-tbl-tight">
           <thead><tr><th>Category</th><th>Worked out from</th><th className="n">Growth</th>{fyLabels.map((l) => <th key={l} className="n">{l}</th>)}</tr></thead>
           <tbody>
-            {catRows.map(({ e, per }) => <tr key={e.id}><td><span className="r-sw" style={{ background: catColour(e.id) }} />{e.name}</td><td className="r-muted">{({ seasonal: 'Past monthly pattern', series: 'Regular payments', flat: 'Past average', manual: 'Your schedule', exclude: 'Left out' } as Record<string, string>)[e.method]}</td><td className="n">{pct(e.growthPct / 100, 1, true)}</td>{per.map((v, k) => <td key={k} className="n">{money(v)}</td>)}</tr>)}
-            <tr className="tot"><td>Difference (in minus out)</td><td /><td />{fyNet.map((v, k) => <td key={k} className="n">{money(v, { sign: true })}</td>)}</tr>
+            {shownCats.map(({ e, per }) => <tr key={e.id}><td><span className="r-sw" style={{ background: catColour(e.id) }} />{e.name}</td><td className="r-muted">{({ seasonal: 'Past monthly pattern', series: 'Regular payments', flat: 'Past average', manual: 'Your schedule', exclude: 'Left out' } as Record<string, string>)[e.method]}</td><td className="n">{pct(e.growthPct / 100, 1, true)}</td>{per.map((v, k) => <td key={k} className="n">{m(v)}</td>)}</tr>)}
+            {restCats.length > 0 && <tr><td>{restCats.length} smaller categories</td><td /><td />{fyLabels.map((_, k) => <td key={k} className="n">{m(restCats.reduce((t, x) => t + x.per[k], 0))}</td>)}</tr>}
+            <tr className="tot"><td>Difference (in minus out)</td><td /><td />{fyNet.map((v, k) => <td key={k} className="n">{m(v, true)}</td>)}</tr>
           </tbody>
         </table>
         <h3>Assumptions and known items</h3>
         <div className="r-two">
           <div>
             <div className="r-label">Changes and growth assumed</div>
-            {sc.assumptions.length ? <ul className="r-list">{sc.assumptions.map((a) => <li key={a.id}>{assumptionText(a)}{a.note ? <span className="r-muted"> — {a.note}</span> : ''}</li>)}</ul>
-              : <p className="r-muted">None — each category follows its historic trend.</p>}
+            {sc.assumptions.length ? <ul className="r-list">{sc.assumptions.map((a) => <li key={a.id}>{assumptionText(a)}{a.note ? <span className="r-muted"> ({a.note})</span> : ''}</li>)}</ul>
+              : <p className="r-muted">None: each category follows its historic trend.</p>}
           </div>
           <div>
             <div className="r-label">One-off items, schedules and figures entered</div>
@@ -245,7 +259,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
             <h3>Biggest movers</h3>
             <table className="r-tbl">
               <thead><tr><th>Category</th><th className="n">First full year</th><th className="n">Latest year</th><th className="n">Average growth each year</th></tr></thead>
-              <tbody>{hist.movers.map((m) => <tr key={m.id}><td><span className="r-sw" style={{ background: catColour(m.id) }} />{catName(m.id)}</td><td className="n">{money(m.first)}</td><td className="n">{money(m.last)}</td><td className="n">{m.g === null ? '–' : pct(m.g, 1, true)}</td></tr>)}</tbody>
+              <tbody>{hist.movers.map((mv) => <tr key={mv.id}><td><span className="r-sw" style={{ background: catColour(mv.id) }} />{catName(mv.id)}</td><td className="n">{m(mv.first)}</td><td className="n">{m(mv.last)}</td><td className="n">{mv.g === null ? '–' : pct(mv.g, 1, true)}</td></tr>)}</tbody>
             </table>
           </>
         ) : <p className="r-muted">Load the bank data to include the historic analysis.</p>}
@@ -253,11 +267,17 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
 
       {/* 6 ---------------------------------------------------------------- confidence */}
       <RPage {...common} n={7} title="6. How much confidence to place in it">
-        <h3 style={{ marginTop: 0 }}>Backtest</h3>
+        <h3 style={{ marginTop: 0 }}>The likely range</h3>
+        <p className="r-intro">The forecast is a central estimate. The likely range comes from how much each category has varied around its own pattern in the past, so it widens the further ahead you look.</p>
+        <table className="r-tbl r-tbl-tight">
+          <thead><tr><th>After</th><th>Date</th><th className="n">Central forecast</th><th className="n">Likely range</th><th className="n">Width</th></tr></thead>
+          <tbody>{rangeAt.map((x) => <tr key={x.mo}><td>{x.mo} months</td><td>{fmtDay(x.day)}</td><td className="n"><strong>{m(x.mid)}</strong></td><td className="n">{m(x.lo)} to {m(x.hi)}</td><td className="n">{m(x.hi - x.lo)}</td></tr>)}</tbody>
+        </table>
+        <h3>Backtest</h3>
         {bt ? (
           <>
-            <p className="r-intro">To test the method, the same forecast was produced as if it were <strong>{fmtDay(bt.cutoff)}</strong>, using only data available on that date, and compared with what actually happened over the following year.</p>
-            <EChart height={190} option={{
+            <p className="r-intro">The same forecast, produced as if it were <strong>{fmtDay(bt.cutoff)}</strong> using only the data available then, against what actually happened over the following year.</p>
+            <EChart height={150} option={{
               animation: false, legend: { top: 0, right: 0, textStyle: { fontSize: 9 } }, grid: { left: 58, right: 10, top: 24, bottom: 22 },
               xAxis: { type: 'category', data: Array.from({ length: bt.H }, (_, d) => fmtDay(bt.cutoff + d)), axisLabel: { fontSize: 9, interval: Math.floor(bt.H / 6) } },
               yAxis: { type: 'value', axisLabel: { formatter: axisMoney, fontSize: 9 }, scale: true },
@@ -267,34 +287,40 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
                 { name: 'Actual excluding one-offs', type: 'line', data: bt.actualCoreCum, showSymbol: false, lineStyle: { color: '#2caffe', type: 'dotted', width: 1.5 }, itemStyle: { color: '#2caffe' } },
               ],
             }} />
-            <table className="r-tbl">
+            <table className="r-tbl r-tbl-tight">
               <thead><tr><th>After</th><th className="n">Gap: forecast vs actual</th><th className="n">Gap excluding one-offs</th><th className="n">As % of cash flowing</th></tr></thead>
-              <tbody>{bt.errorAt.map((e) => <tr key={e.months}><td>{e.months} months</td><td className="n">{money(e.error, { sign: true })}</td><td className="n">{money(e.coreError, { sign: true })}</td><td className="n">{pct(Math.abs(e.error) / Math.max(1, e.actualAbsFlow), 1)}</td></tr>)}</tbody>
+              <tbody>{bt.errorAt.map((e) => <tr key={e.months}><td>{e.months} months</td><td className="n">{m(e.error, true)}</td><td className="n">{m(e.coreError, true)}</td><td className="n">{pct(Math.abs(e.error) / Math.max(1, e.actualAbsFlow), 1)}</td></tr>)}</tbody>
             </table>
             <p className="r-caption">The forecast captures the regular cash rhythm; one-off items (land sales, ad hoc grants) need judgement and should be entered as known items when they are expected.</p>
           </>
-        ) : <p className="r-muted">Backtest not available (needs the bank data loaded).</p>}
+        ) : <p className="r-muted">A backtest replays the method on past bank statements and compares it with what actually happened. It needs the statements themselves loaded in History; this report was built from the saved daily totals.</p>}
         <div className="r-two" style={{ marginTop: 10 }}>
           <div>
             <h3>Data quality</h3>
             {ingest && cat ? (
               <ul className="r-list">
-                <li>{int(ingest.rows)} transactions from {ingest.files.length} file(s) and {ingest.accounts.length} account(s).</li>
+                <li>{int(ingest.rows)} transactions from {ingest.files.length} file{ingest.files.length === 1 ? '' : 's'} and {ingest.accounts.length} account{ingest.accounts.length === 1 ? '' : 's'}.</li>
                 <li>{pct(cat.valueCategorisedPct)} of all money categorised.</li>
                 <li>{money(cat.treasuryAbs)} of borrowing and investment flows identified and excluded ({money(cat.suspectedAbs)} suspected rather than confirmed).</li>
-                <li>{int(ingest.rejectsTotal)} lines skipped (e.g. totals rows, invalid dates); {ingest.balanceChecks.reduce((t, x) => t + x.breaks, 0)} balance check breaks.</li>
+                <li>{int(ingest.rejectsTotal)} lines skipped (totals rows, invalid dates); {ingest.balanceChecks.reduce((t, x) => t + x.breaks, 0)} balance check breaks.</li>
                 {cat.dealLikeOpAbs > 0 && <li>{money(cat.dealLikeOpAbs)} of loan-like items remain in the operational figures and should be reviewed.</li>}
+              </ul>
+            ) : historyBase && span ? (
+              <ul className="r-list">
+                <li>Saved bank history from {fmtDay(span.from)} to {fmtDay(span.to)} ({(Math.round(((span.to - span.from + 1) / 365.25) * 10) / 10).toLocaleString('en-GB')} years) across {historyBase.accounts.length} account{historyBase.accounts.length === 1 ? '' : 's'}.</li>
+                <li>{historyBase.series.length} regular payments recognised and projected on their own dates.</li>
+                <li>Borrowing, investments and transfers between the council’s own accounts were set aside when the history was sorted.</li>
+                {register && <li>Deal register: {register.loans.length} loans and {register.investments.length} investments{register.asAt ? `, as at ${fmtDay(register.asAt)}` : ''}.</li>}
               </ul>
             ) : <p className="r-muted">Not available.</p>}
           </div>
           <div>
             <h3>Method in brief</h3>
             <ul className="r-list">
-              <li>Transactions sorted by transparent rules; each line records the rule used.</li>
-              <li>Borrowing and investment flows (PWLB, LOBO, council loans, money market funds, DMADF, deposits) excluded.</li>
-              <li>Regular payments projected on their own dates; other flows follow the historic seasonal pattern, adjusted for growth.</li>
-              <li>Unusual one-off items set aside so they don’t distort the pattern.</li>
-              <li>Bank data processed entirely on the preparer’s computer; nothing uploaded.</li>
+              <li>Bank lines sorted by clear rules; each records the rule used.</li>
+              <li>Borrowing and investment flows (PWLB, LOBO, council loans, funds, DMADF) left out of the pattern{register ? ' and taken from the deal register instead' : ''}.</li>
+              <li>Regular payments projected on their own dates; the rest follows the seasonal pattern, with growth. One-offs set aside.</li>
+              <li>Processed entirely on the preparer’s computer; nothing uploaded.</li>
             </ul>
           </div>
         </div>

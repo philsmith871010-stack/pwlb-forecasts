@@ -237,3 +237,13 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
 - **Confirmations use the app's own dialog** (`askConfirm`), never the browser's `confirm()`, which some embedded browsers block (it returns "cancel" without showing). This affects accept all, clear our forecast, clear saved work and delete scenario.
 - **The forecast unlocks as soon as every line is checked**, with no separate "See my forecast" step.
 - **The example council's lines come already accepted** (again after its history changes), so its forecast opens on the result with nothing locked.
+
+## Report check (A4 pages)
+
+- **Every page is measured to fit:** content stays inside the 15mm side margins and above the footer, including the busiest case (full statements loaded, so the backtest shows).
+- **Tables are all in £m** (`money(x, { unit: 'm' })`), so a column never mixes −£92k with £9.7m. Anything that rounds to £0.0m loses its sign.
+- **Benchmark table headers are short** (CFR, Benchmark, Over benchmark), with a key underneath. The long headers had pushed the table past the right margin.
+- **The cover's fourth figure is the date cash first drops below the minimum.** "Position at end" repeated the low point whenever cash falls to the end. Position at end still shows when there's no dip.
+- **The confidence page always has substance:** the likely range at 3, 6, 12 and 24 months. A saved history reports its own span, accounts and regular payments, in place of "not available".
+- **Drivers table** shows at most 18 categories, with the rest on one line, so it can't spill off its page.
+- Wording: "1 month", "dips below it twice", no nested brackets around the register's name, plurals in data quality.
