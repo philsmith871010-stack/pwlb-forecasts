@@ -100,7 +100,7 @@ export function ForecastStep() {
   const rv = reviewState(sc, b);
   const locked = !isReviewed(sc, b);
   const idx = TABS.findIndex((t) => t.id === tab);
-  const tabs = TABS.map((t) => ({ ...t, disabled: locked && RESULT_TABS.includes(t.id), hint: locked && RESULT_TABS.includes(t.id) ? 'Check each line first, then see your forecast' : undefined, badge:
+  const tabs = TABS.map((t) => ({ ...t, hint: locked && RESULT_TABS.includes(t.id) ? 'Appears once every line is checked' : undefined, badge: locked && RESULT_TABS.includes(t.id) ? <i className="bi bi-lock-fill" aria-label="locked" /> :
     t.id === 'lines' ? (rv.left.length ? `${rv.left.length} to check` : '✓') :
     t.id === 's-items' || t.id === 'before' ? sc.oneOffs.length + sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').length || '' :
     t.id === 'changes' ? sc.assumptions.filter((a) => a.kind !== 'growth').length || '' :
@@ -117,10 +117,21 @@ export function ForecastStep() {
           : <>Your regular cash pattern carried forward, plus what you know is coming. The lowest point is how much you may need to borrow.</>}
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />
+      {locked && tab !== 'lines' && !RESULT_TABS.includes(tab) && rv.left.length > 0 && (
+        <div className="callout mb small lock-note"><i className="bi bi-lock" /> <strong>{rv.left.length} line{rv.left.length > 1 ? 's' : ''} still to check</strong> before your forecast appears. <button className="link-btn" onClick={() => setTab('lines')}>Check {rv.left.length > 1 ? 'them' : 'it'}</button></div>
+      )}
+      {locked && RESULT_TABS.includes(tab) && (
+        <div className="locked-panel">
+          <i className="bi bi-lock" />
+          {rv.allChecked
+            ? <><h3>Every line is checked</h3><p>Your forecast is ready to see.</p><button className="btn primary lg" onClick={seeForecast}>See my forecast <i className="bi bi-arrow-right" /></button></>
+            : <><h3>Your forecast appears once every line is checked</h3><p><strong>{rv.left.length}</strong> of {rv.main.length + rv.small.length} still to check. It takes a few minutes: open each line and click <strong>Looks right</strong>, or change it first.</p><button className="btn primary lg" onClick={() => setTab('lines')}>Check the lines <i className="bi bi-arrow-right" /></button></>}
+        </div>
+      )}
       {!locked && !RESULT_TABS.includes(tab) && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
-      <Explain compact what={help.what} why={help.why} todo={help.todo} />
+      {!(locked && RESULT_TABS.includes(tab)) && <Explain compact what={help.what} why={help.why} todo={help.todo} />}
 
-      {tab === 'result' && (
+      {tab === 'result' && !locked && (
         <div className="stack">
           <div className="grid g2">
             <Kpi label="You may need to borrow" value={money(fc.borrowingRequirement)} sub={fc.borrowingRequirement > 0 ? `by ${day(fc.low.day)}, to keep at least ${money(fc.buffer)} in the bank` : `you stay above ${money(fc.buffer)} throughout`} />
@@ -162,8 +173,8 @@ export function ForecastStep() {
           )}
         </div>
       )}
-      {tab === 'options' && <StrategyView b={b} />}
-      {tab === 'report' && <SaveStep embedded />}
+      {tab === 'options' && !locked && <StrategyView b={b} />}
+      {tab === 'report' && !locked && <SaveStep embedded />}
       {tab === 's-start' && <><RegisterCard /><SimpleStart sc={sc} upd={upd} b={b} /></>}
       {tab === 'before' && (
         <div className="stack before-tab">
@@ -174,13 +185,13 @@ export function ForecastStep() {
       )}
       {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
       {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}
-      {tab === 's-breakdown' && <SimpleBreakdown b={b} />}
+      {tab === 's-breakdown' && !locked && <SimpleBreakdown b={b} />}
       {tab === 'setup' && <div style={{ maxWidth: 640 }}><SetupSection sc={sc} upd={upd} b={b} /></div>}
       {tab === 'growth' && <MethodsSection sc={sc} upd={upd} b={b} />}
       {tab === 'changes' && <div style={{ maxWidth: 860 }}><AssumptionsSection sc={sc} upd={upd} /></div>}
       {tab === 'oneoffs' && <div style={{ maxWidth: 860 }}><OneOffsSection sc={sc} upd={upd} /></div>}
       {tab === 'schedules' && <div style={{ maxWidth: 980 }}><PasteSection sc={sc} upd={upd} b={b} /></div>}
-      {tab === 'breakdown' && (
+      {tab === 'breakdown' && !locked && (
         <div className="card card-pad">
           <div className="row mb"><Seg value={lower} onChange={setLower} options={[{ v: 'stacked', label: 'Chart by category' }, { v: 'explorer', label: 'One category in detail' }, { v: 'table', label: 'Full table' }]} /></div>
           {lower === 'stacked' && <StackedView b={b} granularity={gran} />}
@@ -188,9 +199,9 @@ export function ForecastStep() {
           {lower === 'table' && <ForecastTable b={b} granularity={gran} />}
         </div>
       )}
-      {tab === 'scenarios' && <div className="card card-pad"><CompareView /></div>}
+      {tab === 'scenarios' && !locked && <div className="card card-pad"><CompareView /></div>}
 
-      {locked && idx === firstResult - 1 ? (
+      {locked && RESULT_TABS.includes(tab) ? null : locked && idx === firstResult - 1 ? (
         rv.allChecked
           ? <NextTab label="See my forecast" onClick={seeForecast} text="Every line is checked. Your forecast is ready." />
           : <NextTab label="Back to checking lines" onClick={() => setTab('lines')} text={`${rv.left.length || 'Some'} line${rv.left.length === 1 ? '' : 's'} still to check before the forecast can be shown.`} />
