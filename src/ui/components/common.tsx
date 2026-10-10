@@ -172,13 +172,14 @@ export function catByIdx(categories: Category[], catIds: string[], idx: number):
 export function Explain({ what, why, todo, compact }: { what: ReactNode; why?: ReactNode; todo?: ReactNode; compact?: boolean }) {
   const show = useStore((s) => s.showTips);
   const setShow = useStore((s) => s.setShowTips);
-  if (!show) return null;
+  const [open, setOpen] = useState(false);
+  if (!show && !open) return <button className="howto" onClick={() => setOpen(true)}><i className="bi bi-question-circle" /> How this works</button>;
   return (
     <div className={`explain ${compact ? 'compact' : ''}`} role="note">
       <div className="explain-col"><div className="explain-h"><i className="bi bi-eye" /> What this is</div><div>{what}</div></div>
       {why && <div className="explain-col"><div className="explain-h"><i className="bi bi-lightbulb" /> Why it matters</div><div>{why}</div></div>}
       {todo && <div className="explain-col todo"><div className="explain-h"><i className="bi bi-hand-index" /> What to do</div><div>{todo}</div></div>}
-      <button className="icon-btn explain-x" title="Hide all tips (turn back on from the header)" aria-label="Hide tips" onClick={() => setShow(false)}><i className="bi bi-x" /></button>
+      <button className="icon-btn explain-x" title="Hide" aria-label="Hide" onClick={() => { setOpen(false); setShow(false); }}><i className="bi bi-x" /></button>
     </div>
   );
 }

@@ -27,7 +27,7 @@ export function CategoriseStep() {
         We’ve sorted each bank line — council tax, payroll, suppliers, loans and so on — using clear rules, never guesswork you can’t see.
       </PageHead>
       {catBusy && <div className="card card-pad mb"><div className="row"><span className="spinner" /><strong className="navy">{catBusy.phase}</strong></div><div className="mt"><Progress frac={catBusy.frac} /></div></div>}
-      {!cat ? (!catBusy && <Empty icon="bi-tags" title="Nothing to categorise yet">Load bank data on step 1.</Empty>) : (
+      {!cat ? (!catBusy && <Empty icon="bi-tags" title="Nothing to categorise yet">Load bank statements first, under History.</Empty>) : (
         <>
           <StepTabs tabs={tabs} value={tab} onChange={setTab} />
           {tab === 'summary' && <>

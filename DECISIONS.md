@@ -158,3 +158,18 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - longer loads say what was added, what was replaced, and any gaps.
 - Rule changes apply to files loaded from then on; re-sorting older history means loading those files again.
 - **Fix found on the way:** progress messages from the worker could arrive after its result (for tiny files), leaving "Reading your files…" on screen. They are now ignored once a step is done.
+
+## One menu, three jobs
+
+- The tool kept growing step by step until every screen was dense. It's now organised around what people come to do:
+  - **Today's statement:** day-to-day, one screen;
+  - **History:** a periodic deep look;
+  - **Forecast:** the borrowing question.
+- One top menu (Home · Today's statement · History · Forecast) replaces the sidebar. History has a short step strip (load, check the sorting, look back). Forecast is one path of tabs, ending in Report & Excel. "What's in it" folds into the result as "See it by category".
+- **Home asks "What would you like to do?"** Each job's card says where you are (history saved to…, lines loaded, forecast checked). The explainer content is below, as "About this tool".
+- **The team file lives in the header** (open, save, save as, your name, keep cash history), so saving isn't a step. The deal register moved to Forecast → Cash and investments, where it's used.
+- **Less on every page:**
+  - the "What this is / Why / What to do" boxes are off by default, behind a "How this works" link;
+  - step-number labels are gone, because the menu and strip already show where you are;
+  - line cards show what we found and the proposal, with the edit tools behind "Change something";
+  - lists under the result are folded.

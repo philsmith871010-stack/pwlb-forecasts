@@ -1,12 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Progress, Counter, Explain } from '../components/common';
 import { openWithPicker, fsAccessSupported, downloadBlob } from '../../lib/teamfile';
 import { bytes, day, ago, int } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
 import { engine } from '../../worker/client';
-import { RegisterCard } from '../register/RegisterCard';
-import { SavedHistoryCard, HistoryAddedNote, DayCard } from '../history/HistoryCards';
+import { SavedHistoryCard, HistoryAddedNote } from '../history/HistoryCards';
 import { AddMoreFiles } from '../components/AddMoreFiles';
 
 export function LoadStep() {
@@ -18,17 +17,19 @@ export function LoadStep() {
   const saved = s.historyBase;
   // a day or two of bank data added to a saved history: show the day itself
   const daily = done && !!saved && !s.demo && s.ingest!.maxDay - s.ingest!.minDay <= 3;
+  // a day or two belongs on Today's statement
+  useEffect(() => { if (daily) s.goto('today'); }, [daily]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="page narrow">
-      <PageHead eyebrow={eyebrow} title={saved ? 'Add new bank data' : 'Add your bank data'}>
+      <PageHead eyebrow={eyebrow} title={saved ? 'Add to your history' : 'Load your bank history'}>
         {saved
-          ? <>Add today’s statement for day-to-day sorting, or the latest month, quarter or year for a review. It joins your saved history; nothing is counted twice.</>
-          : <>The forecast learns from your council’s past bank transactions. Everything stays on this computer.</>}
+          ? <>Add the latest month, quarter or year. It joins your saved history; nothing is counted twice.</>
+          : <>Three to five years of bank statements. The more history, the better the forecast.</>}
       </PageHead>
 
       {s.ingestError && <div className="callout red mb"><strong>We couldn’t read those files.</strong> {s.ingestError}</div>}
       {busy && <ReadingCard />}
-      {daily ? <DayCard /> : done && <DoneCard />}
+      {done && !daily && <DoneCard />}
 
       {!busy && !done && saved && <SavedHistoryCard h={saved} />}
 
@@ -47,7 +48,6 @@ export function LoadStep() {
         </>
       )}
 
-      {!busy && !daily && <RegisterCard />}
 
       <TeamFileLine />
     </div>

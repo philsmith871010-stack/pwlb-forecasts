@@ -94,7 +94,7 @@ export function HistoryStep() {
       {h && tab === 'recurring' && <RecurringView h={h} />}
       {h && tab === 'quality' && <DataQuality />}
       {idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={<button className="link-btn" onClick={() => useStore.getState().goto('forecast')}>or skip to building the forecast</button>} />
-        : !workspace && <StepFooter nextLabel="Next: look ahead" />}
+        : !workspace && <StepFooter nextLabel="Next: build the forecast" />}
     </div>
   );
 }
@@ -522,7 +522,7 @@ export function DataQuality() {
     <div className="stack">
       <div className="grid g5">
         <Kpi light label="Value categorised" value={pct(cat.valueCategorisedPct)} sub={`${int(cat.uncategorisedRows)} lines uncategorised`} />
-        <Kpi light label="Rejected rows" value={int(ingest.rejectsTotal)} sub="see reject log on step 1" />
+        <Kpi light label="Rejected rows" value={int(ingest.rejectsTotal)} sub="see the list under Load statements" />
         <Kpi light label="Balance breaks" value={int(breaks)} sub={`${ingest.balanceChecks.length} file(s) with balances`} />
         <Kpi light label="Possible duplicates" value={int(ingest.dupCandidates)} sub={`${int(ingest.overlapRemoved)} overlap rows removed`} />
         <Kpi light label="Rules used" value={int(cat.rulesUsed)} sub={`${cat.seriesCount} recurring series`} />

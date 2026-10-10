@@ -3,7 +3,10 @@ import type React from 'react';
 import type { ECharts } from 'echarts/core';
 import { useStore, useEyebrow } from '../../state/store';
 import { StrategyView } from '../forecast/StrategyView';
-import { PageHead, Panel, Kpi, StepFooter, Seg, Empty, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
+import { RegisterCard } from '../register/RegisterCard';
+import { SaveStep } from './SaveStep';
+import { useOpenTeamFile } from '../components/HeaderMenus';
+import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast } from '../forecast/useForecast';
 import { ForecastChart } from '../forecast/ForecastChart';
@@ -26,23 +29,25 @@ const FC_TABS: TabDef[] = [
   { id: 'result', label: 'Result' },
   { id: 'options', label: 'What you could do' },
   { id: 'breakdown', label: 'Breakdown' },
+  { id: 'report', label: 'Report & Excel' },
   { id: 'scenarios', label: 'Scenarios' },
 ];
 
 const FC_TABS_SIMPLE: TabDef[] = [
   { id: 'lines', label: 'Check each line' },
   { id: 's-items', label: 'Known future items' },
-  { id: 's-start', label: 'Starting cash' },
+  { id: 's-start', label: 'Cash and investments' },
   { id: 'result', label: 'Your forecast' },
   { id: 'options', label: 'What you could do' },
-  { id: 's-breakdown', label: 'What’s in it' },
+  { id: 'report', label: 'Report & Excel' },
 ];
 
 /** tabs that show results: locked until the proposal has been checked */
-const RESULT_TABS = ['result', 'options', 's-breakdown', 'breakdown', 'scenarios'];
+const RESULT_TABS = ['result', 'options', 's-breakdown', 'breakdown', 'scenarios', 'report'];
 
 const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
   lines: { what: 'Our proposal for each kind of income and spending, worked out from your history: how big it is, how it is growing, and when it is paid.', why: 'A forecast is only as good as its parts. Checking each line takes a few minutes and means every figure is one you have agreed.', todo: <>Open each line, check what we found, change anything you know better (e.g. salaries <strong>+3%</strong> for a pay award, or paid on the <strong>last working day</strong>), then click <strong>Looks right</strong>.</> },
+  report: { what: 'Take the forecast away: a ready-made report (print or save as PDF) and an Excel workbook with every number.', todo: 'Click View and download for the report, or Download Excel.' },
   options: { what: 'Borrowing and investing options worked out from your forecast and, if you added it, your deal register.', why: 'The forecast shows when cash runs short or sits idle. These options turn that into figures to take to your treasury meeting.', todo: 'Read the options, then check them against your treasury management strategy. Change the forecast and they update.' },
   's-start': { what: 'Three simple settings that frame the forecast: the cash you start with, the minimum you want to keep, and how far ahead to look.', todo: 'Check each one. The figures we’ve filled in are a sensible starting point.' },
   's-items': { what: 'Things you know are coming that past years can’t predict: a land sale, a grant that ends, a pay award.', why: 'These often decide whether the low point is £10m or £30m.', todo: 'Pick the kind of item, fill in the short form and click Add. Each will show on your forecast chart as an orange diamond. For figures that belong to one line (a grant’s payment dates, say), use that line’s grid or Import a schedule instead.' },
@@ -87,7 +92,7 @@ export function ForecastStep() {
 
   if (!basis) {
     const snaps = team.forecasts.filter((f) => f.resultsSnapshot);
-    return <div className="page">{snaps.length ? <SnapshotForecastView /> : <Empty icon="bi-graph-up-arrow" title="No forecast yet">Load and categorise bank data, then come back here.</Empty>}</div>;
+    return <div className="page">{snaps.length && !useStore.getState().historyBase ? <SnapshotForecastView /> : <ForecastStart />}</div>;
   }
   if (!sc || !b) return <div className="page"><span className="spinner" /></div>;
   const upd = (fn: (s: Scenario) => Scenario) => updateScenario(sc.id, fn);
@@ -108,10 +113,10 @@ export function ForecastStep() {
   const seeForecast = () => { upd((s) => ({ ...s, reviewDone: true, reviewFor: dataEndIso(b) })); setTab('result'); };
   return (
     <div className="page">
-      <PageHead eyebrow={eyebrow} title={locked ? 'Look ahead: build your forecast' : 'Look ahead: your cash forecast'} actions={advanced ? <ScenarioBar /> : undefined}>
+      <PageHead eyebrow={eyebrow} title={locked ? 'Build your forecast' : 'Your cash forecast'} actions={advanced ? <ScenarioBar /> : undefined}>
         {locked
-          ? <>We’ve drafted a forecast from your history. Check it line by line, add anything you know is coming, then see the result.</>
-          : <>Your council’s regular cash pattern carried forward, plus anything you know is coming. The lowest point tells you how much you may need to borrow, and when.</>}
+          ? <>We’ve drafted it from your history. Check each line, add what you know is coming, then see the result.</>
+          : <>Your regular cash pattern carried forward, plus what you know is coming. The lowest point is how much you may need to borrow.</>}
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />
       {!locked && tab !== 'result' && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
@@ -143,20 +148,27 @@ export function ForecastStep() {
               {fc.breaches.length > 0 && <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(176,70,50,.25)' }} />below your minimum cash</span>}
             </div>
           </Panel>
+          <details className="fold">
+            <summary>See it by category</summary>
+            <SimpleBreakdown b={b} />
+          </details>
           {fc.markers.some((m) => m.kind !== 'treasury') && (
-            <Panel title="What you’ve added to this forecast" sub="changes, one-offs and schedules on the timeline">
+            <details className="fold">
+              <summary>What you’ve added ({fc.markers.filter((m) => m.kind !== 'treasury').length})</summary>
               <ul className="list-plain small">{fc.markers.filter((m) => m.kind !== 'treasury').map((m, i) => <li key={i} className="row tight"><span className={`badge ${m.kind === 'oneoff' ? 'soft' : m.kind === 'schedule' ? 'green' : 'navy'}`}>{m.kind === 'oneoff' ? 'one-off' : m.kind === 'assumption' ? 'change' : m.kind}</span><span className="xs muted" style={{ width: 90 }}>{day(m.day)}</span><span>{m.label}</span></li>)}</ul>
-            </Panel>
+            </details>
           )}
           {fc.register && fc.markers.some((m) => m.kind === 'treasury') && (
-            <Panel title="Coming up from your deal register" sub="loans repaid, borrowing received and investments maturing (£1m or more); interest is included in the forecast too">
+            <details className="fold">
+              <summary>Coming up from your deal register ({fc.markers.filter((m) => m.kind === 'treasury').length})</summary>
               <ul className="list-plain small">{fc.markers.filter((m) => m.kind === 'treasury').map((m, i) => <li key={i} className="row tight"><span className={`badge ${(m.amount ?? 0) < 0 ? 'navy' : 'green'}`}>{(m.amount ?? 0) < 0 ? 'out' : 'in'}</span><span className="xs muted" style={{ width: 90 }}>{day(m.day)}</span><span>{m.label}</span></li>)}</ul>
-            </Panel>
+            </details>
           )}
         </div>
       )}
       {tab === 'options' && <StrategyView b={b} />}
-      {tab === 's-start' && <SimpleStart sc={sc} upd={upd} b={b} />}
+      {tab === 'report' && <SaveStep embedded />}
+      {tab === 's-start' && <><RegisterCard /><SimpleStart sc={sc} upd={upd} b={b} /></>}
       {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
       {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}
       {tab === 's-breakdown' && <SimpleBreakdown b={b} />}
@@ -182,7 +194,7 @@ export function ForecastStep() {
       ) : tab === 'lines' && locked && !rv.allChecked ? (
         <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={`${rv.left.length} still to check. You can come back to them.`} />
       ) : idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={tab === 'result' ? 'See what the forecast means for borrowing and investing.' : !locked ? <button className="link-btn" onClick={() => useStore.getState().goto(advanced ? 'backtest' : 'save')}>or go to {advanced ? 'the backtest' : 'save & share'}</button> : undefined} />
-        : !workspace && <StepFooter nextLabel={advanced ? 'Next: test the forecast' : 'Next: save & share'} />}
+        : !workspace && advanced && <StepFooter nextLabel="Next: test the forecast" />}
     </div>
   );
 }
@@ -259,6 +271,27 @@ function ScenarioBar() {
           {dlg === 'new' && <div className="row mt tight">{['Base', 'Prudent', 'Optimistic'].map((n) => <button key={n} className="chip" onClick={() => setName(n)}>{n}</button>)}<span className="xs muted">A new scenario starts as a copy of the current one.</span></div>}
         </Modal>
       )}
+    </div>
+  );
+}
+
+/** The forecast needs a history first: from the team file, from statements, or the example. */
+function ForecastStart() {
+  const { historyBase, useSavedHistory, goto, generateDemo } = useStore();
+  const { open, el } = useOpenTeamFile();
+  return (
+    <div className="page narrow">
+      {el}
+      <PageHead title="Forecast">A forecast is built from your cash history. Choose where it comes from.</PageHead>
+      <div className="start-choices">
+        {historyBase ? (
+          <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>From your team file. Nothing to load.</span></button>
+        ) : (
+          <button className="start-choice" onClick={() => void open()}><i className="bi bi-folder2-open" /><strong>Open your team file</strong><span>If your team has used the tool before.</span></button>
+        )}
+        <button className="start-choice" onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
+        <button className="start-choice" onClick={() => { goto('forecast'); void generateDemo({ seed: 'northbridge', startFY: 2021, years: 5, preset: 'small', accounts: 4, nastiness: 1 }); }}><i className="bi bi-stars" /><strong>Try the example</strong><span>A made-up council, ready to go.</span></button>
+      </div>
     </div>
   );
 }

@@ -33,7 +33,7 @@ function FriendlySelect({ value, onChange, categories, label }: { value: string;
   );
 }
 
-function useQueue<T>(fn: () => Promise<T>): T | null {
+export function useQueue<T>(fn: () => Promise<T>): T | null {
   const v = useStore((s) => s.catVersion);
   const [x, setX] = useState<T | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +138,7 @@ function RegisterNote() {
   );
 }
 
-function SortCard({ g, onSkip }: { g: ReviewGroup; onSkip: () => void }) {
+export function SortCard({ g, onSkip }: { g: ReviewGroup; onSkip: () => void }) {
   const { team, addRule } = useStore();
   const guess = g.catIdx >= 0 ? useStore.getState().cat?.catIds[g.catIdx] ?? '' : '';
   const [catId, setCatId] = useState(guess);

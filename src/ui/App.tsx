@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
-import { useStore, stepsFor, SIMPLE_STEPS, StepId } from '../state/store';
-import { APP_NAME_PARTS, APP_TAGLINE } from '../config';
+import { useStore, StepId, STREAMS, streamOf, streamSteps, type StreamId } from '../state/store';
 import { Toasts, Modal } from './components/common';
-import { ago } from '../lib/format';
 import { LoadStep } from './steps/LoadStep';
 import { MappingStep } from './steps/MappingStep';
 import { CategoriseStep } from './steps/CategoriseStep';
@@ -14,6 +12,8 @@ import { SaveStep } from './steps/SaveStep';
 import { DataWorkspace } from './steps/DataWorkspace';
 import { SettingsView } from './steps/SettingsView';
 import { HomePage } from './steps/HomePage';
+import { TodayPage } from './steps/TodayPage';
+import { TeamFileMenu, SettingsMenu } from './components/HeaderMenus';
 
 function Logo() {
   return (
@@ -29,8 +29,7 @@ function Logo() {
 
 export function App() {
   const s = useStore();
-  const { step, reached, team, dirty, cat, ingest, goto, advanced } = s;
-  const steps = stepsFor(advanced);
+  const { step, team, cat, goto, advanced } = s;
 
   // Warn before closing with unsaved team-file changes
   useEffect(() => {
@@ -39,61 +38,53 @@ export function App() {
     return () => window.removeEventListener('beforeunload', h);
   }, []);
 
-  const stepIndex = steps.findIndex((x) => x.id === step);
   const enabled = (id: StepId) => {
-    if (id === 'load') return true;
+    if (id === 'load' || id === 'save' || id === 'today' || id === 'home' || id === 'settings') return true;
     if (id === 'map') return s.sources.length > 0;
-    if (id === 'save') return true;
-    if ((id === 'history' || id === 'forecast') && !cat) return !!s.basis || team.forecasts.some((f) => f.resultsSnapshot) || !!team.historySummary;
-    return !!cat || (id === 'categorise' && !!ingest);
+    if (id === 'history' || id === 'forecast') return !!cat || !!s.basis || team.forecasts.some((f) => f.resultsSnapshot) || !!team.historySummary || id === 'forecast';
+    if (id === 'backtest' || id === 'categorise' || id === 'review' || id === 'data') return !!cat;
+    return true;
   };
-  const doneStep = (i: number) => i < reached && i !== stepIndex && enabled(steps[i].id);
+  const current = streamOf(step);
+  // where each job opens: wherever it makes sense given what's loaded
+  const openStream = (id: StreamId) => {
+    if (id === 'today') return goto('today');
+    if (id === 'history') return goto(cat || s.historyOnly ? 'history' : 'load');
+    return goto('forecast');
+  };
 
   return (
-    <div className="shell">
+    <div className="shell top">
       <header className="shell-header">
         <a className="brand" href="#" onClick={(e) => { e.preventDefault(); goto('home'); }} aria-label="Cash Flow Insight home">
-          <Logo /><span className="brand-word">PWLB<span>today</span></span>
+          <Logo /><span className="brand-word">Cash Flow <span>Insight</span></span>
         </a>
-        <div className="product">
-          <span className="product-name">{APP_NAME_PARTS[0]}<span>{APP_NAME_PARTS[1]}</span></span>
-          <span className="product-tag">{APP_TAGLINE}</span>
-        </div>
+        <nav className="topnav" aria-label="Main menu">
+          <button className={step === 'home' ? 'on' : ''} onClick={() => goto('home')}><i className="bi bi-house" /> <span>Home</span></button>
+          {STREAMS.map((st) => (
+            <button key={st.id} className={current?.id === st.id ? 'on' : ''} onClick={() => openStream(st.id)} aria-current={current?.id === st.id ? 'page' : undefined}>
+              <i className={`bi ${st.icon}`} /> <span>{st.label}</span>
+            </button>
+          ))}
+        </nav>
         <div className="header-spacer" />
-        <span className="privacy-badge" title="All processing happens in this browser tab. Nothing is uploaded."><i className="bi bi-shield-lock-fill" /> Your data stays on this computer</span>
-        {(ingest || dirty || team.savedAt) && <>
-          <span className="save-state" title={team.savedAt ? `Last saved ${ago(team.savedAt)}` : 'Not saved yet'}>
-            <span className={`dot ${dirty ? 'warn' : 'ok'}`} />{dirty ? 'Unsaved changes' : team.savedAt ? 'All changes saved' : 'Not saved yet'}
-          </span>
-          <button className={`btn ${dirty ? 'primary' : ''}`} onClick={() => goto('save')} title="Save your work so you (and colleagues) can pick up where you left off">
-            <i className="bi bi-save" /> Save my work
-          </button>
-        </>}
+        <span className="privacy-dot" title="Everything happens in this browser tab. Nothing is uploaded."><i className="bi bi-shield-lock-fill" /></span>
+        <TeamFileMenu />
+        <SettingsMenu />
       </header>
 
-      <nav className="sidebar" aria-label="Steps">
-        <button className={`nav-item ${step === 'home' ? 'active' : ''}`} onClick={() => goto('home')} style={{ marginTop: 6 }}><i className="bi bi-house" /> Start here</button>
-        <div className="nav-label">Your steps</div>
-        {steps.map((x, i) => (
-          <button key={x.id} className={`nav-item ${x.id === step ? 'active' : ''} ${doneStep(i) ? 'done' : ''}`} disabled={!enabled(x.id)} onClick={() => goto(x.id)} aria-current={x.id === step ? 'step' : undefined}>
-            <span className="step-num">{doneStep(i) ? <i className="bi bi-check-lg" style={{ fontSize: 12, color: 'inherit', width: 'auto' }} /> : i + 1}</span>
-            <span>{x.label}<span className="step-sub">{x.sub}</span></span>
-          </button>
-        ))}
-        {advanced && <>
-          <div className="nav-label">Advanced tools</div>
-          <button className={`nav-item ${step === 'data' ? 'active' : ''}`} disabled={!cat} onClick={() => goto('data')}><i className="bi bi-list-ul" /> All transactions</button>
-          <button className={`nav-item ${step === 'settings' ? 'active' : ''}`} onClick={() => goto('settings')}><i className="bi bi-sliders" /> Settings</button>
-        </>}
-        <div className="sidebar-foot">
-          <label className="side-switch"><input type="checkbox" checked={s.showTips} onChange={(e) => s.setShowTips(e.target.checked)} /><span className="sw" /> Show tips</label>
-          <label className="side-switch" title="Extra screens for experienced users: column mapping, rules, backtesting, scenarios, schedules"><input type="checkbox" checked={advanced} onChange={(e) => { s.setAdvanced(e.target.checked); if (!e.target.checked && !SIMPLE_STEPS.some((x) => x.id === step) && step !== 'home') goto(cat ? 'forecast' : 'load'); }} /><span className="sw" /> Advanced tools</label>
-          <div style={{ marginTop: 12 }}><i className="bi bi-lock" /> <strong>Private by design.</strong> Your bank files are read inside this browser tab. Nothing is uploaded.</div>
-        </div>
-      </nav>
-
       <main className="main" id="main">
+        {current && streamSteps(current, advanced).length > 1 && (
+          <div className="streambar">
+            {streamSteps(current, advanced).map((x, i) => (
+              <button key={x.id} className={x.id === step ? 'on' : ''} disabled={!enabled(x.id)} onClick={() => goto(x.id)} aria-current={x.id === step ? 'step' : undefined}>
+                <span className="sb-num">{i + 1}</span>{x.label}
+              </button>
+            ))}
+          </div>
+        )}
         {step === 'home' && <HomePage />}
+        {step === 'today' && <TodayPage />}
         {step === 'load' && <LoadStep />}
         {step === 'map' && <MappingStep />}
         {step === 'categorise' && <CategoriseStep />}

@@ -14,12 +14,12 @@ import { ago, money, day } from '../../lib/format';
 import { addMonths, ymdFromDay, dayFromYMD } from '../../lib/dates';
 import { APP_NAME } from '../../config';
 
-export function SaveStep() {
+export function SaveStep({ embedded }: { embedded?: boolean } = {}) {
   const advanced = useStore((st) => st.advanced);
-  return advanced ? <AdvancedSave /> : <SimpleSave />;
+  return advanced && !embedded ? <AdvancedSave /> : <SimpleSave embedded={embedded} />;
 }
 
-function SimpleSave() {
+function SimpleSave({ embedded }: { embedded?: boolean }) {
   const s = useStore();
   const { team, agg, cat, dirty, teamName, saveTeam, updateTeam, user, setUser } = s;
   const sc = team.forecasts.find((f) => f.id === s.activeScenarioId) ?? team.forecasts[0];
@@ -52,6 +52,33 @@ function SimpleSave() {
       </div>
     );
   }
+  const reportCard = (
+    <div className="save-card primary">
+          <i className="bi bi-file-earmark-richtext" />
+          <h3>The report</h3>
+          <p>A clear seven-page summary for your manager, a treasury report or a Section 151 briefing: the low point, how much you may need to borrow, options to discuss, charts and the assumptions behind it.</p>
+          <button className="btn primary lg" disabled={!b} onClick={() => setView('report')}><i className="bi bi-eye" /> View and download</button>
+        </div>
+  );
+  const excelCard = (
+    <div className="save-card">
+          <i className="bi bi-file-earmark-excel" />
+          <h3>Excel spreadsheet</h3>
+          <p>All the numbers: the forecast month by month, past years by category, growth rates and your assumptions — ready to use in your own spreadsheets.</p>
+          <button className="btn lg" disabled={!b || !agg || busy === 'xlsx'} onClick={async () => {
+            if (!b || !agg) return;
+            setBusy('xlsx');
+            try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `cash-flow-forecast-${team.authorityName.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
+            finally { setBusy(null); }
+          }}>{busy === 'xlsx' ? <span className="spinner" /> : <i className="bi bi-download" />} Download Excel</button>
+        </div>
+  );
+  if (embedded) return (
+    <div className="save-cards two">
+      {reportCard}
+      {excelCard}
+    </div>
+  );
   return (
     <div className="page narrow">
       <PageHead eyebrow={eyebrow} title="Save & share">
@@ -65,27 +92,12 @@ function SimpleSave() {
         Lowest point <strong>{money(b.fc.low.amount)}</strong> on <strong>{day(b.fc.low.day)}</strong>{b.fc.borrowingRequirement > 0 ? <> — you may need to borrow about <strong>{money(b.fc.borrowingRequirement)}</strong> to keep {money(b.fc.buffer)} in the bank.</> : <> — no borrowing needed to keep {money(b.fc.buffer)} in the bank.</>}
       </div>}
       <div className="save-cards">
-        <div className="save-card primary">
-          <i className="bi bi-file-earmark-richtext" />
-          <h3>The report</h3>
-          <p>A clear seven-page summary for your manager, a treasury report or a Section 151 briefing: the low point, how much you may need to borrow, options to discuss, charts and the assumptions behind it.</p>
-          <button className="btn primary lg" disabled={!b} onClick={() => setView('report')}><i className="bi bi-eye" /> View and download</button>
-        </div>
-        <div className="save-card">
-          <i className="bi bi-file-earmark-excel" />
-          <h3>Excel spreadsheet</h3>
-          <p>All the numbers: the forecast month by month, past years by category, growth rates and your assumptions — ready to use in your own spreadsheets.</p>
-          <button className="btn lg" disabled={!b || !agg || busy === 'xlsx'} onClick={async () => {
-            if (!b || !agg) return;
-            setBusy('xlsx');
-            try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `cash-flow-forecast-${team.authorityName.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
-            finally { setBusy(null); }
-          }}>{busy === 'xlsx' ? <span className="spinner" /> : <i className="bi bi-download" />} Download Excel</button>
-        </div>
+        {reportCard}
+        {excelCard}
         <div className="save-card">
           <i className="bi bi-floppy" />
           <h3>Save your work</h3>
-          <p>Saves the sorting decisions, forecast settings and any figures you typed or imported today in a <strong>team file</strong> (no bank transactions). Next time, open it on step 1 and everything is remembered.</p>
+          <p>Saves the sorting decisions, forecast settings and any figures you typed or imported today in a <strong>team file</strong> (no bank transactions). Next time, open it from the Team file menu and everything is remembered.</p>
           <HistoryChoice />
           <div className="field"><label htmlFor="who-s">Your name or initials</label><input id="who-s" className="input" value={user} placeholder="e.g. Sam Patel" onChange={(e) => setUser(e.target.value)} /></div>
           <div className="field"><label htmlFor="auth-s">Council name</label><input id="auth-s" className="input" value={team.authorityName} onChange={(e) => updateTeam((t) => ({ ...t, authorityName: e.target.value }))} /></div>
@@ -98,7 +110,7 @@ function SimpleSave() {
 }
 
 /** Whether the team file keeps the cash history, and what that means. */
-function HistoryChoice() {
+export function HistoryChoice() {
   const { team, updateTeam } = useStore();
   const h = team.cashHistory;
   if (!h || h.example) return null;

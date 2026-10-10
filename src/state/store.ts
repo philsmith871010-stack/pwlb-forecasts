@@ -12,7 +12,7 @@ import { DEFAULT_GENERATOR_OPTIONS, type GeneratorOptions } from '../generator';
 import { isoFromDay, addMonths } from '../lib/dates';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
-export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home';
+export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today';
 /** Full step list (advanced tools on). */
 export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] = [
   { id: 'load', label: 'Add your data', sub: 'Bank statement files', icon: 'bi-cloud-arrow-up' },
@@ -32,12 +32,34 @@ export function stepsFor(advanced: boolean) {
   return advanced ? STEPS : SIMPLE_STEPS;
 }
 
-/** "Step 2 of 5" for a step in the current list. */
+// ---------------------------------------------------------------- the three jobs
+
+export type StreamId = 'today' | 'history' | 'forecast';
+export interface Stream { id: StreamId; label: string; short: string; icon: string; steps: { id: StepId; label: string; advanced?: boolean }[] }
+/** Everything the tool does, as three jobs, each a short path of steps. */
+export const STREAMS: Stream[] = [
+  { id: 'today', label: 'Today’s statement', short: 'Today', icon: 'bi-calendar-day', steps: [{ id: 'today', label: 'Today’s statement' }] },
+  { id: 'history', label: 'History', short: 'History', icon: 'bi-bar-chart-line', steps: [
+    { id: 'load', label: 'Load statements' },
+    { id: 'map', label: 'Check the files', advanced: true },
+    { id: 'categorise', label: 'Sorting results', advanced: true },
+    { id: 'review', label: 'Check the sorting' },
+    { id: 'history', label: 'Look back' },
+    { id: 'data', label: 'All transactions', advanced: true },
+  ] },
+  { id: 'forecast', label: 'Forecast', short: 'Forecast', icon: 'bi-graph-up-arrow', steps: [
+    { id: 'forecast', label: 'Build the forecast' },
+    { id: 'backtest', label: 'Test it', advanced: true },
+    { id: 'save', label: 'Save & share', advanced: true },
+  ] },
+];
+export const streamSteps = (st: Stream, advanced: boolean) => st.steps.filter((x) => advanced || !x.advanced);
+export const streamOf = (step: StepId): Stream | undefined => STREAMS.find((st) => st.steps.some((x) => x.id === step));
+
+/** No "step 2 of 5" labels any more: the menu and the step strip already say where you are. */
 export function useEyebrow(id: StepId): string {
-  const advanced = useStore((s) => s.advanced);
-  const list = stepsFor(advanced);
-  const i = list.findIndex((x) => x.id === id);
-  return i >= 0 ? `Step ${i + 1} of ${list.length}` : advanced ? 'Advanced tool' : '';
+  void id;
+  return '';
 }
 
 export interface Source {
@@ -190,7 +212,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   activeScenarioId: null,
   compareIds: [],
   toasts: [],
-  showTips: lsGet('cfi.tips') !== '0',
+  showTips: lsGet('cfi.tips') === '1',
   advanced: lsGet('cfi.advanced') === '1',
   stepTab: {},
   mergeState: null,

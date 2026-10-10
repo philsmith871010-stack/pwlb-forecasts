@@ -64,7 +64,7 @@ export function HistoryAddedNote() {
 }
 
 /** For a day (or a few) of bank data: the sorted day, by category, with every line a click away. */
-export function DayCard() {
+export function DayCard({ onSort }: { onSort?: () => void } = {}) {
   const { ingest, cat, team, goto, setStepTab, historyBase, activeScenarioId, register, saveTeam, teamName, dirty } = useStore();
   const [rows, setRows] = useState<TxnRow[] | null>(null);
   const [open, setOpen] = useState<number | null>(null);
@@ -117,7 +117,7 @@ export function DayCard() {
       </div>
       {unsorted > 0 && (
         <div className="callout small mb"><strong>{unsorted} line{unsorted > 1 ? 's' : ''} we couldn’t sort.</strong> Sorting {unsorted > 1 ? 'them' : 'it'} once teaches the tool for next time.{' '}
-          <button className="link-btn" onClick={() => { setStepTab('review-simple', 'unsorted'); goto('review'); }}>Sort {unsorted > 1 ? 'them' : 'it'} now</button></div>
+          <button className="link-btn" onClick={() => { if (onSort) onSort(); else { setStepTab('review-simple', 'unsorted'); goto('review'); } }}>Sort {unsorted > 1 ? 'them' : 'it'} now</button></div>
       )}
       <table className="tbl day-tbl">
         <thead><tr><th>Category</th><th className="num">Lines</th><th className="num">In</th><th className="num">Out</th><th /></tr></thead>

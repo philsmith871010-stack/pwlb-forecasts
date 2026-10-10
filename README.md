@@ -65,18 +65,13 @@ Reference numbers on a 2024-era laptop, from the bench:
 
 A forecast recomputes in 10–30 ms; changing an assumption updates the chart and summary in under 100 ms.
 
-## How it works — the eight steps
+## How it works — one menu, three jobs
 
-1. **Load.** Open the team file, then drop in bank CSVs. Files are streamed with PapaParse in a Web Worker, with progress. Rejected rows are logged with reasons. Overlapping exports are de-duplicated, and a balance continuity check runs where there is a balance column.
-2. **Map columns.** Header row, delimiter, date format, day/month order, amount convention and column roles are auto-detected, with dropdowns to override. Save a layout as a **bank profile** and it maps itself next time.
-3. **Categorise.** A deterministic pipeline records the rule behind every line: internal transfers, team rules, starter rules, treasury counterparties and the "another council" detector, recurring-series detection, then heuristic flags (loan pairs, round sums, interest-like half-yearly amounts, outliers).
-4. **Review.** Three queues, biggest value first: uncategorised and low-confidence groups, treasury/deal flows with suspected loan pairs side by side, and outliers. Every decision becomes a rule in the team file, with undo.
-5. **History.** Overview by financial year, cumulative operational versus actual position, year-on-year with CAGR, small multiples, a waterfall, seasonal profiles, a day-of-month profile, a heatmap, structural-break detection, a category deep dive with drill-down, recurring versus one-off, and data quality.
-6. **Forecast.** Seasonal × trend, recurring-series schedules, flat average or manual. Assumptions cover growth, step changes with backdated arrears, timing changes, start/stop and an inflation overlay. One-offs carry confidence weighting, schedules can be pasted from Excel, and a known treasury schedule can be overlaid. Outputs: an uncertainty band, low/high points, threshold breaches, a plain-English summary, scenarios and comparison.
-7. **Backtest.** "Forecast as if it were…" builds profiles strictly from earlier data, then compares the result with what actually happened. It reports the predictable core versus one-off surprises, and a rolling mode shows accuracy by horizon.
-8. **Save and export.** Save the team file (save in place with merge-on-conflict, or download). Exports: an Excel workbook, a categorised transactions CSV, PNG/SVG charts and a printable report.
+- **Today's statement:** drop in a day's bank statement. It's sorted with the team's rules; sort anything new on the same screen; the day joins the saved history.
+- **History:** load statements (years the first time, the latest period after that), check the sorting, look back at how cash behaves.
+- **Forecast:** start from the saved history, statements or the example. Then: check each line, known future items, cash and investments (including the deal register), your forecast, what you could do, report and Excel.
 
-After the first full run the sidebar becomes a **workspace** (Data, History, Forecast, Backtest, Save & export, Settings) instead of repeating the wizard.
+The team file opens and saves from the header from anywhere. Settings (the gear) holds explanations on every page and the advanced tools: column mapping, sorting results, all transactions, backtesting, scenarios.
 
 ## Day to day, or a periodic review
 

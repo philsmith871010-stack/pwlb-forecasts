@@ -43,7 +43,7 @@ export function StrategyView({ b }: { b: ForecastBundle }) {
         {!register && (
           <div className="callout mt small">
             <strong>Add your deal register for a fuller picture.</strong> With it, these options take account of your loans falling due,
-            LOBO call dates, investments maturing and your liability benchmark. <button className="link-btn" onClick={() => goto('load')}>Add it on step 1</button>
+            LOBO call dates, investments maturing and your liability benchmark. <button className="link-btn" onClick={() => { useStore.getState().setStepTab('forecast-simple', 's-start'); useStore.getState().setStepTab('forecast', 's-start'); goto('forecast'); }}>Add it under Cash and investments</button>
           </div>
         )}
       </Panel>

@@ -1,13 +1,13 @@
 import { useStore } from '../../state/store';
 import { APP_NAME_PARTS } from '../../config';
-import { ago } from '../../lib/format';
+import { ago, day, int } from '../../lib/format';
+import { historySpan } from '../../lib/history/cashHistory';
+import { useOpenTeamFile } from '../components/HeaderMenus';
 
 const STAGES = [
-  { icon: 'bi-cloud-arrow-up', title: 'Add your data', text: 'Drop in the bank statement files (CSV) from your online banking — or try the example data.' },
-  { icon: 'bi-ui-checks', title: 'Check the sorting', text: 'Almost everything is sorted for you. Confirm the handful of items we weren’t sure about.' },
-  { icon: 'bi-bar-chart-line', title: 'Look back', text: 'See how your cash has behaved: year by year, and through the seasons.' },
-  { icon: 'bi-graph-up-arrow', title: 'Look ahead', text: 'Check our proposal line by line — how big, how fast it grows, when it’s paid — add what you know, then see your forecast.' },
-  { icon: 'bi-box-arrow-down', title: 'Save & share', text: 'Download a ready-made report or Excel file, and save your work for next time.' },
+  { icon: 'bi-calendar-day', title: 'Today’s statement', text: 'Drop in today’s bank statement. It’s sorted with your team’s rules in seconds, you sort anything new, and the day joins your history.' },
+  { icon: 'bi-bar-chart-line', title: 'History', text: 'Load years of statements once. Check the sorting, then see how your cash behaves: year by year and through the seasons.' },
+  { icon: 'bi-graph-up-arrow', title: 'Forecast', text: 'Check our proposal line by line, add what you know is coming, and see when you’d need to borrow, with options and a ready-made report.' },
 ];
 
 const BENEFITS = [
@@ -27,37 +27,53 @@ const SECURITY = [
 ];
 
 export function HomePage() {
-  const { goto, setStepTab, generateDemo, team, teamName, ingest } = useStore();
-  const start = () => { setStepTab('load', 'team'); goto('load'); };
+  const { goto, setStepTab, generateDemo, team, teamName, ingest, cat, historyOnly, historyBase, basis } = useStore();
+  const { open, el } = useOpenTeamFile();
+  const span = historyBase ? historySpan(historyBase) : null;
+  const checked = team.forecasts.find((f) => f.reviewDone);
+  const start = () => goto('load');
   const demo = () => { setStepTab('load', 'demo'); goto('load'); void generateDemo({ seed: 'northbridge', startFY: 2021, years: 5, preset: 'small', accounts: 4, nastiness: 1 }); };
   return (
     <div className="home">
-      <section className="home-hero">
+      <section className="home-hero compact">
         <div className="home-hero-inner">
-          <div className="pill-live"><span className="dot ok" /> A PWLBtoday tool · runs entirely in your browser</div>
           <h1>{APP_NAME_PARTS[0]}<span>{APP_NAME_PARTS[1]}</span></h1>
-          <p className="home-lead">Turn your bank statements into a clear, explainable <strong>cash flow forecast</strong> — and see when your council will need to borrow, how much, and when it will have cash to invest.</p>
-          <div className="row" style={{ gap: 12, marginTop: 24 }}>
-            <button className="btn primary lg" onClick={start}><i className="bi bi-play-fill" /> Get started</button>
-            <button className="btn lg on-dark" onClick={demo}><i className="bi bi-stars" /> Try it with example data</button>
-            {ingest && <button className="btn lg on-dark" onClick={() => goto('forecast')}>Continue where I was <i className="bi bi-arrow-right" /></button>}
+          <p className="home-lead">Your council’s cash: sorted, understood and forecast. What would you like to do?</p>
+          <div className="jobs">
+            <button className="job" onClick={() => goto('today')}>
+              <i className="bi bi-calendar-day" />
+              <strong>Today’s statement</strong>
+              <span>Sort today’s bank statement in seconds.</span>
+              <em>{span ? `History saved to ${day(span.to)}` : 'Best with your team file'}</em>
+            </button>
+            <button className="job" onClick={() => goto(cat || historyOnly ? 'history' : 'load')}>
+              <i className="bi bi-bar-chart-line" />
+              <strong>History</strong>
+              <span>Load years of statements and see how your cash behaves.</span>
+              <em>{cat ? `${int(ingest?.rows ?? 0)} bank lines loaded` : span ? `Saved: ${day(span.from)} to ${day(span.to)}` : 'Start here the first time'}</em>
+            </button>
+            <button className="job" onClick={() => goto('forecast')}>
+              <i className="bi bi-graph-up-arrow" />
+              <strong>Forecast</strong>
+              <span>See when you’d need to borrow, and your options.</span>
+              <em>{checked ? `“${checked.name}” checked` : basis || span ? 'Ready to build' : 'Needs your history first'}</em>
+            </button>
           </div>
-          <div className="home-daily"><button className="link-btn" onClick={() => { goto('load'); void useStore.getState().tryDayToDay(); }}>Or see day-to-day use</button> <span>— a saved history, and today’s statement sorted in seconds</span></div>
-          <div className="home-trust">
-            <span><i className="bi bi-shield-lock-fill" /> Bank data never leaves this computer</span>
-            <span><i className="bi bi-eye" /> Every number explained</span>
-            <span><i className="bi bi-stopwatch" /> Five years sorted in seconds</span>
+          <div className="home-under">
+            {(teamName || team.savedAt)
+              ? <span><i className="bi bi-folder2" /> Team file: <strong>{team.authorityName}</strong>{team.savedAt ? ` · saved ${ago(team.savedAt)}` : ''}</span>
+              : <span><i className="bi bi-folder2" /> Used it before? <button className="link-btn" onClick={() => void open()}>Open your team file</button></span>}
+            <span>New here? <button className="link-btn" onClick={demo}>Try the example</button> or <button className="link-btn" onClick={() => { goto('today'); void useStore.getState().tryDayToDay(); }}>see today’s statement with it</button></span>
           </div>
-          {(teamName || team.savedAt) && <div className="home-team"><i className="bi bi-file-earmark-check" /> Team file loaded: <strong>{team.authorityName}</strong> · {team.rules.length} rules · {team.forecasts.length} saved forecast{team.forecasts.length === 1 ? '' : 's'}{team.savedAt ? ` · saved ${ago(team.savedAt)}` : ''}</div>}
+          {el}
         </div>
       </section>
 
       <nav className="home-nav" aria-label="On this page">
-        {[['what', 'What it is'], ['how', 'How it works'], ['benefits', 'What you get'], ['security', 'Your data is safe'], ['start', 'What you need']].map(([id, l]) => (
+        <span className="home-nav-label">About this tool</span>
+        {[['what', 'What it is'], ['how', 'What you can do'], ['benefits', 'What you get'], ['security', 'Your data is safe'], ['start', 'What you need']].map(([id, l]) => (
           <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{l}</a>
         ))}
-        <span className="spacer" />
-        <button className="btn primary sm" onClick={start}>Get started <i className="bi bi-arrow-right" /></button>
       </nav>
       <div className="page" style={{ paddingTop: 36 }}>
         <section className="home-section" id="what">
@@ -89,9 +105,9 @@ export function HomePage() {
         </section>
 
         <section className="home-section" id="how">
-          <div className="eyebrow">How it works</div>
-          <h2>Five simple steps</h2>
-          <p className="muted">Each screen tells you what you’re looking at, why it matters and what to do next. You don’t need any treasury or spreadsheet experience — most of the work is automatic.</p>
+          <div className="eyebrow">What you can do</div>
+          <h2>Three jobs, one menu</h2>
+          <p className="muted">Use whichever you need: today’s statement for day-to-day work, history for a periodic deep look, the forecast for the borrowing question. Most of the work is automatic.</p>
           <div className="home-steps">
             {STAGES.map((s, i) => (
               <div key={s.title} className="home-step">

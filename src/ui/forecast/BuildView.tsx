@@ -143,6 +143,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
   const removedSigs = new Set(sc.assumptions.filter((a) => a.kind === 'stop' && a.categoryId === e.id && a.signature).map((a) => (a as Extract<Assumption, { kind: 'stop' }>).signature!));
   const changed = !!(e.method === 'manual' || growthA || levelA || stopA || overridesHere.length || removedSigs.size || e.series.some((s) => s.timing === 'user'));
   const [showGrid, setShowGrid] = useState(overridesHere.length > 0);
+  const [editing, setEditing] = useState(overridesHere.length > 0);
   const [wizard, setWizard] = useState<null | 'build' | 'import'>(null);
   const manual = e.method === 'manual';
   const setManual = (on: boolean) => upd((s) => {
@@ -252,6 +253,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
             </div>
           </div>
 
+          {(editing || changed) && <>
           <div className="lc-edit">
             <div className="lc-label">Change anything you know better</div>
             <div className="lc-fields">
@@ -301,9 +303,11 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
           {wizard === 'build' && <LineWizard e={e} b={b} upd={upd} inflow={inflow} onClose={() => { setWizard(null); setShowGrid(true); }} />}
           {wizard === 'import' && <ImportWizard b={b} upd={upd} lockCategory={e.id} onClose={() => { setWizard(null); setShowGrid(true); }} />}
 
+          </>}
           <div className="lc-foot">
             {changed && <span className="small muted"><i className="bi bi-pencil" /> Your changes are already in the proposal above.</span>}
             <span className="spacer" />
+            {!editing && !changed && <button className="btn" onClick={() => setEditing(true)}><i className="bi bi-pencil" /> Change something</button>}
             <button className="btn primary" onClick={onConfirm}><i className="bi bi-check-lg" /> {checked ? 'Done' : 'Looks right'}</button>
           </div>
         </div>
