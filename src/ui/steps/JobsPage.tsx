@@ -1,13 +1,17 @@
 // Home inside the app: the three jobs, for your council or the example council.
 import { useStore } from '../../state/store';
 import { historySpan, MIN_HISTORY_DAYS } from '../../lib/history/cashHistory';
-import { day } from '../../lib/format';
+import { day, money } from '../../lib/format';
+import { useTracking, aheadWords } from '../forecast/useTracking';
 import { ymdFromDay, MONTH_NAMES } from '../../lib/dates';
 
 const monthOf = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
 
 export function JobsPage() {
-  const { goto, team, historyBase, space, switchWorkspace, exampleBusy, register } = useStore();
+  const { goto, team, historyBase, space, switchWorkspace, exampleBusy, register, setStepTab, advanced } = useStore();
+  const tr = useTracking();
+  // with a signed-off forecast to track, the Forecast card opens on how it's doing
+  const openForecast = () => { if (tr?.r) setStepTab(advanced ? 'forecast' : 'forecast-simple', 'past'); goto('forecast'); };
   // the saved history including anything added this session
   const saved = team.cashHistory ?? historyBase;
   const span = saved ? historySpan(saved) : null;
@@ -45,11 +49,12 @@ export function JobsPage() {
                 <span>Load years of statements and see how your cash behaves.</span>
                 <em>{!span ? 'Three to five years of statements' : years >= 1 ? `${years.toLocaleString('en-GB')} years saved, ${monthOf(span.from)} to ${monthOf(span.to)}` : `${days} day${days === 1 ? '' : 's'} saved: add past years to see patterns`}</em>
               </button>
-              <button className={`job ${checked || enough ? 'ready' : 'waiting'}`} onClick={() => goto('forecast')}>
+              <button className={`job ${checked || enough ? 'ready' : 'waiting'}`} onClick={openForecast}>
                 <i className="bi bi-graph-up-arrow" />
                 <strong>Forecast</strong>
                 <span>See when you’d need to borrow, and your options.</span>
-                <em>{checked && enough ? `“${checked.name}” checked` : enough ? 'Ready to build' : register ? 'Deal register loaded' : 'Needs your history first'}</em>
+                {tr?.r && <em className="job-track"><i className="bi bi-patch-check-fill" /> Everyday cash {aheadWords(tr.gap, money)} the signed-off “{tr.rec.scenarioName}”, to {day(tr.asOf)}</em>}
+                {!tr?.r && <em>{tr ? `“${tr.rec.scenarioName}” signed off: waiting for statements` : checked && enough ? `“${checked.name}” checked` : enough ? 'Ready to build' : register ? 'Deal register loaded' : 'Needs your history first'}</em>}
               </button>
             </div>
           )}

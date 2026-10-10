@@ -890,3 +890,8 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 .signed-meta { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--pt-line-soft); }
 .signed-meta .bi-patch-check-fill { color: #1e7b34; margin-right: 4px; }
 @media (max-width: 640px) { .signed-list button { min-width: 0; flex: 1 1 100%; } }
+.job em.job-track { color: #fff; background: rgba(255,255,255,.1); border-radius: 8px; padding: 6px 9px; line-height: 1.35; }
+.job em.job-track i { color: var(--pt-mint); margin-right: 3px; font-size: 13px; }
+.day-card .day-foot { display: flex; flex-direction: column; gap: 6px; }
+.day-track { padding-top: 6px; border-top: 1px solid var(--pt-line); }
+.day-track i { color: #1e7b34; margin-right: 3px; }

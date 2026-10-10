@@ -290,3 +290,21 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
   - **Today:** records live in `TeamFile.signedOff`. They're added and never edited, and merging team files keeps everyone's (union by id), so two people's sign-offs never conflict.
   - **Later:** one table, e.g. `forecast_signoffs (id, council_id, scenario_id, signed_by_user_id, signed_at, note, start, end, payload jsonb)`, insert-only, readable by everyone in the council.
   - **Comparison:** `compareSigned(record, history)` is a pure function of the record and the cash history, so it can run in the browser or on a server, and needs no change when storage moves. The dialog's free-text name becomes the signed-in user.
+
+## Tracking on Home and Today's statement
+
+- **One answer everywhere** (`useTracking`): the newest signed-off forecast with statements to compare against, or else the newest one still waiting. Home, Today's statement and Forecast vs actual all use it, so they always name the same forecast and the same figure.
+- **Home:** the Forecast card reads like "Everyday cash £11.2m ahead of the signed-off 'Mid-year review', to 31 Mar 2026", and opens straight on Forecast vs actual. A sign-off with no statements after it yet reads "signed off: waiting for statements".
+- **Today's statement:** under the day's totals, "Since the signed-off 'Mid-year review' began (1 Oct 2025), everyday cash is £11.2m ahead of it", with a link. It shows only when the comparison includes the day just loaded.
+- **Wording:** "ahead of" means more cash than the signed-off forecast expected, "behind" less, and "in line with" within £0.5m.
+
+## Scope: a bank tool with monitoring, not a treasury management system
+
+What this tool does: sorts bank statements, forecasts everyday cash, and checks forecasts against what happened. It reads the deal register, and it has no way to write to it. It deliberately doesn't:
+- record, price, confirm or settle deals;
+- hold the book of record for loans and investments (the deal register stays the source);
+- monitor counterparty or treasury management strategy limits;
+- make or approve payments;
+- produce accounting entries.
+
+New features should stay on this side of the line. Signing off and monitoring a cash forecast is forecasting governance, not dealing.

@@ -7,6 +7,7 @@ import { EChart, axisMoney } from '../components/EChart';
 import { money, pct, day } from '../../lib/format';
 import { addMonths, dayFromYMD, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
 import { compareSigned, fullMonthsLabel } from '../../lib/forecast/signoff';
+import { useTracking } from './useTracking';
 import { backtestFromHistory, type BacktestResult } from '../../lib/forecast/backtest';
 import { historySpan, type CashHistory } from '../../lib/history/cashHistory';
 import type { Category } from '../../lib/categories';
@@ -52,7 +53,9 @@ function SignedView() {
   const { team, historyBase } = useStore();
   const h = team.cashHistory ?? historyBase;
   const list = [...(team.signedOff ?? [])].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
-  const [id, setId] = useState(list[0]?.id);
+  // open on the one Home and Today's statement report on
+  const tracked = useTracking();
+  const [id, setId] = useState(tracked?.rec.id ?? list[0]?.id);
   const rec = list.find((x) => x.id === id) ?? list[0];
   const r = useMemo(() => (rec && h ? compareSigned(rec, h, team.categories) : null), [rec, h, team.categories]);
   if (!rec) return null;
