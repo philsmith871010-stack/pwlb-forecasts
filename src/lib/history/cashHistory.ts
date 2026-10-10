@@ -211,6 +211,10 @@ export function mergeHistory(base: CashHistory | null, add: CashHistory): { hist
 
 // ---------------------------------------------------------------- back to a forecast basis
 
+/** Less history than this can't show a pattern: no look back or forecast from it yet. */
+export const MIN_HISTORY_DAYS = 180;
+export function historyDays(h: CashHistory | null | undefined): number { const s = h ? historySpan(h) : null; return s ? s.to - s.from + 1 : 0; }
+
 export function historySpan(h: CashHistory): { from: Day; to: Day } | null {
   const all = h.accounts.flatMap((a) => a.ranges);
   if (!all.length) return null;

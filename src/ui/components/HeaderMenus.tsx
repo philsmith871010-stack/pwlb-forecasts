@@ -131,7 +131,7 @@ export function SpaceSwitch() {
   const { space, switchWorkspace, exampleBusy } = useStore();
   return (
     <div className="space-switch" role="tablist" aria-label="Whose cash">
-      <button role="tab" aria-selected={space === 'mine'} className={space === 'mine' ? 'on' : ''} onClick={() => void switchWorkspace('mine')}>Your council</button>
+      <button role="tab" aria-selected={space === 'mine'} className={space === 'mine' ? 'on' : ''} onClick={() => void switchWorkspace('mine')}><span className="ss-long">Your council</span><span className="ss-short">Yours</span></button>
       <button role="tab" aria-selected={space === 'example'} className={space === 'example' ? 'on' : ''} onClick={() => void switchWorkspace('example')}>{exampleBusy ? <span className="spinner sm" /> : <i className="bi bi-stars" />} Example</button>
     </div>
   );

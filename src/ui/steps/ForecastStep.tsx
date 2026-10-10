@@ -16,6 +16,7 @@ import { SimpleStart, SimpleItems, SimpleBreakdown } from '../forecast/SimpleCon
 import { BuildView, reviewState, isReviewed, dataEndIso } from '../forecast/BuildView';
 import { SnapshotForecastView } from '../forecast/SnapshotView';
 import { money, day, ago } from '../../lib/format';
+import { historyDays, MIN_HISTORY_DAYS } from '../../lib/history/cashHistory';
 import type { Scenario } from '../../lib/model';
 import { buildResultsSnapshot } from '../../lib/analysis/snapshot';
 
@@ -101,7 +102,7 @@ export function ForecastStep() {
     return () => clearTimeout(t);
   }, [b, sc]);
 
-  if (!basis) {
+  if (!basis || basis.agg.D < MIN_HISTORY_DAYS) {
     const snaps = team.forecasts.filter((f) => f.resultsSnapshot);
     return <div className="page">{snaps.length && !useStore.getState().historyBase ? <SnapshotForecastView /> : <ForecastStart />}</div>;
   }
@@ -306,13 +307,17 @@ function ScenarioBar() {
 
 /** The forecast needs a history first: the saved one, or statements loaded under History. */
 function ForecastStart() {
-  const { historyBase, useSavedHistory, goto, space, switchWorkspace, register } = useStore();
+  const { historyBase, basis, useSavedHistory, goto, space, switchWorkspace, register, exampleBusy } = useStore();
+  const days = basis ? basis.agg.D : historyDays(historyBase);
+  const short = days > 0 && days < MIN_HISTORY_DAYS;
+  if (exampleBusy) return <div className="page narrow"><div className="jobs-busy light"><span className="spinner" /> Setting up the example council: five years of statements, sorted…</div></div>;
   return (
     <div className={`page ${register ? '' : 'narrow'}`}>
       <PageHead title="Forecast">A forecast is built from your cash history.</PageHead>
+      {short && <div className="callout navy mb small"><strong>Not enough history yet.</strong> Your bank history covers {days === 1 ? 'one day' : `${days} days`}. A forecast needs at least six months of statements to see a pattern, and three to five years is ideal.</div>}
       <div className="start-choices">
-        {historyBase && <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>Nothing to load.</span></button>}
-        <button className={`start-choice ${historyBase ? '' : 'primary'}`} onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
+        {historyBase && !short && <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>Pick up where you left off.</span></button>}
+        <button className={`start-choice ${historyBase && !short ? '' : 'primary'}`} onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
         {space === 'mine' && <button className="start-choice" onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /><strong>Explore the example council</strong><span>See a finished forecast first.</span></button>}
       </div>
       <section className="register-start">

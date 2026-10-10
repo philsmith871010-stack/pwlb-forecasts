@@ -3,7 +3,7 @@ import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, StepFooter, Money } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
-import { money, pct, day, int } from '../../lib/format';
+import { money, pctDone, day, int } from '../../lib/format';
 import { F_LOAN_PAIR, F_ROUND, F_COUNCIL, F_INTEREST_LIKE, F_LARGE, F_SINGLE, F_DEAL_LIKE_OP } from '../../lib/categorise/engine';
 import type { Category } from '../../lib/categories';
 import { ymdFromDay, MONTH_NAMES } from '../../lib/dates';
@@ -54,26 +54,28 @@ export function SimpleReview() {
   const unsorted = useQueue(() => engine().uncategorisedQueue(200));
   const deals = useQueue(() => engine().dealQueue(200));
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
-  const groups = (unsorted?.groups ?? []).filter((g) => !skipped.has(`g${g.sigIdx}`));
   const questions = buildLoanQuestions(deals).filter((q) => !skipped.has(q.key));
+  // a line asked about as a possible loan isn't asked about twice
+  const asLoan = new Set(questions.map((q) => q.signature));
+  const groups = (unsorted?.groups ?? []).filter((g) => !skipped.has(`g${g.sigIdx}`) && !asLoan.has(g.signature));
   if (!cat) return null;
   const allDone = groups.length === 0 && questions.length === 0;
   const skip = (k: string) => setSkipped(new Set([...skipped, k]));
   return (
     <div className="page narrow">
       <PageHead eyebrow={eyebrow} title="Check the sorting">
-        We’ve sorted almost everything automatically. Help us with the few items we weren’t sure about — biggest amounts first.
+        We’ve sorted almost everything automatically. Help us with the few items we weren’t sure about, biggest amounts first.
       </PageHead>
 
       <div className="progress-card">
         <div>
-          <div className="pc-big">{pct(cat.valueCategorisedPct)}</div>
+          <div className="pc-big">{pctDone(cat.valueCategorisedPct)}</div>
           <div className="pc-label">of your money is sorted</div>
         </div>
         <div style={{ flex: 1 }}>
           <div className="meter" style={{ height: 12 }}><div style={{ width: `${cat.valueCategorisedPct * 100}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
           <div className="small muted" style={{ marginTop: 8 }}>
-            {allDone ? 'Nothing left to check — well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to sort</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. You don’t have to do them all — small amounts make little difference.</>}
+            {allDone ? 'Nothing left to check. Well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to check</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. You don’t have to do them all: small amounts make little difference.</>}
           </div>
         </div>
         {catBusy && <span className="spinner" title="Updating" />}
@@ -90,7 +92,7 @@ export function SimpleReview() {
         <>
           {groups.length > 0 && (
             <section className="review-sec">
-              <h3>Items we couldn’t sort <span className="muted">({groups.length})</span></h3>
+              <h3>Items we weren’t sure about <span className="muted">({groups.length})</span></h3>
               <p className="small muted">Choose what each one is and click <strong>Save</strong>. Not sure? Click <strong>Skip</strong>.</p>
               <div className="stack" style={{ gap: 12 }}>{groups.slice(0, 12).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => skip(`g${g.sigIdx}`)} />)}
                 {groups.length > 12 && <div className="small muted center">Showing the 12 largest. More appear as you go.</div>}</div>
@@ -99,11 +101,11 @@ export function SimpleReview() {
           {questions.length > 0 && (
             <section className="review-sec">
               <h3>Possible loans or investments <span className="muted">({questions.length})</span></h3>
-              <p className="small muted">Loans and investments are left out of the forecast. Is each of these one? The reason we’re asking is under each.</p>
+              <p className="small muted">Loans and investments are left out of the everyday forecast, so it matters which these are. Each says why we’re asking.</p>
               <div className="stack" style={{ gap: 12 }}>{questions.slice(0, 12).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</div>
             </section>
           )}
-          <StepFooter nextLabel={allDone ? 'Next: look back' : 'Done for now — next: look back'} />
+          <StepFooter nextLabel={allDone ? 'Next: look back' : 'Done for now: look back'} />
         </>
       )}
     </div>

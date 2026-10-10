@@ -55,3 +55,6 @@ export function ago(isoStr: string): string {
   if (h < 48) return `${h} h ago`;
   return new Date(isoStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/** A share of something done, rounded down: 99.96% sorted shows as 99.9%, never 100%. */
+export const pctDone = (x: number) => pct(Math.floor(x * 1000) / 1000);

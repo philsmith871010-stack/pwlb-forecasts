@@ -37,6 +37,7 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
     const tr = fc.treasuryDaily.some((v) => v) && showTreasury ? idx.map((i, k) => (k === lastHistIdx ? histVals[k] : fcAt(days[i], fc.cumulativeAfterTreasury))) : null;
     const nearest = (d: Day) => { const s = isoFromDay(d); let best = x[0]; for (const v of x) { if (v <= s) best = v; else break; } return best; };
     const breaches = fc.breaches.map((br) => [{ xAxis: nearest(br.from), itemStyle: { color: 'rgba(176,70,50,.045)' } }, { xAxis: nearest(br.to) }]);
+    const narrow = window.innerWidth < 640;
     const markers = fc.markers.filter((m) => m.day >= fc.start && m.day < fc.start + fc.H);
     return {
       tooltip: {
@@ -51,17 +52,18 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
           return [head, ...rows, ...ms].join('<br/>');
         },
       },
-      legend: { top: 0, right: 0, data: ['Past', fcName, 'Likely range', ...(before ? ['Everyday cash only'] : []), ...(tr ? ['After known loan repayments'] : [])] },
-      grid: { left: 72, right: 24, top: 36, bottom: slider ? 64 : 30 },
+      // on a phone the legend wraps: put it under the chart, clear of the "forecast starts" label
+      legend: { ...(narrow ? { bottom: slider ? 36 : 0, left: 0 } : { top: 0, right: 0 }), data: ['Past', fcName, 'Likely range', ...(before ? ['Everyday cash only'] : []), ...(tr ? ['After known loan repayments'] : [])] },
+      grid: narrow ? { left: 52, right: 12, top: 24, bottom: slider ? 110 : 78 } : { left: 72, right: 24, top: 36, bottom: slider ? 64 : 30 },
       xAxis: { type: 'category', data: x, axisLabel: { formatter: (v: string) => { const { y, m } = ymdFromDay(Math.floor(Date.parse(v) / 864e5)); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1]} ${String(y).slice(2)}`; } } },
       yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
-      dataZoom: slider ? [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 12, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }] : [{ type: 'inside' }],
+      dataZoom: slider ? [{ type: 'inside', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false }, { type: 'slider', height: 18, bottom: 12, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }] : [{ type: 'inside', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false }],
       series: [
         { name: '_lo', type: 'line', data: lo, stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
         { name: 'Likely range', type: 'line', data: width, stack: 'band', stackStrategy: 'all', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(253,126,20,.14)' }, showSymbol: false, silent: true, itemStyle: { color: 'rgba(253,126,20,.4)' } },
         {
           name: 'Past', type: 'line', data: histVals, showSymbol: false, connectNulls: false, lineStyle: { width: 2.2, color: '#0a2540' }, itemStyle: { color: '#0a2540' }, sampling: 'lttb',
-          markLine: { silent: true, symbol: 'none', data: [{ xAxis: nearest(fc.start - 1), lineStyle: { color: '#adb5bd', type: 'solid' }, label: { formatter: 'today', color: '#6c757d', fontSize: 11 } }] },
+          markLine: { silent: true, symbol: 'none', data: [{ xAxis: nearest(fc.start - 1), lineStyle: { color: '#adb5bd', type: 'solid' }, label: { formatter: 'forecast starts', color: '#6c757d', fontSize: 11 } }] },
         },
         {
           name: fcName, type: 'line', data: fcVals, showSymbol: false, lineStyle: { width: 2.6, color: '#fd7e14', type: 'dashed' }, itemStyle: { color: '#fd7e14' }, sampling: 'lttb',

@@ -56,7 +56,7 @@ function SimpleSave({ embedded }: { embedded?: boolean }) {
     <div className="save-card primary">
           <i className="bi bi-file-earmark-richtext" />
           <h3>The report</h3>
-          <p>A clear seven-page summary for your manager, a treasury report or a Section 151 briefing: the low point, how much you may need to borrow, options to discuss, charts and the assumptions behind it.</p>
+          <p>A clear seven-page summary for your manager, a treasury report or a section 151 briefing: the low point, how much you may need to borrow, options to discuss, charts and the assumptions behind it.</p>
           <button className="btn primary lg" disabled={!b} onClick={() => setView('report')}><i className="bi bi-eye" /> View and download</button>
         </div>
   );
@@ -64,7 +64,7 @@ function SimpleSave({ embedded }: { embedded?: boolean }) {
     <div className="save-card">
           <i className="bi bi-file-earmark-excel" />
           <h3>Excel spreadsheet</h3>
-          <p>All the numbers: the forecast month by month, past years by category, growth rates and your assumptions — ready to use in your own spreadsheets.</p>
+          <p>All the numbers: the forecast month by month, past years by category, growth rates and your assumptions, ready for your own spreadsheets.</p>
           <button className="btn lg" disabled={!b || !agg || busy === 'xlsx'} onClick={async () => {
             if (!b || !agg) return;
             setBusy('xlsx');
@@ -207,7 +207,7 @@ function AdvancedSave() {
         <NextTab label="Next: report" onClick={() => setTab('report')} />
       </div>}
       {tab === 'report' && b && <>
-        <div className="no-print"><Explain compact what="A ready-made summary for a treasury report or Section 151 briefing: low point, borrowing need, chart, categories, assumptions, backtest and data quality." todo={<>Click <strong>Print / save as PDF</strong>, then choose “Save as PDF” in the print dialog.</>} /></div>
+        <div className="no-print"><Explain compact what="A ready-made summary for a treasury report or section 151 briefing: low point, borrowing need, chart, categories, assumptions, backtest and data quality." todo={<>Click <strong>Print / save as PDF</strong>, then choose “Save as PDF” in the print dialog.</>} /></div>
         <div className="row no-print mb"><span className="small muted">Six A4 pages: cover, executive summary, month by month, drivers & assumptions, history, and confidence.</span><span className="spacer" /><button className="btn primary lg" onClick={() => window.print()}><i className="bi bi-printer" /> Print / save as PDF</button></div>
         <ReportView b={b} backtest={defaultBacktest} />
       </>}

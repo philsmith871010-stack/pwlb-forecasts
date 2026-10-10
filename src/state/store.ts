@@ -5,7 +5,7 @@ import type { TeamFile, Rule, Scenario, TxnOverride, SeriesOverride, ForecastSet
 import { uid } from '../lib/model';
 import { emptyTeamFile, parseTeamFile, serialiseTeamFile, teamHash, fsAccessSupported, readHandle, writeHandle, saveAsWithPicker, downloadText, mergeTeamFiles, MergeConflict } from '../lib/teamfile';
 import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
-import { mergeHistory, basisFromHistory, historyBefore, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
+import { mergeHistory, basisFromHistory, historyBefore, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
 import type { GeneratorOptions } from '../generator';
@@ -263,7 +263,7 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   goto: (step) => {
     // with a saved history there's nothing to choose: look back and forecast work from it straight away
-    if ((step === 'history' || step === 'forecast') && !get().basis && get().historyBase) get().useSavedHistory();
+    if ((step === 'history' || step === 'forecast') && !get().basis && historyDays(get().historyBase) >= MIN_HISTORY_DAYS) get().useSavedHistory();
     if (step === 'history' && !get().basis) step = 'load';
     const list = stepsFor(get().advanced);
     const i = list.findIndex((s) => s.id === step);
@@ -416,6 +416,9 @@ export const useStore = create<State & Actions>((set, get) => ({
     if (ws === 'example' && !get().team.cashHistory) await get().setupExample();
     // the example council's deal register is always connected
     if (ws === 'example' && !get().register) await get().useExampleRegister();
+    // stay on the same job, now working from this workspace's saved history
+    const st = get().step;
+    if (st === 'forecast' || st === 'history' || st === 'load' || st === 'review') get().goto(st === 'forecast' ? 'forecast' : 'history');
   },
 
   /** The example council's saved history: five years, up to the day before its last statement. */

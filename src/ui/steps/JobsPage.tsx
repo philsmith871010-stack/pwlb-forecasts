@@ -1,11 +1,19 @@
 // Home inside the app: the three jobs, for your council or the example council.
 import { useStore } from '../../state/store';
-import { historySpan } from '../../lib/history/cashHistory';
-import { day, int } from '../../lib/format';
+import { historySpan, MIN_HISTORY_DAYS } from '../../lib/history/cashHistory';
+import { day } from '../../lib/format';
+import { ymdFromDay, MONTH_NAMES } from '../../lib/dates';
+
+const monthOf = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
 
 export function JobsPage() {
-  const { goto, team, ingest, cat, historyBase, basis, space, switchWorkspace, exampleBusy, register } = useStore();
-  const span = historyBase ? historySpan(historyBase) : null;
+  const { goto, team, historyBase, space, switchWorkspace, exampleBusy, register } = useStore();
+  // the saved history including anything added this session
+  const saved = team.cashHistory ?? historyBase;
+  const span = saved ? historySpan(saved) : null;
+  const days = span ? span.to - span.from + 1 : 0;
+  const years = Math.round((days / 365.25) * 2) / 2;
+  const enough = days >= MIN_HISTORY_DAYS;
   const checked = team.forecasts.find((f) => f.reviewDone);
   const example = space === 'example';
   return (
@@ -24,23 +32,24 @@ export function JobsPage() {
             <div className="jobs-busy"><span className="spinner" /> Setting up the example council: five years of statements, sorted…</div>
           ) : (
             <div className="jobs">
-              <button className="job" onClick={() => goto('today')}>
+              <button className={`job ${span ? 'ready' : 'waiting'}`} onClick={() => goto('today')}>
                 <i className="bi bi-calendar-day" />
                 <strong>Today’s statement</strong>
                 <span>Sort today’s bank statement in seconds.</span>
-                <em>{span ? `History saved to ${day(span.to)}` : 'Works best once your history is loaded'}</em>
+                <em>{span ? `Saved up to ${day(span.to)}` : 'Works best once your history is loaded'}</em>
               </button>
-              <button className="job" onClick={() => goto('history')}>
+              <button className={`job ${enough ? 'ready' : 'start'}`} onClick={() => goto('history')}>
+                {!enough && <b className="job-flag">Start here</b>}
                 <i className="bi bi-bar-chart-line" />
                 <strong>History</strong>
                 <span>Load years of statements and see how your cash behaves.</span>
-                <em>{cat ? `${int(ingest?.rows ?? 0)} bank lines loaded` : span ? `Saved: ${day(span.from)} to ${day(span.to)}` : 'Start here the first time'}</em>
+                <em>{!span ? 'Three to five years of statements' : years >= 1 ? `${years.toLocaleString('en-GB')} years saved, ${monthOf(span.from)} to ${monthOf(span.to)}` : `${days} day${days === 1 ? '' : 's'} saved: add past years to see patterns`}</em>
               </button>
-              <button className="job" onClick={() => goto('forecast')}>
+              <button className={`job ${checked || enough ? 'ready' : 'waiting'}`} onClick={() => goto('forecast')}>
                 <i className="bi bi-graph-up-arrow" />
                 <strong>Forecast</strong>
                 <span>See when you’d need to borrow, and your options.</span>
-                <em>{checked ? `“${checked.name}” checked` : basis || span ? 'Ready to build' : register ? 'Deal register loaded' : 'Needs your history first'}</em>
+                <em>{checked && enough ? `“${checked.name}” checked` : enough ? 'Ready to build' : register ? 'Deal register loaded' : 'Needs your history first'}</em>
               </button>
             </div>
           )}

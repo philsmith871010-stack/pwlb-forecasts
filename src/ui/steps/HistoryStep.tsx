@@ -5,7 +5,7 @@ import { PageHead, Panel, StepFooter, Seg, Empty, CatBadge, Money, Kpi, Explain,
 import { EChart, axisMoney } from '../components/EChart';
 import { TxnTable } from '../components/TxnTable';
 import { annualTotals, yearsOf, positions, cagr, seasonalProfile, dayOfMonthProfile, detectBreaks, monthlyTotals, extremes, YearMode } from '../../lib/analysis/history';
-import { money, pct, day, int, iso } from '../../lib/format';
+import { money, pct, pctDone, day, int, iso } from '../../lib/format';
 import { fmtDay, isoFromDay, Day, ymdFromDay } from '../../lib/dates';
 import { UNCATEGORISED_COLOUR, Category, GROUP_LABELS } from '../../lib/categories';
 import { engine } from '../../worker/client';
@@ -118,7 +118,7 @@ function Overview({ h, part }: { h: H; part: 'years' | 'position' }) {
   const trVol = years.map((y) => { let s = 0; for (let c = 0; c <= h.C; c++) for (let d = Math.max(0, y.start - agg.startDay); d <= Math.min(agg.D - 1, y.end - agg.startDay); d++) s += Math.abs(agg.treasury[c * agg.D + d]); return s; });
   return (
     <div className="stack">
-      {part === 'years' && <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(cards.length, 6)}, minmax(0,1fr))` }}>
+      {part === 'years' && <div className="grid year-grid" style={{ ['--n' as string]: Math.min(cards.length, 6) }}>
         {cards.map((k, i) => (
           <div key={k.y.key} className="kpi" style={{ minHeight: 0 }}>
             <div className="kpi-label">{k.y.label}{!k.y.complete && <span className="badge soft" style={{ marginLeft: 6 }}>part</span>}</div>
@@ -137,7 +137,7 @@ function Overview({ h, part }: { h: H; part: 'years' | 'position' }) {
       {part === 'position' && (() => {
         const first = pos.operational[0], lastV = pos.operational[pos.operational.length - 1];
         const change = lastV - first;
-        return <div className="summary-box"><div className="eyebrow">In a sentence</div>Over these {years.filter((y) => y.complete).length || years.length} years your everyday cash {change < 0 ? <>fell by <strong>{money(-change)}</strong>. That gap was covered by borrowing and by using savings — it’s the underlying need to borrow.</> : <>grew by <strong>{money(change)}</strong>, leaving spare cash to invest.</>}</div>;
+        return <div className="summary-box"><div className="eyebrow">In a sentence</div>Over these {(Math.round((pos.operational.length / 365.25) * 2) / 2).toLocaleString('en-GB')} years your everyday cash {change < 0 ? <>fell by <strong>{money(-change)}</strong>. That gap was covered by borrowing and by using savings: it’s the underlying need to borrow.</> : <>grew by <strong>{money(change)}</strong>, leaving spare cash to invest.</>}</div>;
       })()}
       {part === 'position' && <Panel title="Your everyday cash over time" sub={`starting from your bank balance of ${money(agg.openingBalance)}`}
         right={<label className="check" style={{ color: '#fff', fontSize: 12.5 }}><input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> also show actual bank balance</label>}>
@@ -147,7 +147,7 @@ function Overview({ h, part }: { h: H; part: 'years' | 'position' }) {
           grid: { left: 70, right: 20, top: 36, bottom: 60 },
           xAxis: { type: 'category', data: dates, axisLabel: { formatter: (v: string) => { const [y, m] = v.split('-'); return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m - 1]} ${y.slice(2)}`; } } },
           yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
-          dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 10, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }],
+          dataZoom: [{ type: 'inside', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false }, { type: 'slider', height: 18, bottom: 10, borderColor: 'transparent', fillerColor: 'rgba(253,126,20,.15)' }],
           series: [
             { name: 'Everyday cash', type: 'line', data: Array.from(pos.operational), showSymbol: false, lineStyle: { width: 2, color: '#0a2540' }, areaStyle: { color: 'rgba(10,37,64,.06)' }, sampling: 'lttb',
               markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0 }], lineStyle: { color: '#adb5bd', type: 'dashed' }, label: { show: false } } },
@@ -396,7 +396,7 @@ function CategoryDeepDive({ h }: { h: H }) {
     return { labels: keys.map((k) => iso(k)), rec: keys.map((k) => m.get(k)![0]), one: keys.map((k) => m.get(k)![1]) };
   }, [h, c, gran]);
   return (
-    <div className="grid g-side-l" style={{ gridTemplateColumns: '260px minmax(0,1fr)' }}>
+    <div className="grid g-side-l side-260">
       <Panel title="Categories" flush>
         <div style={{ maxHeight: 900, overflow: 'auto' }}>
           {h.opCats.map(({ i }) => (
@@ -414,7 +414,7 @@ function CategoryDeepDive({ h }: { h: H }) {
             grid: { left: 70, right: 16, top: 30, bottom: 60 },
             xAxis: { type: 'category', data: data.labels },
             yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
-            dataZoom: [{ type: 'inside' }, { type: 'slider', height: 18, bottom: 8 }],
+            dataZoom: [{ type: 'inside', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false }, { type: 'slider', height: 18, bottom: 8 }],
             series: [
               { name: 'Recurring', type: 'bar', stack: 'a', data: data.rec, itemStyle: { color: h.colour(c) }, large: true },
               { name: 'One-off', type: 'bar', stack: 'a', data: data.one, itemStyle: { color: '#fd7e14' }, large: true },
@@ -521,7 +521,7 @@ export function DataQuality() {
   return (
     <div className="stack">
       <div className="grid g5">
-        <Kpi light label="Value categorised" value={pct(cat.valueCategorisedPct)} sub={`${int(cat.uncategorisedRows)} lines uncategorised`} />
+        <Kpi light label="Value categorised" value={pctDone(cat.valueCategorisedPct)} sub={`${int(cat.uncategorisedRows)} lines uncategorised`} />
         <Kpi light label="Rejected rows" value={int(ingest.rejectsTotal)} sub="see the list under Load statements" />
         <Kpi light label="Balance breaks" value={int(breaks)} sub={`${ingest.balanceChecks.length} file(s) with balances`} />
         <Kpi light label="Possible duplicates" value={int(ingest.dupCandidates)} sub={`${int(ingest.overlapRemoved)} overlap rows removed`} />
@@ -562,12 +562,12 @@ function SimpleYears({ h }: { h: H }) {
   const first = full[0], last = full[full.length - 1];
   const sentence = full.length >= 2
     ? <>In <strong>{deficits} of the last {full.length} full years</strong> the council spent more everyday cash than it received.{' '}
-        {first && last && <>In {first.y.label} <strong>{first.net >= 0 ? `${money(first.net)} more came in` : `${money(-first.net)} more went out`}</strong> than {first.net >= 0 ? 'went out' : 'came in'}; by {last.y.label} it was <strong>{last.net >= 0 ? `${money(last.net)} more in` : `${money(-last.net)} more out`}</strong>{Math.abs(last.net) > Math.abs(first.net) && last.net < 0 ? ' — so the need to borrow is growing' : ''}.</>}</>
+        {first && last && <>In {first.y.label} <strong>{first.net >= 0 ? `${money(first.net)} more came in` : `${money(-first.net)} more went out`}</strong> than {first.net >= 0 ? 'went out' : 'came in'}; by {last.y.label} it was <strong>{last.net >= 0 ? `${money(last.net)} more in` : `${money(-last.net)} more out`}</strong>{Math.abs(last.net) > Math.abs(first.net) && last.net < 0 ? ', so the need to borrow is growing' : ''}.</>}</>
     : <>Here is how much everyday money came in and went out each year.</>;
   return (
     <div className="stack">
       <div className="summary-box"><div className="eyebrow">In a sentence</div>{sentence}</div>
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${Math.min(rows.length, 6)}, minmax(0,1fr))` }}>
+      <div className="grid year-grid" style={{ ['--n' as string]: Math.min(rows.length, 6) }}>
         {rows.map((r) => (
           <div key={r.y.key} className="year-card">
             <div className="yc-year">{r.y.label}{!r.y.complete && <span className="badge soft" style={{ marginLeft: 6 }}>part year</span>}</div>

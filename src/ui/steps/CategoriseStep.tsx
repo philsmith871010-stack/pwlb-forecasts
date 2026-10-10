@@ -88,7 +88,7 @@ function CatHeadline() {
   return (
     <div className="stack fade" key={catVersion}>
       <div className="grid g4">
-        <Kpi label="Money categorised" value={<Counter value={cat.valueCategorisedPct * 100} format={(v) => `${v.toFixed(1)}%`} />} sub={`${int(cat.uncategorisedRows)} lines (${money(cat.uncategorisedAbs)}) still to sort`} />
+        <Kpi label="Money categorised" value={<Counter value={cat.valueCategorisedPct * 100} format={(v) => `${(Math.floor(v * 10) / 10).toFixed(1)}%`} />} sub={`${int(cat.uncategorisedRows)} lines (${money(cat.uncategorisedAbs)}) still to sort`} />
         <Kpi label="Loans & investments found" value={<Counter value={cat.treasuryAbs} format={(v) => money(v)} />} sub={`${money(cat.suspectedAbs)} of it to confirm in Review`} />
         <Kpi label="Regular payments found" value={<Counter value={cat.seriesCount} />} sub="e.g. payroll, precepts, grant instalments" />
         <Kpi label="Worth a quick look" value={<Counter value={cat.outlierRows + cat.dealLikeOpRows} />} sub={`${cat.outlierRows} unusually large · ${cat.dealLikeOpRows} loan-like`} />

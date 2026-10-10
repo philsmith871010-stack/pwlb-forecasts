@@ -7,7 +7,7 @@ import { periodise, sumByPeriod, lastByPeriod } from '../../lib/forecast/engine'
 import { annualTotals, yearsOf, cagr } from '../../lib/analysis/history';
 import type { BacktestResult } from '../../lib/forecast/backtest';
 import type { Assumption } from '../../lib/model';
-import { money, pct, day, int } from '../../lib/format';
+import { money, pct, pctDone, day, int } from '../../lib/format';
 import { historySpan } from '../../lib/history/cashHistory';
 import { fmtDay, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
 import { APP_NAME, PARENT_BRAND } from '../../config';
@@ -300,7 +300,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
             {ingest && cat ? (
               <ul className="r-list">
                 <li>{int(ingest.rows)} transactions from {ingest.files.length} file{ingest.files.length === 1 ? '' : 's'} and {ingest.accounts.length} account{ingest.accounts.length === 1 ? '' : 's'}.</li>
-                <li>{pct(cat.valueCategorisedPct)} of all money categorised.</li>
+                <li>{pctDone(cat.valueCategorisedPct)} of all money categorised.</li>
                 <li>{money(cat.treasuryAbs)} of borrowing and investment flows identified and excluded ({money(cat.suspectedAbs)} suspected rather than confirmed).</li>
                 <li>{int(ingest.rejectsTotal)} lines skipped (totals rows, invalid dates); {ingest.balanceChecks.reduce((t, x) => t + x.breaks, 0)} balance check breaks.</li>
                 {cat.dealLikeOpAbs > 0 && <li>{money(cat.dealLikeOpAbs)} of loan-like items remain in the operational figures and should be reviewed.</li>}

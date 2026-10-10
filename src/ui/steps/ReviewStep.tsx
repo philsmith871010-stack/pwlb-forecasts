@@ -4,7 +4,7 @@ import { SimpleReview } from './SimpleReview';
 import { PageHead, Panel, StepFooter, Modal, CategorySelect, CatBadge, catByIdx, Empty, Money, Seg, Explain, StepTabs, NextTab, useStepTab, TabDef } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
-import { money, pct, day, int } from '../../lib/format';
+import { money, pct, pctDone, day, int } from '../../lib/format';
 import { FLAG_LABELS, F_OUTLIER, F_SINGLE } from '../../lib/categorise/engine';
 import type { Category } from '../../lib/categories';
 import type { DealFlag, TxnOverride } from '../../lib/model';
@@ -90,7 +90,7 @@ function ReviewOverview({ go }: { go: (t: string) => void }) {
         why="This is the step that makes the forecast trustworthy — especially making sure no loans or investments are counted as everyday cash."
         todo="Work through the three lists in order. Each shows the biggest money first, so you can stop when what’s left is small." />
       <div className="card card-pad mb">
-        <div className="row"><strong className="navy">{pct(cat.valueCategorisedPct)} of all money is sorted</strong><span className="spacer" /><span className="small muted">{money(cat.treasuryAbs)} identified as loans & investments</span></div>
+        <div className="row"><strong className="navy">{pctDone(cat.valueCategorisedPct)} of all money is sorted</strong><span className="spacer" /><span className="small muted">{money(cat.treasuryAbs)} identified as loans & investments</span></div>
         <div className="meter mt"><div style={{ width: `${cat.valueCategorisedPct * 100}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
       </div>
       <div className="stack">

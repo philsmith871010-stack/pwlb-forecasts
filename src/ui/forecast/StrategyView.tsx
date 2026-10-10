@@ -22,7 +22,7 @@ export function StrategyView({ b }: { b: ForecastBundle }) {
   const longest = [...st.ladder].reverse().find((r) => r.amount >= 1e6);
   return (
     <div className="stack">
-      <div className="callout navy small"><i className="bi bi-chat-square-text" /> <strong>Options to discuss.</strong> {STRATEGY_CAVEAT}</div>
+      <div className="callout navy small"><i className="bi bi-chat-square-text" /> {STRATEGY_CAVEAT}</div>
 
       <div className="grid g2">
         <Kpi label="Borrowing needed" value={money(st.shortfall)} sub={st.shortfallDay ? `by ${day(st.shortfallDay)}: ${money(st.lasting)} lasting, ${money(st.shortTerm)} short term` : 'none in this forecast'} />

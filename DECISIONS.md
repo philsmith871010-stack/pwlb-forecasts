@@ -247,3 +247,22 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
 - **The confidence page always has substance:** the likely range at 3, 6, 12 and 24 months. A saved history reports its own span, accounts and regular payments, in place of "not available".
 - **Drivers table** shows at most 18 categories, with the rest on one line, so it can't spill off its page.
 - Wording: "1 month", "dips below it twice", no nested brackets around the register's name, plurals in data quality.
+
+## Full run-through (every job, desktop and phone)
+
+- **Switching to the example while on Forecast or History** now waits for the example to set up, shows a message meanwhile, then opens the same job on its history. Before, it stopped on the start screen offering "Use your saved history: nothing to load".
+- **A forecast needs at least six months of history** (`MIN_HISTORY_DAYS`). One saved day (from a first Today's statement) used to produce an empty "0 of 0 lines checked" forecast. Now Forecast says how much history there is and what it needs, and History opens on loading statements.
+- **Home shows the saved history including today's additions**, as years and months ("5 years saved, Apr 2021 to Mar 2026"), not the lines in this session. A first-time user's History card says **Start here**, and jobs that can't run yet are muted.
+- **Landing page:** a small illustration of a forecast (past, forecast, likely range, minimum cash, borrowing need) sits beside the headline. It's hidden on narrow screens.
+- **Charts no longer capture the scroll wheel:** zoom with Ctrl + scroll (or the slider in advanced tools), so the page scrolls normally over a chart. The forecast chart's divider reads "forecast starts", not "today": the forecast starts where the data ends, which may not be today.
+- **Phones:** the app shell no longer runs wider than the screen (it was 551px on a 375px phone). The header fits on one row (the switch reads "Yours | Example", and the privacy shield moves out). Step tabs and job strips scroll sideways on one row with the current tab in view. The chart legend moves under the chart. Year cards wrap.
+- **Today's statement:**
+  - Lines in a single day no longer repeat the date.
+  - The account column shows only when there are several accounts.
+  - A new user is pointed to History afterwards.
+- **Check the sorting:**
+  - "% sorted" rounds down (`pctDone`).
+  - The fallback items are "items we weren't sure about" (they do have a best-guess category), not "couldn't sort".
+  - A line asked about as a possible loan isn't also listed as an item to sort.
+- **History's "over these N years"** uses the span actually held (it said 4 for nearly 5).
+- **Wording:** the "not advice" note no longer repeats "Options to discuss"; "section 151" is lower case; a few dashes became plain punctuation.

@@ -60,6 +60,10 @@ export function TodayPage() {
         <>
           <DayCard onSort={() => sortRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           <div ref={sortRef}><TodaySorting /></div>
+          {space === 'mine' && !historyBase && (
+            <div className="callout navy mt small"><strong>Next:</strong> to see patterns and forecast, load a few years of past statements under{' '}
+              <button className="link-btn" onClick={() => { useStore.setState({ sources: [], ingest: null, cat: null }); goto('load'); }}>History</button>. Today’s day is already saved, so nothing is lost.</div>
+          )}
         </>
       )}
     </div>

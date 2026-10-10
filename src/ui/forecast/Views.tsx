@@ -35,7 +35,7 @@ export function StackedView({ b }: { b: ForecastBundle; granularity?: Granularit
       grid: { left: 72, right: 16, top: 16, bottom: 64 },
       xAxis: { type: 'category', data: p.labels },
       yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
-      dataZoom: n > 40 ? [{ type: 'inside' }] : undefined,
+      dataZoom: n > 40 ? [{ type: 'inside', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false }] : undefined,
       series: [
         ...series.map((s) => ({ name: cat(s.id)?.name ?? 'Uncategorised', type: 'bar', stack: s.v.reduce((a, x) => a + x, 0) >= 0 ? 'in' : 'out', data: s.v, itemStyle: { color: cat(s.id)?.colour ?? UNCATEGORISED_COLOUR }, emphasis: { focus: 'series' } })),
         { name: 'Net', type: 'line', data: net, lineStyle: { color: '#0a2540', width: 2 }, itemStyle: { color: '#0a2540' }, symbolSize: 4, z: 10 },
@@ -75,7 +75,7 @@ export function CategoryExplorer({ b }: { b: ForecastBundle }) {
       grid: { left: 72, right: 16, top: 30, bottom: 50 },
       xAxis: { type: 'category', data: labels },
       yAxis: { type: 'value', axisLabel: { formatter: axisMoney } },
-      dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 6 }],
+      dataZoom: [{ type: 'inside', zoomOnMouseWheel: 'ctrl', moveOnMouseWheel: false }, { type: 'slider', height: 16, bottom: 6 }],
       series: [
         { name: 'History', type: 'bar', data: hist, itemStyle: { color: colour } },
         { name: 'Forecast', type: 'bar', data: fut.map((v, k) => (k < ms.labels.length ? null : v)), itemStyle: { color: colour, opacity: 0.45, borderColor: colour, borderWidth: 1, borderType: 'dashed' } },

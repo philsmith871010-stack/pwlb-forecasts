@@ -194,8 +194,11 @@ export function useStepTab(step: string, tabs: TabDef[], initial?: string): [str
 }
 
 export function StepTabs({ tabs, value, onChange, numbered = true }: { tabs: TabDef[]; value: string; onChange: (id: string) => void; numbered?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // on a phone the tabs scroll sideways: keep the current one in view
+  useEffect(() => { const el = ref.current, on = el?.querySelector<HTMLElement>('.on'); if (el && on && el.scrollWidth > el.clientWidth) el.scrollTo({ left: el.scrollLeft + on.getBoundingClientRect().left - el.getBoundingClientRect().left - 24, behavior: 'smooth' }); }, [value]);
   return (
-    <div className="step-tabs" role="tablist">
+    <div className="step-tabs" role="tablist" ref={ref}>
       {tabs.map((t, i) => (
         <button key={t.id} role="tab" aria-selected={value === t.id} title={t.hint} className={value === t.id ? 'on' : ''} disabled={t.disabled} onClick={() => onChange(t.id)}>
           {numbered ? <span className="st-num">{i + 1}</span> : t.icon ? <i className={`bi ${t.icon}`} /> : null}
