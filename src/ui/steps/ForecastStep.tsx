@@ -315,16 +315,15 @@ function ForecastStart() {
   if (exampleBusy) return <div className="page narrow"><div className="jobs-busy light"><span className="spinner" /> Setting up the example council: five years of statements, sorted…</div></div>;
   return (
     <div className={`page ${register ? '' : 'narrow'}`}>
-      <PageHead title="Forecast">A forecast is built from your cash history.</PageHead>
-      {short && <div className="callout navy mb small"><strong>Not enough history yet.</strong> Your bank history covers {days === 1 ? 'one day' : `${days} days`}. A forecast needs at least six months of statements to see a pattern, and three to five years is ideal.</div>}
+      <PageHead title="Forecast">{short ? <>Your bank history covers {days === 1 ? 'one day' : `${days} days`}. A forecast needs at least six months to see a pattern; three to five years is ideal.</> : historyBase ? 'Built from your saved history.' : 'A forecast learns from your bank history, so load that first.'}</PageHead>
       <div className="start-choices">
         {historyBase && !short && <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>Pick up where you left off.</span></button>}
         <button className={`start-choice ${historyBase && !short ? '' : 'primary'}`} onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
         {space === 'mine' && <button className="start-choice" onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /><strong>Explore the example council</strong><span>See a finished forecast first.</span></button>}
       </div>
       <section className="register-start">
-        <h3>{register ? 'Your deal register on its own' : 'Or start with your deal register'}</h3>
-        {!register && <p className="small muted" style={{ marginTop: 0 }}>No bank statements yet? Your deal register alone shows what you owe and hold, the repayments, interest and maturities coming up, and your liability benchmark.</p>}
+        <h3>{register ? 'Your deal register on its own' : 'Meanwhile: your deal register'}</h3>
+        {!register && <p className="small muted" style={{ marginTop: 0 }}>On its own it shows what you owe and hold, what falls due, and your liability benchmark.</p>}
         <RegisterCard />
         {register && <RegisterOverview r={register} />}
       </section>

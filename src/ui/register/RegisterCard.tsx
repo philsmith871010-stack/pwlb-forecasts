@@ -55,11 +55,10 @@ export function RegisterCard() {
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <i className="bi bi-journal-text reg-icon" />
         <div style={{ flex: 1 }}>
-          <h3 style={{ margin: 0 }}>Add your deal register <span className="badge soft">recommended</span></h3>
+          <h3 style={{ margin: 0 }}>Add your deal register</h3>
           <p className="small" style={{ margin: '4px 0 0' }}>
-            Your deal register is the spreadsheet listing your council’s loans and investments (the one used for PWLBtoday reports).
-            With it, the forecast knows when loans are repaid, when investments mature and what interest is due, and can suggest
-            how much to borrow, for how long, and whether you could invest for longer.
+            The spreadsheet of your loans and investments (the one used for PWLBtoday reports). With it, repayments, maturities and
+            interest are in the forecast, and the options say how much to borrow and for how long.
           </p>
           {registerError && <div className="callout red mt"><strong>We couldn’t read that register.</strong> {registerError}</div>}
           <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
@@ -68,7 +67,7 @@ export function RegisterCard() {
               {registerBusy ? <><span className="spinner sm" /> Reading…</> : <><i className="bi bi-file-earmark-excel" /> Choose register (.xlsx)</>}
             </button>
             <a className="btn ghost" href={TEMPLATE_URL} download="pwlb-register.xlsx"><i className="bi bi-download" /> Blank template</a>
-            <span className="xs muted">Read on this computer only, for this session.</span>
+            <span className="xs muted">Read on this computer only.</span>
           </div>
         </div>
       </div>

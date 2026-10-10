@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../../state/store';
-import { Panel, Kpi } from '../components/common';
+import { Panel } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, day } from '../../lib/format';
 import { STRATEGY_CAVEAT, Strategy } from '../../lib/forecast/strategy';
@@ -23,11 +23,6 @@ export function StrategyView({ b }: { b: ForecastBundle }) {
   return (
     <div className="stack">
       <div className="callout navy small"><i className="bi bi-chat-square-text" /> {STRATEGY_CAVEAT}</div>
-
-      <div className="grid g2">
-        <Kpi label="Borrowing needed" value={money(st.shortfall)} sub={st.shortfallDay ? `by ${day(st.shortfallDay)}: ${money(st.lasting)} lasting, ${money(st.shortTerm)} short term` : 'none in this forecast'} />
-        <Kpi light label="Could invest for 12 months" value={money(st.ladder.find((r) => r.months === 12)?.amount ?? 0)} sub="above your minimum, on the cautious line" />
-      </div>
 
       <Panel title="Options to discuss" sub={register ? 'from your forecast and your deal register' : 'from your forecast'}>
         <div className="options">

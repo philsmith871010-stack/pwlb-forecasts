@@ -59,7 +59,6 @@ function SignedView() {
   const rec = list.find((x) => x.id === id) ?? list[0];
   const r = useMemo(() => (rec && h ? compareSigned(rec, h, team.categories) : null), [rec, h, team.categories]);
   if (!rec) return null;
-  const signedOn = day(dayFromISO(rec.signedAt.slice(0, 10)));
   return (
     <>
       <div className="signed-list" role="radiogroup" aria-label="Signed-off forecast">
@@ -71,11 +70,11 @@ function SignedView() {
         ))}
       </div>
       <div className="signed-meta small">
-        <div><i className="bi bi-patch-check-fill" /> Signed off on <strong>{signedOn}</strong> by <strong>{rec.signedBy}</strong>. At the time: may need to borrow <strong>{money(rec.borrowingNeed)}</strong>, lowest point {money(rec.low)} on {day(dayFromISO(rec.lowDay))}.</div>
+        <div><i className="bi bi-patch-check-fill" /> When signed off it said: may need to borrow <strong>{money(rec.borrowingNeed)}</strong>, lowest point {money(rec.low)} on {day(dayFromISO(rec.lowDay))}.</div>
         {rec.note && <div className="muted">“{rec.note}”</div>}
         {rec.knownItems.length > 0 && <div className="muted">Added by hand: {rec.knownItems.join('; ')}.</div>}
       </div>
-      {r ? <PastResult r={r} intro={<>Signed off on {signedOn}, the forecast said</>} handAdded={rec.knownItems.length > 0}
+      {r ? <PastResult r={r} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
         chartNote="Exactly as signed off, including anything added by hand. Everyday cash only: loans, investments and transfers between your own accounts are left out."
         catsLabel={fullMonthsLabel(r) ? `over the complete months so far, ${fullMonthsLabel(r)}` : ''} />
         : <div className="callout navy small">Nothing to compare yet: no statements from {day(dayFromISO(rec.start))} onwards have come in. As each new statement arrives, it’s compared with this forecast.</div>}
@@ -124,8 +123,6 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: Backtest
   let gross = 0;
   for (let d = 0; d <= end; d++) gross += Math.abs(r.actualCum[d] - (d ? r.actualCum[d - 1] : 0));
   const share = gross ? Math.abs(gap) / gross : 0;
-  let inside = 0;
-  for (let d = 0; d < r.H; d++) if (r.actualCum[d] >= r.lowerCum[d] && r.actualCum[d] <= r.upperCum[d]) inside++;
   const oneOffs = r.actualCum[end] - r.actualCoreCum[end];
   const verdict = share < 0.02 ? { word: 'Very close', cls: 'green' } : share < 0.05 ? { word: 'Close', cls: 'green' } : { word: 'Some way out', cls: 'soft' };
   const move = (v: number, past = false) => (v < 0 ? `${past ? 'fell' : 'fall'} by ${money(-v)}` : `${past ? 'rose' : 'rise'} by ${money(v)}`);
@@ -159,7 +156,7 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: Backtest
     <>
       <div className="summary-box">
         <div className="eyebrow">In a sentence <span className={`badge ${verdict.cls}`} style={{ marginLeft: 8 }}>{verdict.word}</span></div>
-        {intro} everyday cash would <strong>{move(fc)}</strong> by {day(at)}{atWords}. It actually <strong>{move(act, true)}</strong>: {Math.abs(gap) < 0.05e6 ? 'almost exactly as forecast' : <>a difference of <strong>{money(Math.abs(gap))}</strong>, {pct(share)} of the {money(gross)} that flowed in and out</>}.
+        {intro} everyday cash would <strong>{move(fc)}</strong> by {day(at)}{atWords}. It actually <strong>{move(act, true)}</strong>{Math.abs(gap) < 0.05e6 ? ', almost exactly as forecast' : ''}.
         {Math.abs(oneOffs) >= 1e6 && (handAdded
           ? <> One-off items account for {money(oneOffs, { sign: true })} of what happened; only those added by hand were in the forecast.</>
           : <> One-off items, which no forecast from history can see, account for {money(oneOffs, { sign: true })} of what happened.</>)}
@@ -168,7 +165,7 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: Backtest
       <div className="grid g3">
         <Kpi label="Forecast made then" value={money(fc, { sign: true })} sub={`change in everyday cash to ${day(at)}`} />
         <Kpi light label="What actually happened" value={money(act, { sign: true })} sub={`over the same ${months === 1 ? 'month' : `${months} months`}`} />
-        <Kpi light label="Inside the likely range" value={pct(inside / r.H, 0)} sub="of the days" />
+        <Kpi light label="Difference" value={money(gap, { sign: true })} sub={`${pct(share)} of the cash that flowed`} />
       </div>
 
       <Panel title="Forecast made then, against what happened" sub={`change in everyday cash since ${day(r.cutoff)}`}>

@@ -12,7 +12,7 @@ import { EChart, axisMoney } from '../components/EChart';
 import { GridEditor } from './GridEditor';
 import { ImportWizard } from './ImportWizard';
 import { LineWizard } from './LineWizard';
-import { money, day } from '../../lib/format';
+import { money, day, pct } from '../../lib/format';
 import { MONTH_NAMES, weekday, dayFromISO, isoFromDay } from '../../lib/dates';
 
 type Upd = (fn: (s: Scenario) => Scenario) => void;
@@ -201,7 +201,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
     ],
   } : null, [hist, proposal, open]);
 
-  const summary = `${money(Math.abs(next12))} ${inflow ? 'in' : 'out'} over the next 12 months · ${e.method === 'manual' ? 'your figures only' : `${e.growthPct >= 0 ? '+' : ''}${e.growthPct.toFixed(1)}% a year${changed ? ' · changed by you' : ''}`}`;
+  const summary = `${money(Math.abs(next12))} ${inflow ? 'in' : 'out'} over the next 12 months · ${e.method === 'manual' ? 'your figures only' : `${pct(e.growthPct / 100, 1, true)} a year${changed ? ' · changed by you' : ''}`}`;
 
   return (
     <div id={`line-${e.id}`} className={`card line-card ${checked ? 'checked' : ''} ${open ? 'open' : ''}`}>
@@ -209,7 +209,6 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
         <i className={`bi ${checked ? 'bi-check-circle-fill green' : 'bi-circle'} lc-icon`} />
         <span className="swatch" style={{ background: colour }} />
         <span className="lc-title">{e.name}</span>
-        <span className={`badge ${inflow ? 'green' : 'soft'}`}>{inflow ? 'money in' : 'money out'}</span>
         <span className="lc-sum small muted">{summary}</span>
         <i className={`bi ${open ? 'bi-chevron-up' : 'bi-chevron-down'} muted`} />
       </button>

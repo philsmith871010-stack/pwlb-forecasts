@@ -330,3 +330,14 @@ New features should stay on this side of the line. Signing off and monitoring a 
 - **Headline comparisons read at the latest month end inside the period** (`monthEndIndex`), not the latest day. A payday or grant landing a day off forecast swung the daily figure by £10m or more (in the example: £21.5m ahead on 30 Mar, £11.2m on 31 Mar). Home, Today's statement and Monitor's sentence and figures all use the month end and say so ("at the end of Mar 2026"). Monitor's chart still shows every day, so timing is visible but doesn't drive the headline.
 - **Before the first month end of a period**, the latest day is used and labelled "so far".
 - "Inside the likely range" still counts every day: it's about the range, not the headline.
+
+## Sixth simplification pass
+
+- **Forecast before any history** says in one line that a forecast learns from your bank history. The deal register is offered as "Meanwhile: your deal register", with a two-line description and no "recommended" badge (it read as a contradiction under "Or start with…").
+- **Check each line:** the "money in / money out" badge is gone; the line already says "£211.8m in over the next 12 months". Growth uses a proper minus sign (−2.3%).
+- **What you could do:** the row of figures repeating the first option ("Borrowing needed", plus "Could invest for 12 months: £0") is gone. The options lead.
+- **Monitor:**
+  - "Signed off on … by …" is said once, on the forecast's card.
+  - The box under it gives what the forecast said at the time.
+  - The sentence is just what it said and what happened.
+  - The difference has its own figure, replacing "inside the likely range: 29% of the days", which was hard to read (the chart still shows the range).
