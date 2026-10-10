@@ -133,7 +133,7 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
               open === idx ? (
                 <tr key={`l${idx}`} className="lines"><td colSpan={4}>
                   <table className="tbl tbl-sm"><tbody>{g.rows.slice(0, 200).map((r) => (
-                    <tr key={r.i}><td className="xs muted" style={{ width: 90 }}>{day(r.day)}</td><td className="xs">{r.narrative}</td><td className="xs muted">{r.account}</td><td className="num xs"><Money v={r.amount} /></td></tr>
+                    <tr key={r.i}><td className="xs muted" style={{ width: 90 }}>{day(r.day)}</td><td className="xs">{r.narrative}</td><td className="xs muted">{r.account}</td><td className="num xs"><Money v={r.amount} full /></td></tr>
                   ))}</tbody></table>
                 </td></tr>
               ) : null,

@@ -51,3 +51,15 @@ describe('grid cells', async () => {
     expect(parseCell('n/a')).toBeNaN();
   });
 });
+
+describe('money format', async () => {
+  const { money, setExactAmounts } = await import('../src/lib/format');
+  it('rounds to £m / £k by default, and to the penny when asked', () => {
+    expect(money(12_634_512.34)).toBe('£12.6m');
+    expect(money(-25_400)).toBe('−£25k');
+    setExactAmounts(true);
+    expect(money(12_634_512.34)).toBe('£12,634,512.34');
+    expect(money(25_400, { sign: true })).toBe('+£25,400.00');
+    setExactAmounts(false);
+  });
+});

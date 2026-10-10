@@ -10,6 +10,7 @@ import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
 import type { GeneratorOptions } from '../generator';
 import { isoFromDay, addMonths } from '../lib/dates';
+import { setExactAmounts as setExactAmountsFormat } from '../lib/format';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
 export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today';
@@ -86,6 +87,8 @@ export const EXAMPLE_OPTIONS: GeneratorOptions = { seed: 'northbridge', startFY:
 interface State {
   /** past the landing page */
   entered: boolean;
+  /** every figure in pounds and pence, rather than £m / £k */
+  exactAmounts: boolean;
   space: Workspace;
   exampleBusy: boolean;
   team: TeamFile;
@@ -154,6 +157,7 @@ interface Actions {
   generateDemo: (o: GeneratorOptions) => Promise<void>;
   tryDayToDay: () => Promise<void>;
   enter: (ws: Workspace) => Promise<void>;
+  setExactAmounts: (v: boolean) => void;
   switchWorkspace: (ws: Workspace) => Promise<void>;
   setupExample: () => Promise<void>;
   useExampleStatement: () => Promise<void>;
@@ -186,6 +190,8 @@ function cachedTeam(ws: Workspace): TeamFile {
   if (cached) { const r = parseTeamFile(cached); if (r.ok && r.team) return r.team; }
   return emptyTeamFile(ws === 'example' ? 'Northbridge Council (example)' : undefined);
 }
+const initialExact = lsGet('cfi.exact') === '1';
+setExactAmountsFormat(initialExact);
 const initialWs: Workspace = lsGet('cfi.workspace') === 'example' ? 'example' : 'mine';
 
 function lsGet(k: string): string | null { try { return localStorage.getItem(k); } catch { return null; } }
@@ -201,6 +207,7 @@ export function defaultSettings(basis: ForecastBasis | null): ForecastSettings {
 
 export const useStore = create<State & Actions>((set, get) => ({
   entered: false,
+  exactAmounts: initialExact,
   space: initialWs,
   exampleBusy: false,
   team: cachedTeam(initialWs),
@@ -376,6 +383,8 @@ export const useStore = create<State & Actions>((set, get) => ({
     await get().switchWorkspace('example');
     get().goto('today');
   },
+
+  setExactAmounts: (v) => { lsSet('cfi.exact', v ? '1' : '0'); setExactAmountsFormat(v); set({ exactAmounts: v }); },
 
   enter: async (ws) => {
     set({ entered: true });

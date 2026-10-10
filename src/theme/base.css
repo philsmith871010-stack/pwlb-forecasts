@@ -800,3 +800,13 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 .day-tbl tr.clickable:hover td { background: var(--pt-line-soft); }
 .day-tbl td.chev { width: 28px; color: var(--pt-muted); text-align: right; }
 .why-line { margin: 0; font-size: 15px; color: var(--pt-text); }
+.landing-one { min-height: 100vh; display: flex; flex-direction: column; }
+.landing-one .home-hero.landing { flex: 1; display: flex; align-items: center; }
+.landing-one .home-hero-inner { width: 100%; }
+.landing-jobs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 40px; }
+.landing-job { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+.landing-job i { font-size: 22px; color: var(--pt-orange); line-height: 1.2; }
+.landing-job strong { display: block; color: #fff; font-size: 15px; }
+.landing-job span { display: block; color: rgba(255,255,255,.72); font-size: 13.5px; margin-top: 2px; }
+.landing-one .home-trust { margin-top: 26px; }
+@media (max-width: 800px) { .landing-jobs { grid-template-columns: 1fr; } }

@@ -96,7 +96,7 @@ export function TeamFileMenu() {
 }
 
 export function SettingsMenu() {
-  const { showTips, setShowTips, advanced, setAdvanced, goto, cat, step, space, forgetWorkspace } = useStore();
+  const { showTips, setShowTips, advanced, setAdvanced, goto, cat, step, space, forgetWorkspace, exactAmounts, setExactAmounts } = useStore();
   const { open, el } = useOpenTeamFile();
   const save = useSaveTeamFile();
   return (
@@ -106,6 +106,7 @@ export function SettingsMenu() {
       {(close) => (
         <div className="menu">
           <label className="menu-item check"><input type="checkbox" checked={showTips} onChange={(e) => setShowTips(e.target.checked)} /> Show explanations on every page</label>
+          <label className="menu-item check" title="Every figure in pounds and pence, instead of £m and £k"><input type="checkbox" checked={exactAmounts} onChange={(e) => setExactAmounts(e.target.checked)} /> Show exact amounts (£ and pence)</label>
           <label className="menu-item check" title="Column mapping, sorting rules, all transactions, backtesting, scenarios">
             <input type="checkbox" checked={advanced} onChange={(e) => { setAdvanced(e.target.checked); if (!e.target.checked && ['map', 'categorise', 'backtest', 'data', 'settings'].includes(step)) goto('home'); }} /> Advanced tools
           </label>

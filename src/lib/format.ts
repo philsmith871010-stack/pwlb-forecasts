@@ -1,8 +1,13 @@
 import { fmtDay, isoFromDay, Day } from './dates';
 
+/** "Show exact amounts": every figure in pounds and pence instead of £m / £k (a user setting). */
+let exactAmounts = false;
+export function setExactAmounts(v: boolean) { exactAmounts = v; }
+
 export function money(x: number, opts: { dp?: number; compact?: boolean; sign?: boolean } = {}): string {
   const { dp, compact = true, sign = false } = opts;
   if (!isFinite(x)) return '–';
+  if (exactAmounts && compact) { const f = moneyFull(x); return sign && x > 0 ? `+${f}` : f; }
   const a = Math.abs(x);
   let s: string;
   if (compact && a >= 1e9) s = `£${(a / 1e9).toFixed(dp ?? 2)}bn`;

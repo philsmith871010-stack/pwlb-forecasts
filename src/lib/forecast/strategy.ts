@@ -56,7 +56,8 @@ export interface Strategy {
   needBy: { day: Day; amount: number }[];
   /** surplus that stays above the minimum for the whole forecast on the cautious line */
   coreSurplus: number;
-  options: { title: string; body: string; tone: 'borrow' | 'invest' | 'info' | 'warn' }[];
+  /** a headline, one supporting line, and (optionally) the full reasoning */
+  options: { title: string; body: string; detail?: string; tone: 'borrow' | 'invest' | 'info' | 'warn' }[];
 }
 
 const TENORS = [1, 3, 6, 12, 24];
@@ -154,41 +155,58 @@ export function buildStrategy(fc: ForecastResult, reg: StrategyRegister | null):
     }
   }
 
-  // ---------- options to discuss ----------
+  // ---------- options to discuss: a headline, one line, and the reasoning behind "More" ----------
   const options: Strategy['options'] = [];
   const m = (x: number) => fmtMoney(x);
   if (shortfall > 0) {
     options.push({
-      tone: 'borrow', title: `About ${m(shortfall)} of borrowing needed by ${fmtDay(start + lo)}`,
-      body: `Cash is forecast to fall ${m(shortfall)} below your ${m(buffer)} minimum at its lowest point, on ${fmtDay(start + lo)}. It first drops below the minimum on ${fmtDay(firstBelow ?? start + lo)}, so the first borrowing would need to be in place by then.` +
-        (lasting > 0 ? ` About ${m(lasting)} of that does not recover within a year${lastingClipped ? ' or before the forecast ends' : ''} (lasting)${shortTerm > 0 ? `, and ${m(shortTerm)} recovers within a year (short term)` : ''}.` : ' The forecast shows it recovering within a year, so short-term borrowing could cover it.') +
+      tone: 'borrow', title: `Borrow about ${m(shortfall)} by ${fmtDay(start + lo)}`,
+      body: `Have the first in place by ${fmtDay(firstBelow ?? start + lo)}, when cash first dips below your ${m(buffer)} minimum.` +
+        (lasting > 0 ? ` ${m(lasting)} doesn’t recover within a year${shortTerm > 0 ? `; ${m(shortTerm)} does` : ''}.` : ' It all recovers within a year.'),
+      detail: `Cash is forecast to fall ${m(shortfall)} below your ${m(buffer)} minimum at its lowest point, on ${fmtDay(start + lo)}. ` +
+        (lasting > 0 ? `About ${m(lasting)} does not recover within a year${lastingClipped ? ' or before the forecast ends' : ''} (lasting)${shortTerm > 0 ? `, and ${m(shortTerm)} recovers within a year (short term)` : ''}.` : 'The forecast shows it recovering within a year, so short-term borrowing could cover it.') +
         (lastingClipped ? ' A longer forecast would show whether the later part recovers.' : ''),
     });
-    if (shortTerm > 0) options.push({ tone: 'borrow', title: `Short term: ${m(shortTerm)}`, body: 'The part that recovers within a year could be covered by borrowing for up to a year (for example from another council), timed for the low point, rather than by long-term loans.' });
+    if (shortTerm > 0) options.push({ tone: 'borrow', title: `Short term: ${m(shortTerm)}`, body: 'Borrow it for up to a year, timed for the low point.', detail: 'The part that recovers within a year could be covered by short borrowing (for example from another council) rather than by long-term loans.' });
   } else {
-    options.push({ tone: 'info', title: 'No new borrowing needed in this forecast', body: `Cash stays above your ${m(buffer)} minimum throughout. The lowest point is ${m(cum[lo])} on ${fmtDay(start + lo)}.` });
+    options.push({ tone: 'info', title: 'No new borrowing needed', body: `Cash stays above your ${m(buffer)} minimum; the lowest point is ${m(cum[lo])} on ${fmtDay(start + lo)}.` });
   }
   if (benchmark && lasting > 0) {
     if (benchmark.lastingWithinRoom > 0) {
       const longest = benchmark.tranches[benchmark.tranches.length - 1];
-      options.push({ tone: 'borrow', title: `Lasting: ${m(benchmark.lastingWithinRoom)} sits under your liability benchmark`, body: `Your benchmark at the end of ${benchmark.fy} (the year of the low point) is ${m(benchmark.lb)} against ${m(benchmark.loans)} of existing loans, so there is room for ${m(benchmark.room)} of longer-term borrowing. ` + (benchmark.tranches.length > 1 ? `The room narrows in later years, so the benchmark suggests spreading maturities: ${benchmark.tranches.map((t) => `${m(t.amount)} to ${t.untilFy}`).join(', ')}.` : longest ? `The room lasts to at least ${longest.untilFy}, so the benchmark would support borrowing for that long.` : '') });
+      options.push({
+        tone: 'borrow', title: `${m(benchmark.lastingWithinRoom)} could be long-term borrowing`,
+        body: benchmark.tranches.length > 1 ? `Spread the maturities: ${benchmark.tranches.map((t) => `${m(t.amount)} to ${t.untilFy}`).join(', ')}.` : longest ? `Your liability benchmark supports it to at least ${longest.untilFy}.` : 'It sits under your liability benchmark.',
+        detail: `Your benchmark at the end of ${benchmark.fy} (the year of the low point) is ${m(benchmark.lb)} against ${m(benchmark.loans)} of existing loans, so there is room for ${m(benchmark.room)} of longer-term borrowing. Where the room narrows in later years, loans should mature as it does.`,
+      });
     }
-    if (benchmark.lastingAboveRoom > 0) options.push({ tone: 'warn', title: `${m(benchmark.lastingAboveRoom)} more than the benchmark allows by ${benchmark.fy}`, body: `The cash forecast (bottom up) needs more borrowing than the balance sheet projections (top down) support. Either the projections understate capital spending or other needs, or the forecast is too cautious, for example its growth rates. Borrowing that part short term keeps options open while the two are reconciled; long-term borrowing above the benchmark would leave the council over-borrowed.` });
+    if (benchmark.lastingAboveRoom > 0) options.push({
+      tone: 'warn', title: `${m(benchmark.lastingAboveRoom)} more than your benchmark allows`,
+      body: 'Borrow that part short term until the forecast and the balance sheet projections agree.',
+      detail: `By ${benchmark.fy} the cash forecast (bottom up) needs more borrowing than the balance sheet projections (top down) support. Either the projections understate capital spending or other needs, or the forecast is too cautious, for example its growth rates. Long-term borrowing above the benchmark would leave the council over-borrowed.`,
+    });
   }
-  if (benchmark && benchmark.over > 0) options.push({ tone: 'warn', title: `Existing loans are ${m(benchmark.over)} above the benchmark`, body: `In ${benchmark.fy} the council holds more debt than its liability benchmark. Repaying early, or not refinancing maturing loans, may be worth discussing.` });
-  if (refinancing.total > 0) options.push({ tone: 'info', title: `${m(refinancing.total)} of loans fall due in this forecast`, body: `These repayments are already in the forecast. Whether to refinance them is the same question as the lasting need above. The largest: ${refinancing.items.slice().sort((a, b) => b.amount - a.amount).slice(0, 3).map((r) => `${m(r.amount)} on ${fmtDay(r.day)} (${r.label.replace(/^[^:]*: /, '')})`).join('; ')}.` });
-  if (refinancing.lobo.length) options.push({ tone: 'warn', title: `${refinancing.lobo.length} LOBO call date${refinancing.lobo.length > 1 ? 's' : ''} in this forecast`, body: `The forecast assumes the lender calls on ${refinancing.lobo.map((l) => fmtDay(l.day)).join(', ')} (the usual cautious assumption). If it does not, cash will be higher than shown.` });
+  if (benchmark && benchmark.over > 0) options.push({ tone: 'warn', title: `Existing loans ${m(benchmark.over)} above the benchmark`, body: 'Repaying early, or not refinancing maturing loans, may be worth discussing.', detail: `In ${benchmark.fy} the council holds more debt than its liability benchmark.` });
+  if (refinancing.total > 0) {
+    const big = refinancing.items.slice().sort((a, b) => b.amount - a.amount);
+    options.push({
+      tone: 'info', title: `${m(refinancing.total)} of loans fall due`,
+      body: `Largest: ${m(big[0].amount)} on ${fmtDay(big[0].day)} (${big[0].label.replace(/^[^:]*: /, '')}).`,
+      detail: `These repayments are already in the forecast; whether to refinance them is the same question as the lasting need. The largest: ${big.slice(0, 3).map((r) => `${m(r.amount)} on ${fmtDay(r.day)} (${r.label.replace(/^[^:]*: /, '')})`).join('; ')}.`,
+    });
+  }
+  if (refinancing.lobo.length) options.push({ tone: 'warn', title: `${refinancing.lobo.length} LOBO call date${refinancing.lobo.length > 1 ? 's' : ''}`, body: `Assumed called on ${refinancing.lobo.map((l) => fmtDay(l.day)).join(', ')}; cash is higher if not.`, detail: 'Assuming the lender calls is the usual cautious view.' });
   const best = ladder.filter((r) => r.amount >= 1e6);
   if (best.length) {
     const longest = best[best.length - 1];
     const underBorrowed = benchmark && benchmark.room > 0;
     options.push({
-      tone: 'invest', title: `You could lock away about ${m(longest.amount)} for ${longest.months} month${longest.months > 1 ? 's' : ''}`,
-      body: `Even on the cautious line, cash stays above your minimum by at least: ${ladder.map((r) => `${m(r.amount)} for ${r.months}m`).join(', ')}. Cash not needed for that long could earn more in a longer deposit than in an instant-access fund.` +
-        (underBorrowed ? ' But the benchmark shows you are under-borrowed: using surplus cash instead of new borrowing (internal borrowing) is often cheaper than investing it.' : ''),
+      tone: 'invest', title: `Lock away about ${m(longest.amount)} for ${longest.months} month${longest.months > 1 ? 's' : ''}`,
+      body: underBorrowed ? 'Or use it instead of new borrowing, which is usually cheaper.' : 'It stays above your minimum even on the cautious line.',
+      detail: `Even on the cautious line, cash stays above your minimum by at least: ${ladder.map((r) => `${m(r.amount)} for ${r.months}m`).join(', ')}. Cash not needed for that long could earn more in a longer deposit than in an instant-access fund.` + (underBorrowed ? ' The benchmark shows you are under-borrowed, so using surplus cash instead of new borrowing (internal borrowing) is often cheaper than investing it.' : ''),
     });
   } else if (shortfall === 0) {
-    options.push({ tone: 'info', title: 'Keep surplus cash liquid', body: 'On the cautious line the margin above your minimum is small, so instant-access funds suit it better than fixed-term deposits.' });
+    options.push({ tone: 'info', title: 'Keep surplus cash liquid', body: 'The margin above your minimum is small, so instant-access funds suit it.' });
   }
   return {
     shortfall, shortfallDay: shortfall > 0 ? start + lo : null, firstBelow, lasting, lastingFrom, shortTerm,

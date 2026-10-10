@@ -34,7 +34,8 @@ export function StrategyView({ b }: { b: ForecastBundle }) {
           {st.options.map((o, i) => (
             <div key={i} className={`option ${TONE[o.tone].cls}`}>
               <i className={`bi ${TONE[o.tone].icon}`} />
-              <div><div className="t">{o.title}</div><div className="b">{o.body}</div></div>
+              <div><div className="t">{o.title}</div><div className="b">{o.body}</div>
+                {o.detail && <details className="more-detail"><summary>More</summary><div className="b muted">{o.detail}</div></details>}</div>
             </div>
           ))}
         </div>

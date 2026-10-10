@@ -212,3 +212,12 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
 - **Look back:** the year cards stay and the duplicate bar chart below them goes. View tabs are unnumbered, so they don't read as steps under the History strip.
 - **Check each line:** the progress card is the count, "Accept all", and "Import a schedule from another department"; the separate import banner is gone.
 - **Your forecast:** the two figures and one "why" sentence (biggest calls on cash, first dip below the minimum) replace the plain-English paragraph, which repeated the figures. The paragraph remains with advanced tools and in the report. No subtitle once unlocked, and the chart's extra key line shows only with advanced tools.
+
+## Options in one line; a one-screen landing page; how amounts are shown
+
+- **Each option** is a headline plus one line, with the reasoning behind "More" (`Strategy.options[].detail`). The report and Excel use the headline and line.
+- **The landing page is one screen:** name, one sentence, Enter or Explore the example council, the three jobs, three reassurances. The longer explanation sections are gone.
+- **Amounts:**
+  - summaries are rounded to £m / £k, since pennies on a two-year forecast imply false precision;
+  - individual bank lines (Today's statement) are always shown to the penny, for reconciling, and Excel is exact;
+  - a setting, "Show exact amounts (£ and pence)", switches every on-screen figure to pounds and pence. Chart axes and the "about £…" option headlines stay rounded.
