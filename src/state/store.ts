@@ -12,11 +12,11 @@ import { mergeHistory, basisFromHistory, historyBefore, historyDays, MIN_HISTORY
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
 import type { GeneratorOptions } from '../generator';
-import { isoFromDay, addMonths } from '../lib/dates';
+import { isoFromDay, addMonths, dayFromYMD, isBusinessDay, type Day } from '../lib/dates';
 import { setExactAmounts as setExactAmountsFormat } from '../lib/format';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
-export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today';
+export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today' | 'monitor';
 /** Full step list (advanced tools on). */
 export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] = [
   { id: 'load', label: 'Add your data', sub: 'Bank statement files', icon: 'bi-cloud-arrow-up' },
@@ -36,13 +36,16 @@ export function stepsFor(advanced: boolean) {
   return advanced ? STEPS : SIMPLE_STEPS;
 }
 
-// ---------------------------------------------------------------- the three jobs
+// ---------------------------------------------------------------- the four jobs
 
-export type StreamId = 'today' | 'history' | 'forecast';
+export type StreamId = 'history' | 'forecast' | 'today' | 'monitor';
 export interface Stream { id: StreamId; label: string; short: string; icon: string; steps: { id: StepId; label: string; advanced?: boolean }[] }
-/** Everything the tool does, as three jobs, each a short path of steps. */
+/**
+ * Everything the tool does, as four distinct jobs in the order they depend on each other:
+ * learn from the history, build and sign off a forecast, add each day's statement, and check the
+ * signed-off forecasts against what happens.
+ */
 export const STREAMS: Stream[] = [
-  { id: 'today', label: 'Today’s statement', short: 'Today', icon: 'bi-calendar-day', steps: [{ id: 'today', label: 'Today’s statement' }] },
   { id: 'history', label: 'History', short: 'History', icon: 'bi-bar-chart-line', steps: [
     { id: 'load', label: 'Load statements' },
     { id: 'map', label: 'Check the files', advanced: true },
@@ -56,7 +59,17 @@ export const STREAMS: Stream[] = [
     { id: 'backtest', label: 'Test it', advanced: true },
     { id: 'save', label: 'Save & share', advanced: true },
   ] },
+  { id: 'today', label: 'Today’s statement', short: 'Today', icon: 'bi-calendar-day', steps: [{ id: 'today', label: 'Today’s statement' }] },
+  { id: 'monitor', label: 'Monitor', short: 'Monitor', icon: 'bi-activity', steps: [{ id: 'monitor', label: 'Forecast vs actual' }] },
 ];
+
+/** The day a statement is expected up to: the example council's last day, or the last working day before today. */
+export function expectedStatementDay(space: Workspace): Day {
+  if (space === 'example') return dayFromYMD(EXAMPLE_OPTIONS.startFY + EXAMPLE_OPTIONS.years, 3, 31);
+  let d = Math.floor(Date.now() / 86400000) - 1;
+  while (!isBusinessDay(d)) d--;
+  return d;
+}
 export const streamSteps = (st: Stream, advanced: boolean) => st.steps.filter((x) => advanced || !x.advanced);
 export const streamOf = (step: StepId): Stream | undefined => STREAMS.find((st) => st.steps.some((x) => x.id === step));
 

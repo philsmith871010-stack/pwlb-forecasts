@@ -14,7 +14,11 @@ export function exampleSignOffs(h: CashHistory, categories: Category[], buffer: 
   const catIds = categories.map((c) => c.id);
   const full = basisFromHistory(h, catIds);
   if (!full) return [];
-  const firstOf = (months: number) => { const { y, m } = ymdFromDay(addMonths(span.to + 1, -months)); return dayFromYMD(y, m, 1); };
+  // counted back from the start of the month after the history ends, so the dates don't move as
+  // the last few days' statements are added
+  const { y: ey, m: em } = ymdFromDay(span.to);
+  const anchor = addMonths(dayFromYMD(ey, em, 1), 1);
+  const firstOf = (months: number) => addMonths(anchor, -months);
   const plans = [
     { cutoff: firstOf(12), name: 'Budget forecast', note: 'Agreed with the section 151 officer at budget setting. Includes the depot sale, agreed in March.', withSale: true },
     { cutoff: firstOf(6), name: 'Mid-year review', note: 'Refreshed for the mid-year treasury report.', withSale: false },

@@ -3,9 +3,10 @@ import { useStore } from '../../state/store';
 import { APP_NAME_PARTS } from '../../config';
 
 const JOBS = [
-  { icon: 'bi-calendar-day', title: 'Today’s statement', text: 'Drop it in; it’s sorted in seconds and joins your history.' },
-  { icon: 'bi-bar-chart-line', title: 'History', text: 'Years of bank statements, sorted once, so you can see how your cash behaves.' },
-  { icon: 'bi-graph-up-arrow', title: 'Forecast', text: 'When you’ll need to borrow, how much, and your options, with a ready-made report.' },
+  { icon: 'bi-bar-chart-line', title: 'History', text: 'Years of bank statements, sorted once. The forecast learns from them.' },
+  { icon: 'bi-graph-up-arrow', title: 'Forecast', text: 'When you’ll need to borrow and how much. Check it, then sign it off.' },
+  { icon: 'bi-calendar-day', title: 'Today’s statement', text: 'Each day: drop it in, it’s sorted in seconds and joins your history.' },
+  { icon: 'bi-activity', title: 'Monitor', text: 'Your signed-off forecasts against what actually happens.' },
 ];
 
 export function HomePage() {

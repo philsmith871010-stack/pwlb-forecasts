@@ -121,7 +121,7 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
         <span>Everyday cash {one ? 'on the day' : 'over these days'}: <strong>{money(everyday, { sign: true })}</strong>{expected !== null && <span className="muted"> · your forecast expected about {money(expected, { sign: true })}</span>}.</span>
         {tr?.r && tr.asOf >= ingest.maxDay && (
           <span className="day-track"><i className="bi bi-patch-check-fill" /> Since the signed-off “{tr.rec.scenarioName}” began ({day(dayFromISO(tr.rec.start))}), everyday cash is <strong>{aheadWords(tr.gap, money)}</strong> it.{' '}
-            <button className="link-btn" onClick={() => { setStepTab(useStore.getState().advanced ? 'forecast' : 'forecast-simple', 'past'); goto('forecast'); }}>See how</button></span>
+            <button className="link-btn" onClick={() => goto('monitor')}>See how</button></span>
         )}
       </div>
       <div className="done-next">

@@ -43,7 +43,7 @@ export function PastCheck({ sc }: { sc: Scenario }) {
     <div className="stack">
       {signed.length > 0 && <Seg value={v} onChange={setView} options={[{ v: 'signed', label: `Signed-off forecasts (${signed.length})` }, { v: 'method', label: 'Test the method' }]} ariaLabel="What to compare" />}
       {v === 'signed' ? <SignedView /> : <MethodCheck sc={sc} />}
-      {!signed.length && <p className="xs muted" style={{ margin: 0 }}>When you sign off a forecast (on <strong>Your forecast</strong>), it’s kept exactly as it stands and compared here with what actually happens as new statements come in.</p>}
+      {!signed.length && <p className="xs muted" style={{ margin: 0 }}>When you sign off a forecast (under <strong>Forecast</strong>, on <strong>Your forecast</strong>), it’s kept exactly as it stands and compared here with what actually happens as new statements come in. Until then, test the method below.</p>}
     </div>
   );
 }

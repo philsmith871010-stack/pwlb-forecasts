@@ -308,3 +308,19 @@ What this tool does: sorts bank statements, forecasts everyday cash, and checks 
 - produce accounting entries.
 
 New features should stay on this side of the line. Signing off and monitoring a cash forecast is forecasting governance, not dealing.
+
+## Four distinct jobs, and a next step on Home
+
+- **Four jobs, in the order they depend on each other:** History (learn from years of statements, topped up when behind), Forecast (build, check, sign off), Today's statement (daily), Monitor (signed-off forecasts against actuals, whenever you like). They appear in this order in the menu, on Home and on the landing page.
+- **Monitor is its own job** (the `monitor` step, `MonitorPage`), no longer a tab inside Forecast. It works from the saved history and the sign-offs alone, without building a forecast first. "See it against what happens" on a sign-off, Home's Monitor card and the link on Today's statement all go there.
+- **Home shows one next step**, worked out from where you are:
+  1. not enough history (six months): load your bank history;
+  2. history more than 14 days behind: catch up under History, so a forecast doesn't start from old data;
+  3. nothing signed off: build your forecast and sign it off;
+  4. no statement yet up to the expected day: add today's statement;
+  5. otherwise "You're up to date", with the latest signed-off forecast against actuals, opening Monitor.
+
+  Below it, the four jobs each show done (tick), next (orange), to do, or waiting (greyed: it needs an earlier job first), with a one-line status.
+- **The expected statement day** is the last working day before today, or for the example council its last day (31 Mar 2026), so the example has a daily job to do until its statement is added.
+- **The example's sign-offs** are dated from the month after its history ends (1 Apr and 1 Oct 2025), so they don't move when the last day's statement is added.
+- **Phones:** five menu items need the header's room, so the Yours | Example switch is hidden there (Home has the big one) and an "Example" tag shows when you're in the example.

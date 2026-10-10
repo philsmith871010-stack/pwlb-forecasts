@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore, StepId, STREAMS, streamOf, streamSteps, type StreamId } from '../state/store';
 import { Toasts, Modal } from './components/common';
 import { LoadStep } from './steps/LoadStep';
+import { MonitorPage } from './steps/MonitorPage';
 import { MappingStep } from './steps/MappingStep';
 import { CategoriseStep } from './steps/CategoriseStep';
 import { ReviewStep } from './steps/ReviewStep';
@@ -30,7 +31,7 @@ function Logo() {
 
 export function App() {
   const s = useStore();
-  const { step, team, cat, goto, advanced } = s;
+  const { step, team, cat, goto, advanced, space } = s;
 
   // the landing page comes first, on its own; one click enters the app
   if (!s.entered) return <div className="landing-shell"><HomePage /><Toasts /></div>;
@@ -47,6 +48,7 @@ export function App() {
   const openStream = (id: StreamId) => {
     if (id === 'today') return goto('today');
     if (id === 'history') return goto('history');
+    if (id === 'monitor') return goto('monitor');
     return goto('forecast');
   };
 
@@ -67,6 +69,7 @@ export function App() {
         <div className="header-spacer" />
         <span className="privacy-dot" title="Everything happens in this browser tab. Nothing is uploaded."><i className="bi bi-shield-lock-fill" /></span>
         {step !== 'home' && <SpaceSwitch />}
+        {step !== 'home' && space === 'example' && <span className="example-tag" title="You’re in the example council">Example</span>}
         <SettingsMenu />
       </header>
 
@@ -82,6 +85,7 @@ export function App() {
         )}
         {step === 'home' && <JobsPage />}
         {step === 'today' && <TodayPage />}
+        {step === 'monitor' && <MonitorPage />}
         {step === 'load' && <LoadStep />}
         {step === 'map' && <MappingStep />}
         {step === 'categorise' && <CategoriseStep />}
