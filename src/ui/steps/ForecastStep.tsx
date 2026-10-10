@@ -34,8 +34,7 @@ const FC_TABS: TabDef[] = [
 
 const FC_TABS_SIMPLE: TabDef[] = [
   { id: 'lines', label: 'Check each line' },
-  { id: 's-items', label: 'Known future items' },
-  { id: 's-start', label: 'Cash and investments' },
+  { id: 'before', label: 'Known items and cash' },
   { id: 'result', label: 'Your forecast' },
   { id: 'options', label: 'What you could do' },
   { id: 'report', label: 'Report & Excel' },
@@ -45,6 +44,7 @@ const FC_TABS_SIMPLE: TabDef[] = [
 const RESULT_TABS = ['result', 'options', 's-breakdown', 'breakdown', 'scenarios', 'report'];
 
 const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
+  before: { what: 'Three short things before you see the result: anything coming up (a land sale, a grant ending, a pay award), your starting cash and minimum, and, if you have it, your deal register.', todo: 'Add anything you know about, check the starting cash, then click See my forecast.' },
   lines: { what: 'Our proposal for each kind of income and spending, worked out from your history: how big it is, how it is growing, and when it is paid.', why: 'A forecast is only as good as its parts. Checking each line takes a few minutes and means every figure is one you have agreed.', todo: <>Open each line, check what we found, change anything you know better (e.g. salaries <strong>+3%</strong> for a pay award, or paid on the <strong>last working day</strong>), then click <strong>Looks right</strong>.</> },
   report: { what: 'Take the forecast away: a ready-made report (print or save as PDF) and an Excel workbook with every number.', todo: 'Click View and download for the report, or Download Excel.' },
   options: { what: 'Borrowing and investing options worked out from your forecast and, if you added it, your deal register.', why: 'The forecast shows when cash runs short or sits idle. These options turn that into figures to take to your treasury meeting.', todo: 'Read the options, then check them against your treasury management strategy. Change the forecast and they update.' },
@@ -96,14 +96,13 @@ export function ForecastStep() {
   if (!sc || !b) return <div className="page"><span className="spinner" /></div>;
   const upd = (fn: (s: Scenario) => Scenario) => updateScenario(sc.id, fn);
   const fc = b.fc;
-  const endPos = fc.cumulative[fc.H - 1];
   const help = tab === 'result' && fc.register ? { ...FC_HELP.result, what: <>Your cash, day by day, <strong>including your loans and investments</strong> from the deal register. The <strong>navy line</strong> is the past, the <strong>orange dashed line</strong> the forecast, and the grey dotted line is your everyday cash without the deals. The red dashed line is the minimum cash you want to keep.</> } : FC_HELP[tab];
   const rv = reviewState(sc, b);
   const locked = !isReviewed(sc, b);
   const idx = TABS.findIndex((t) => t.id === tab);
   const tabs = TABS.map((t) => ({ ...t, disabled: locked && RESULT_TABS.includes(t.id), hint: locked && RESULT_TABS.includes(t.id) ? 'Check each line first, then see your forecast' : undefined, badge:
     t.id === 'lines' ? (rv.left.length ? `${rv.left.length} to check` : '✓') :
-    t.id === 's-items' ? sc.oneOffs.length + sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').length || '' :
+    t.id === 's-items' || t.id === 'before' ? sc.oneOffs.length + sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').length || '' :
     t.id === 'changes' ? sc.assumptions.filter((a) => a.kind !== 'growth').length || '' :
     t.id === 'oneoffs' ? sc.oneOffs.length || '' :
     t.id === 'schedules' ? sc.pastedSchedules.length + (sc.treasurySchedule.length ? 1 : 0) || '' :
@@ -118,16 +117,14 @@ export function ForecastStep() {
           : <>Your regular cash pattern carried forward, plus what you know is coming. The lowest point is how much you may need to borrow.</>}
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />
-      {!locked && tab !== 'result' && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
+      {!locked && !RESULT_TABS.includes(tab) && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
       <Explain compact what={help.what} why={help.why} todo={help.todo} />
 
       {tab === 'result' && (
         <div className="stack">
-          <div className="grid g4">
-            <Kpi label="Lowest point" value={money(fc.low.amount)} sub={`on ${day(fc.low.day)}`} />
-            <Kpi label="You may need to borrow" value={money(fc.borrowingRequirement)} sub={`to keep at least ${money(fc.buffer)} in the bank`} />
-            <Kpi label="Highest point" value={money(fc.high.amount)} sub={fc.borrowingRequirement > 0 ? `on ${day(fc.high.day)}, before cash falls` : `on ${day(fc.high.day)}, the best time to invest`} />
-            <Kpi label={`Position at ${day(fc.start + fc.H - 1)}`} value={money(endPos)} sub={fc.treasuryDaily.some((v) => v) ? `after known loan repayments: ${money(fc.cumulativeAfterTreasury[fc.H - 1])}` : fc.register ? `starting from ${money(fc.opening)}, including ${money(fc.register.liquid)} in funds` : `starting from ${money(fc.opening)}`} />
+          <div className="grid g2">
+            <Kpi label="You may need to borrow" value={money(fc.borrowingRequirement)} sub={fc.borrowingRequirement > 0 ? `by ${day(fc.low.day)}, to keep at least ${money(fc.buffer)} in the bank` : `you stay above ${money(fc.buffer)} throughout`} />
+            <Kpi light label="Lowest point" value={money(fc.low.amount)} sub={`on ${day(fc.low.day)}`} />
           </div>
           <div className="summary-box" aria-live="polite">
             <div className="eyebrow">In plain English{advanced ? ` · ${sc.name}` : ''}</div>
@@ -168,6 +165,13 @@ export function ForecastStep() {
       {tab === 'options' && <StrategyView b={b} />}
       {tab === 'report' && <SaveStep embedded />}
       {tab === 's-start' && <><RegisterCard /><SimpleStart sc={sc} upd={upd} b={b} /></>}
+      {tab === 'before' && (
+        <div className="stack before-tab">
+          <section><SimpleItems sc={sc} upd={upd} /></section>
+          <section><h3>Cash at the start, and the least you want to hold</h3><SimpleStart sc={sc} upd={upd} b={b} /></section>
+          <section><h3>Loans and investments <span className="muted small">(optional)</span></h3><RegisterCard /></section>
+        </div>
+      )}
       {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
       {tab === 's-items' && <SimpleItems sc={sc} upd={upd} />}
       {tab === 's-breakdown' && <SimpleBreakdown b={b} />}
@@ -210,10 +214,8 @@ function ResultsStrip({ b, onOpen }: { b: NonNullable<ReturnType<typeof useForec
   return (
     <div className="results-strip">
       <div className="mini-kpis">
-        <div className="mini-kpi"><div className="l">Lowest point</div><div className="v">{money(fc.low.amount)}</div><div className="s">{day(fc.low.day)}</div></div>
         <div className="mini-kpi"><div className="l">May need to borrow</div><div className="v">{money(fc.borrowingRequirement)}</div><div className="s">to keep {money(fc.buffer)}</div></div>
-        <div className="mini-kpi"><div className="l">Highest point</div><div className="v">{money(fc.high.amount)}</div><div className="s">{day(fc.high.day)}</div></div>
-        <div className="mini-kpi"><div className="l">At the end</div><div className="v">{money(fc.cumulative[fc.H - 1])}</div><div className="s">{day(fc.start + fc.H - 1)}</div></div>
+        <div className="mini-kpi"><div className="l">Lowest point</div><div className="v">{money(fc.low.amount)}</div><div className="s">{day(fc.low.day)}</div></div>
         <button className="mini-chart" onClick={onOpen} title="Open the full chart" style={{ cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
           <EChart height={58} option={{
             animation: false, grid: { left: 2, right: 2, top: 4, bottom: 2 },

@@ -25,6 +25,8 @@ const S: R[] = [
   ['PRECEPT|POLICE (AND|&) CRIME|CRIME COMM|\\bPCC\\b|FIRE (AND|&) RESCUE|FIRE AUTH', 'precepts', { direction: 'out' }],
   ['CENTRAL SHARE|\\bBRR\\b|TARIFF|TOP ?UP|RATES RETENTION|POOL DISTRIBUTION|BUSINESS RATES POOL', 'nndr_retention'],
   ['\\bNNDR\\b|BUSINESS RATES|\\bBUS RATES\\b|\\bNDR\\b', 'business_rates', { direction: 'in' }],
+  // banks cut narratives at 30 characters: "…SHOPPING CTR NNDR" arrives as "…SHOPPING CTR NND"
+  ['\\bNND?$', 'business_rates', { direction: 'in', confidence: 'medium' }],
   ['\\bCTAX\\b|COUNCIL TAX|\\bCT PYMT\\b|\\bCT PAYMENT\\b', 'council_tax'],
   ['PAY AWARD ARREARS|BACKDATED PAY|\\bARREARS\\b', 'salaries', { classification: 'one_off' }],
   ['SALAR|PAYROLL|NET PAY|\\bWAGES\\b', 'salaries', { direction: 'out' }],

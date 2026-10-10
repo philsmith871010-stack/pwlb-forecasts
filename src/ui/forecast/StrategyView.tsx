@@ -24,10 +24,8 @@ export function StrategyView({ b }: { b: ForecastBundle }) {
     <div className="stack">
       <div className="callout navy small"><i className="bi bi-chat-square-text" /> <strong>Options to discuss.</strong> {STRATEGY_CAVEAT}</div>
 
-      <div className="grid g4">
-        <Kpi label="Borrowing needed" value={money(st.shortfall)} sub={st.shortfallDay ? `by ${day(st.shortfallDay)}` : 'none in this forecast'} />
-        <Kpi light label="Lasting (over a year)" value={money(st.lasting)} sub="doesn’t recover within 12 months" />
-        <Kpi light label="Short term (under a year)" value={money(st.shortTerm)} sub="recovers within 12 months" />
+      <div className="grid g2">
+        <Kpi label="Borrowing needed" value={money(st.shortfall)} sub={st.shortfallDay ? `by ${day(st.shortfallDay)}: ${money(st.lasting)} lasting, ${money(st.shortTerm)} short term` : 'none in this forecast'} />
         <Kpi light label="Could invest for 12 months" value={money(st.ladder.find((r) => r.months === 12)?.amount ?? 0)} sub="above your minimum, on the cautious line" />
       </div>
 
@@ -48,20 +46,23 @@ export function StrategyView({ b }: { b: ForecastBundle }) {
         )}
       </Panel>
 
-      <div className="grid g2">
-        <Panel title="How the borrowing need builds" sub="total borrowing needed by each quarter end to stay above your minimum">
-          <NeedChart st={st} />
-        </Panel>
-        <Panel title="Could you invest for longer?" sub="cash that stays above your minimum even on the cautious line">
-          <Ladder st={st} />
-          <p className="xs muted" style={{ margin: '8px 0 0' }}>
-            {longest ? <>The forecast suggests about <strong>{money(longest.amount)}</strong> isn’t needed for at least {longest.months} months. </> : 'There’s no cash the forecast is confident you won’t need. '}
-            The cautious line is the bottom of the likely range, so a bad month is already allowed for.
-          </p>
-        </Panel>
-      </div>
+      <details className="fold">
+        <summary>How the borrowing need builds</summary>
+        <NeedChart st={st} />
+      </details>
+      <details className="fold">
+        <summary>Could you invest for longer?</summary>
+        <Ladder st={st} />
+        <p className="xs muted" style={{ margin: '8px 0 0' }}>
+          {longest ? <>The forecast suggests about <strong>{money(longest.amount)}</strong> isn’t needed for at least {longest.months} months. </> : 'There’s no cash the forecast is confident you won’t need. '}
+          The cautious line is the bottom of the likely range, so a bad month is already allowed for.
+        </p>
+      </details>
+      <details className="fold">
+        <summary>The long-term view: your liability benchmark</summary>
+        <LongTerm b={b} register={register} />
+      </details>
 
-      <LongTerm b={b} register={register} />
     </div>
   );
 }

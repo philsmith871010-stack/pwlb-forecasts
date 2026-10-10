@@ -181,3 +181,14 @@ Where the spec left a detail open, this is what I chose and why. Most recent las
 - **The example council is a workspace of its own** (`cfi.teamCache.example`), switched from Home or the header, so it can never touch a real council's work.
   - On first use it loads the example's five years and keeps its history up to the day before its last statement.
   - Each job then has a ready-made main action in place of a file drop: the example's statement, its five years, its deal register.
+
+## Second simplification pass
+
+- **Check the sorting** is one list: items to sort, then possible loans or investments. The tabs are gone, and the deal-register banner shows only with advanced tools.
+- **The load results card** says one thing ("…% sorted, loans and investments set aside, saved to your history"), plus anything that needs attention (gaps, unusual files).
+- **Forecast has five tabs:** check each line, known items and cash (one page: items, starting cash and minimum, deal register), your forecast, what you could do, report and Excel.
+  - The result and "what you could do" each lead with two figures, not four.
+  - The options page folds its three charts.
+  - The live strip shows only on the editing tabs.
+- **The loaded deal register** is one line, with the rest under "More detail".
+- **A built-in rule** reads "…NND" at the end of a narrative (NNDR cut at 30 characters) as business rates. On the example, uncategorised money fell from £28m to £0.

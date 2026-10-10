@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
-import { PageHead, Explain, StepTabs, useStepTab, TabDef, StepFooter, Money } from '../components/common';
+import { PageHead, StepFooter, Money } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
 import { money, pct, day, int } from '../../lib/format';
@@ -56,11 +56,6 @@ export function SimpleReview() {
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const groups = (unsorted?.groups ?? []).filter((g) => !skipped.has(`g${g.sigIdx}`));
   const questions = buildLoanQuestions(deals).filter((q) => !skipped.has(q.key));
-  const tabs: TabDef[] = [
-    { id: 'unsorted', label: 'Items we couldn’t sort', badge: groups.length || '✓' },
-    { id: 'loans', label: 'Possible loans or investments', badge: questions.length || '✓' },
-  ];
-  const [tab, setTab] = useStepTab('review-simple', tabs);
   if (!cat) return null;
   const allDone = groups.length === 0 && questions.length === 0;
   const skip = (k: string) => setSkipped(new Set([...skipped, k]));
@@ -84,7 +79,7 @@ export function SimpleReview() {
         {catBusy && <span className="spinner" title="Updating" />}
       </div>
 
-      <RegisterNote />
+      {useStore.getState().advanced && <RegisterNote />}
 
       {allDone ? (
         <div className="card done-card fade">
@@ -93,24 +88,21 @@ export function SimpleReview() {
         </div>
       ) : (
         <>
-          <StepTabs tabs={tabs} value={tab} onChange={setTab} />
-          {tab === 'unsorted' && <>
-            <Explain compact
-              what="Groups of transactions with the same description that no rule recognised."
-              todo={<>Choose what each one is and click <strong>Save</strong>. Not sure? Click <strong>Skip</strong>.</>} />
-            {!unsorted ? <div className="card card-pad"><span className="spinner" /></div> : groups.length === 0
-              ? <div className="callout green"><strong>All sorted.</strong> Now check the <button className="link-btn" onClick={() => setTab('loans')}>possible loans or investments</button>.</div>
-              : <div className="stack" style={{ gap: 12 }}>{groups.slice(0, 12).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => skip(`g${g.sigIdx}`)} />)}
-                  {groups.length > 12 && <div className="small muted center">Showing the 12 largest. More appear as you go.</div>}</div>}
-          </>}
-          {tab === 'loans' && <>
-            <Explain compact
-              what={<>Borrowing and investments are <strong>left out of the forecast</strong>, because the forecast exists to show when you’ll need them. These items might be loans or investments — we’d like you to confirm.</>}
-              todo={<>For each one, answer <strong>Yes</strong> or <strong>No</strong>. The reason we’re asking is shown under each item.</>} />
-            {!deals ? <div className="card card-pad"><span className="spinner" /></div> : questions.length === 0
-              ? <div className="callout green"><strong>Nothing to confirm.</strong> All loans and investments are identified.</div>
-              : <div className="stack" style={{ gap: 12 }}>{questions.slice(0, 12).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</div>}
-          </>}
+          {groups.length > 0 && (
+            <section className="review-sec">
+              <h3>Items we couldn’t sort <span className="muted">({groups.length})</span></h3>
+              <p className="small muted">Choose what each one is and click <strong>Save</strong>. Not sure? Click <strong>Skip</strong>.</p>
+              <div className="stack" style={{ gap: 12 }}>{groups.slice(0, 12).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => skip(`g${g.sigIdx}`)} />)}
+                {groups.length > 12 && <div className="small muted center">Showing the 12 largest. More appear as you go.</div>}</div>
+            </section>
+          )}
+          {questions.length > 0 && (
+            <section className="review-sec">
+              <h3>Possible loans or investments <span className="muted">({questions.length})</span></h3>
+              <p className="small muted">Loans and investments are left out of the forecast. Is each of these one? The reason we’re asking is under each.</p>
+              <div className="stack" style={{ gap: 12 }}>{questions.slice(0, 12).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</div>
+            </section>
+          )}
           <StepFooter nextLabel={allDone ? 'Next: look back' : 'Done for now — next: look back'} />
         </>
       )}

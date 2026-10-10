@@ -107,7 +107,7 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
           <div className="meter" style={{ height: 10 }}><div style={{ width: `${Math.min(100, (covered / gross) * 100)}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
           <div className="small muted" style={{ marginTop: 6 }}>
             {checked.length === all.length
-              ? <><strong className="navy">Every line is checked.</strong> Next, add anything you know is coming (a land sale, a grant that ends), then check your starting cash.</>
+              ? <><strong className="navy">Every line is checked.</strong> Next: anything you know is coming, and your starting cash.</>
               : <>Open each line below and click <strong>Looks right</strong> when it is. Your forecast appears once every line is checked.</>}
           </div>
         </div>

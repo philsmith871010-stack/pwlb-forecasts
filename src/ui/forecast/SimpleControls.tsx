@@ -101,7 +101,7 @@ export function SimpleItems({ sc, upd }: { sc: Scenario; upd: Upd }) {
         </Panel>
       )}
       <div className="card card-pad">
-        <h3 style={{ marginTop: 0 }}>Add something you know about</h3>
+        <h3 style={{ marginTop: 0 }}>Anything coming up that history can’t know?</h3>
         <div className="big-choice">
           <button className={`choice-card ${kind === 'oneoff' ? 'on' : ''}`} onClick={() => setKind('oneoff')}><i className="bi bi-pin-map" /><strong>A one-off amount</strong><span>e.g. a land sale, a capital grant, a big contract payment</span></button>
           <button className={`choice-card ${kind === 'stop' ? 'on' : ''}`} onClick={() => setKind('stop')}><i className="bi bi-stop-circle" /><strong>Something will stop</strong><span>e.g. a grant ends, a contract finishes</span></button>

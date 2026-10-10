@@ -139,7 +139,7 @@ function ReadingCard() {
 }
 
 function DoneCard() {
-  const { ingest, cat, sources, goto, setStepTab, demo } = useStore();
+  const { ingest, cat, sources, goto, setStepTab, demo, advanced } = useStore();
   if (!ingest || !cat) return null;
   const needCheck = sources.filter((s) => s.report.confidence === 'low');
   const toCheck = cat.uncategorisedRows + cat.suspectedRows + cat.dealLikeOpRows;
@@ -153,10 +153,9 @@ function DoneCard() {
         </div>
       </div>
       <ul className="done-list">
-        <li><i className="bi bi-check2" /> {(Math.floor(cat.valueCategorisedPct * 1000) / 10).toFixed(1)}% of the money has been sorted into categories such as council tax, salaries and suppliers.</li>
-        <HistoryAddedNote />
-        <li><i className="bi bi-check2" /> Loans and investments have been spotted and set aside{cat.registerMatch?.matched ? <>, {int(cat.registerMatch.matched)} of them matched exactly to your deal register</> : ''}.</li>
-        {ingest.rejectsTotal > 0 && <li className="muted"><i className="bi bi-info-circle" /> {int(ingest.rejectsTotal)} lines were skipped, such as totals rows or lines without a date. <button className="link-btn" onClick={async () => downloadBlob(await engine().rejectLogBlob(), 'skipped-lines.csv')}>See which</button></li>}
+        <li><i className="bi bi-check2" /> {(Math.floor(cat.valueCategorisedPct * 1000) / 10).toFixed(1)}% of the money is sorted, with loans and investments set aside, and it’s saved to your history.</li>
+        <HistoryAddedNote gapsOnly />
+        {advanced && ingest.rejectsTotal > 0 && <li className="muted"><i className="bi bi-info-circle" /> {int(ingest.rejectsTotal)} lines were skipped, such as totals rows or lines without a date. <button className="link-btn" onClick={async () => downloadBlob(await engine().rejectLogBlob(), 'skipped-lines.csv')}>See which</button></li>}
         {needCheck.length > 0 && <li className="warn"><i className="bi bi-exclamation-triangle" /> {needCheck.length} file{needCheck.length > 1 ? 's have' : ' has'} an unusual layout. <button className="link-btn" onClick={() => goto('map')}>Check {needCheck.length > 1 ? 'them' : 'it'}</button></li>}
       </ul>
       <div className="done-next">

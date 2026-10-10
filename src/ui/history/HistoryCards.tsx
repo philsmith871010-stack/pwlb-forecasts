@@ -41,7 +41,7 @@ export function SavedHistoryCard({ h }: { h: CashHistory }) {
 }
 
 /** One line on what loading these files did to the saved history. */
-export function HistoryAddedNote() {
+export function HistoryAddedNote({ gapsOnly }: { gapsOnly?: boolean } = {}) {
   const { historyReport: r, team, historyBase } = useStore();
   const h = team.cashHistory;
   if (!r || !h || !historyBase) return null;
@@ -51,8 +51,8 @@ export function HistoryAddedNote() {
   const n = workingDays(from, to);
   return (
     <>
-      <li><i className="bi bi-clock-history" /> Added {n <= 1 ? <strong>{day(from)}</strong> : <><strong>{day(from)}</strong> to <strong>{day(to)}</strong> ({int(n)} working days)</>} to your saved history{span ? <>, which now runs {day(span.from)} to {day(span.to)}</> : ''}.
-        {replaced > 0 && <span className="muted"> {int(replaced)} day{replaced > 1 ? 's' : ''} you’d loaded before {replaced > 1 ? 'were' : 'was'} replaced by these files, so nothing is counted twice.</span>}</li>
+      {!gapsOnly && <li><i className="bi bi-clock-history" /> Added {n <= 1 ? <strong>{day(from)}</strong> : <><strong>{day(from)}</strong> to <strong>{day(to)}</strong> ({int(n)} working days)</>} to your saved history{span ? <>, which now runs {day(span.from)} to {day(span.to)}</> : ''}.
+        {replaced > 0 && <span className="muted"> {int(replaced)} day{replaced > 1 ? 's' : ''} you’d loaded before {replaced > 1 ? 'were' : 'was'} replaced by these files, so nothing is counted twice.</span>}</li>}
       {r.gaps.map((g, i) => (
         <li key={i} className="warn"><i className="bi bi-exclamation-triangle" /> Nothing has been loaded for account <strong>{g.account}</strong> between {day(g.from)} and {day(g.to)} ({int(workingDays(g.from, g.to))} working days). If money moved then, add that statement too.</li>
       ))}
