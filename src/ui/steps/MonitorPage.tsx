@@ -14,7 +14,7 @@ export function MonitorPage() {
     ?? { id: 'default', name: 'Default', updatedAt: '', settings: defaultSettings(null), assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [] };
   return (
     <div className="page">
-      <PageHead title="Forecast vs actual">How your signed-off forecasts compare with what actually happened, up to the latest statement. Check whenever you like.</PageHead>
+      <PageHead title="Forecast vs actual">Signed-off forecasts against what actually happened, to the latest statement.</PageHead>
       {historyDays(h) < MIN_HISTORY_DAYS
         ? <div className="callout navy small">This needs your bank history first. <button className="link-btn" onClick={() => goto('history')}>Load it under History</button>.</div>
         : <>{useStore.getState().space === 'example' && <PracticeNote>The example’s treasury team signed off two forecasts in the past year. Yours joins them, and is compared as each new statement comes in.</PracticeNote>}<PastCheck sc={sc} /></>}

@@ -51,11 +51,20 @@ export function linesToCheck(b: ForecastBundle) {
 
 /** the checks only count for the data they were made on */
 export const dataEndIso = (b: ForecastBundle) => isoFromDay(b.req.basis.dataEnd);
-export const isReviewed = (sc: Scenario, b: ForecastBundle) => !!sc.reviewDone && sc.reviewFor === dataEndIso(b);
+/**
+ * The lines' checks still hold: made against this history, or one that has since grown by no
+ * more than a month of daily statements. A new quarter or year (or older data) means checking again.
+ */
+const checksHold = (sc: Scenario, b: ForecastBundle) => {
+  if (!sc.reviewFor) return false;
+  const grown = b.req.basis.dataEnd - dayFromISO(sc.reviewFor);
+  return grown >= 0 && grown <= 31;
+};
+export const isReviewed = (sc: Scenario, b: ForecastBundle) => !!sc.reviewDone && checksHold(sc, b);
 
 export function reviewState(sc: Scenario, b: ForecastBundle) {
   const { main, small } = linesToCheck(b);
-  const done = new Set(sc.reviewFor === dataEndIso(b) ? sc.reviewed ?? [] : []);
+  const done = new Set(checksHold(sc, b) ? sc.reviewed ?? [] : []);
   const left = [...main, ...small].filter((e) => !done.has(e.id));
   return { main, small, done, left, allChecked: left.length === 0 };
 }
@@ -99,24 +108,17 @@ export function BuildView({ sc, upd, b }: { sc: Scenario; upd: Upd; b: ForecastB
   return (
     <div className="stack build">
       <div className="build-progress">
-        <div>
-          <div className="bp-big">{checked.length} <span>of {all.length}</span></div>
-          <div className="bp-label">lines checked</div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div className="meter" style={{ height: 10 }}><div style={{ width: `${Math.min(100, (covered / gross) * 100)}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
-          <div className="small muted" style={{ marginTop: 6 }}>
-            {checked.length === all.length
-              ? <><strong className="navy">Every line is checked: your forecast is ready.</strong> Next: anything you know is coming, and your starting cash.</>
-              : null}
-          </div>
+        <div className="bp-big">{checked.length} <span>of {all.length} lines checked</span></div>
+        <div className="meter" style={{ height: 8, flex: 1, minWidth: 120 }}><div style={{ width: `${Math.min(100, (covered / gross) * 100)}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
+        <div className="bp-actions">
+          {checked.length === all.length && <strong className="navy small">Every line is checked: your forecast is ready.</strong>}
           {checked.length < all.length && (
             <button className="link-btn small accept-all" onClick={() => {
               const left = all.filter((e) => !done.has(e.id));
               void useStore.getState().askConfirm({ title: `Accept all ${left.length} remaining line${left.length > 1 ? 's' : ''}?`, body: `They’ll be marked as checked without being opened. You can still open and change any line afterwards.`, ok: 'Accept all' }).then((yes) => { if (yes) { mark(left.map((e) => e.id)); setOpen(null); } });
             }}>Accept all {all.length - checked.length} remaining as proposed</button>
           )}
-          <button className="link-btn small accept-all" style={{ marginLeft: 16 }} onClick={() => setImporting(true)} title="Excel or CSV with dates, categories and amounts, e.g. from Finance or HR"><i className="bi bi-file-earmark-arrow-up" /> Import a schedule from another department</button>
+          <button className="link-btn small accept-all" onClick={() => setImporting(true)} title="Excel or CSV with dates, categories and amounts, e.g. from Finance or HR"><i className="bi bi-file-earmark-arrow-up" /> Import a schedule</button>
         </div>
       </div>
 

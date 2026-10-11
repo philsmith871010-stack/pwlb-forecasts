@@ -414,3 +414,16 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
 - **The register card lists only what the register holds** ("£223.1m of loans and £46.6m in funds", no "£0 in fixed-term investments").
 - **Today's statement no longer shows "That covers … gone into your history"** for years read earlier under History; only for statements read on that page.
 - **Home:** the closing paragraph about how the jobs depend on each other is gone (the numbered cards say it). The example's intro and Monitor's practice note are shorter.
+
+## Density pass: full width, more on screen
+
+- **Every page uses the full width** (it was capped at 1480px, or 1040px for "narrow" pages), with tighter spacing throughout: page padding, headings, cards, panels, figure tiles, tables, tabs, the practice bar and the notes. The board report's A4 pages are unchanged.
+- **"How this works"** sits at the top right of the page, not on a line of its own.
+- **Your forecast:** the two headline figures, the "biggest calls on cash" line and the sign-off share one row, so the whole chart fits on a laptop screen.
+- **Check each line:** progress is one slim row (count, bar, Accept all, Import a schedule). The lines are a continuous list rather than spaced-out cards.
+- **Known items and cash:** two columns, known items and the deal register beside the starting point, so the tab fits on one screen.
+- **What you could do:** options sit side by side (three across on a wide screen). The broken link to add a register (it pointed at a tab that no longer exists) now opens Known items and cash.
+- **Look back:** the year cards and "your everyday cash over time" are on one view; "Through the year" is the other tab.
+- **Forecast vs actual:** the forecasts to pick from sit beside what the chosen one said when signed off; the sentence and the three figures share a row.
+- **Home:** full width, with a smaller title.
+- **Line checks survive daily statements.** They stay valid while the history has grown by no more than a month since they were made. Before, any new day meant re-checking all 18 lines. A new quarter or year, or older data, still means checking again.

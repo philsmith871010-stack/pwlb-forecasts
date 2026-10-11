@@ -64,6 +64,7 @@ function SignedView() {
   if (!rec) return null;
   return (
     <>
+      <div className="signed-head">
       <div className="signed-list" role="radiogroup" aria-label="Signed-off forecast">
         {list.map((x) => (
           <button key={x.id} role="radio" aria-checked={x.id === rec.id} className={x.id === rec.id ? 'on' : ''} onClick={() => setId(x.id)}>
@@ -76,6 +77,7 @@ function SignedView() {
         <div><i className="bi bi-patch-check-fill" /> When signed off it said: may need to borrow <strong>{money(rec.borrowingNeed)}</strong>, lowest point {money(rec.low)} on {day(dayFromISO(rec.lowDay))}.</div>
         {rec.note && <div className="muted">“{rec.note}”</div>}
         {rec.knownItems.length > 0 && <div className="muted">Added by hand: {rec.knownItems.join('; ')}.</div>}
+      </div>
       </div>
       {r && r.H < MIN_COMPARE_DAYS ? <div className="callout navy small">Too early to tell: {r.H === 1 ? 'one day' : `${r.H} days`} of statements since it started. It’s judged at month ends, from the end of {monthName(firstFairMonthEnd(r.cutoff))}.</div>
         : r ? <PastResult r={r} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
@@ -163,6 +165,7 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: Backtest
   const rows = r.categories.filter((c) => !c.excluded && Math.abs(c.error) >= 0.5e6).slice(0, 6);
   return (
     <>
+      <div className="past-top">
       <div className="summary-box">
         <div className="eyebrow">In a sentence <span className={`badge ${verdict.cls}`} style={{ marginLeft: 8 }}>{verdict.word}</span></div>
         {intro} everyday cash would <strong>{move(fc)}</strong> by {day(at)}{atWords}. It actually <strong>{move(act, true)}</strong>{Math.abs(gap) < 0.05e6 ? ', almost exactly as forecast' : ''}.
@@ -172,7 +175,6 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded }: { r: Backtest
         {Math.abs(oneOffs) >= 1e6 && Math.abs(coreGap) < Math.abs(gap) && <> Leaving those aside, it was out by <strong>{money(Math.abs(coreGap))}</strong>.</>}
       </div>
 
-      <div className="grid g3">
         <Kpi label="Forecast made then" value={money(fc, { sign: true })} sub={`change in everyday cash to ${day(at)}`} />
         <Kpi light label="What actually happened" value={money(act, { sign: true })} sub={`over the same ${months === 1 ? 'month' : `${months} months`}`} />
         <Kpi light label="Difference" value={money(gap, { sign: true })} sub={`${pct(share)} of the cash that flowed`} />

@@ -929,3 +929,108 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 .pb-hint { color: #3c4b5a; }
 @media (max-width: 640px) { .practice-bar { position: static; padding: 8px 16px; gap: 8px; } .pb-title { display: none; } }
 .jobs-try { margin: 12px 0 0; color: rgba(255,255,255,.75); font-size: 14.5px; }
+
+/* ------------------------------------------------------------------ density: full width, more on screen */
+.page, .page.narrow { max-width: none; padding: 14px 24px 40px; }
+.streambar { max-width: none; padding: 10px 24px 0; }
+.page-head { margin-bottom: 10px; gap: 10px; }
+.page-head h1 { font-size: 1.45rem; margin: 0 0 2px; }
+.page-head p { font-size: 14px; max-width: none; }
+.stack { gap: 12px; }
+.grid { gap: 12px; }
+.mt { margin-top: 12px; }
+.mb { margin-bottom: 12px; }
+.card-body, .card-pad { padding: 14px 16px; }
+.panel-head { padding: 6px 12px; min-height: 36px; }
+.panel-title { font-size: 14px; }
+.panel-body { padding: 10px 14px; }
+.kpi { padding: 9px 14px 10px; min-height: 0; }
+.kpi-label { font-size: 11.5px; }
+.kpi-value { font-size: clamp(20px, 1.8vw, 28px); margin-top: 2px; }
+.kpi-sub { font-size: 12px; }
+.summary-box { padding: 11px 16px; font-size: 14px; line-height: 1.5; }
+.summary-box .eyebrow { margin-bottom: 3px; }
+.tbl td { padding: 4px 8px; }
+.tbl th { padding: 5px 8px; font-size: 11px; }
+.step-tabs { margin-bottom: 10px; padding: 3px; }
+.step-tabs button { padding: 6px 10px; font-size: 13px; }
+.step-footer { margin-top: 16px; padding-top: 12px; }
+.explain { margin-bottom: 10px; padding: 9px 36px 9px 14px; }
+.dropzone { padding: 22px 20px; }
+.dropzone .big-icon { font-size: 30px; }
+.done-card { padding: 16px 20px; }
+.done-head > i { font-size: 30px; }
+.done-head h2 { font-size: 21px; }
+.done-head p { font-size: 14px; }
+.progress-card { padding: 10px 16px; margin-bottom: 10px; gap: 16px; }
+.sort-card { padding: 10px 14px; gap: 6px 14px; }
+.review-sec { margin-top: 12px; }
+.year-card { padding: 10px 12px; }
+.line-card .lc-head { padding: 8px 14px; }
+details.fold > summary { padding: 8px 0; }
+details.fold[open] { padding-bottom: 8px; }
+.signoff-row { padding: 7px 12px; }
+.practice-bar { padding: 6px 24px; font-size: 13.5px; }
+.practice-note { padding: 7px 12px; margin-bottom: 10px; font-size: 13.5px; }
+.callout { padding: 8px 12px; }
+.home-hero.compact { padding-top: 24px; padding-bottom: 24px; }
+.next-step { margin-top: 14px; padding: 14px 20px; }
+.next-step strong { font-size: 19px; }
+.jobs.four { margin-top: 12px; }
+.job { padding: 14px 16px; }
+@media (max-width: 640px) { .page, .page.narrow { padding: 12px 16px 32px; } .streambar { padding: 10px 16px 0; } }
+/* the forecast's headline row: the two figures, then why and the sign-off beside them */
+.result-top { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr) minmax(0, 2fr); gap: 12px; align-items: stretch; }
+.result-aside { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.result-aside .why-line { margin: 0; }
+@media (max-width: 1000px) { .result-top { grid-template-columns: 1fr 1fr; } .result-aside { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .result-top { grid-template-columns: 1fr; } }
+/* "How this works" sits at the top right of the page, not on a line of its own */
+.page { position: relative; }
+.page > .howto, .page > .stack > .howto { position: absolute; top: 18px; right: 24px; margin: 0; }
+/* Check each line: one slim progress row, then the lines as a tight list */
+.build-progress { padding: 8px 14px; gap: 14px; flex-wrap: wrap; }
+.build-progress .bp-big { font-size: 20px; }
+.build-progress .bp-big span { font-size: 13px; }
+.build-progress .bp-actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.build-progress .accept-all { margin-top: 0; }
+.stack.build { gap: 6px; }
+.stack.build > .build-progress { margin-bottom: 4px; }
+.line-card { box-shadow: none; }
+.stack.build > .line-card { border-radius: 0; }
+.stack.build > .line-card + .line-card { margin-top: -7px; }
+.stack.build > .line-card.open { border-color: var(--pt-orange); position: relative; z-index: 1; }
+.line-card .lc-head { padding: 6px 14px; }
+/* Known items and cash: two columns on a wide screen */
+.before-tab { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.before-col { display: flex; flex-direction: column; gap: 12px; }
+.before-tab section + section, .before-tab > section { border-top: 0; padding-top: 0; }
+.before-tab section > h3 { margin: 0 0 6px; font-size: 1rem; }
+.before-tab .register-card { margin-top: 0; }
+.start-form .sf-row { padding: 8px 0; gap: 12px; }
+.start-form { padding-top: 2px; padding-bottom: 2px; }
+@media (max-width: 1000px) { .before-tab { grid-template-columns: 1fr; } }
+/* options: two to a row on a wide screen */
+.options { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 8px; }
+.option { padding: 8px 12px; gap: 10px; }
+.option > i { font-size: 17px; }
+details.more-detail { margin-top: 2px; }
+/* forecast vs actual: the sentence and the three figures on one row */
+.past-top { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(150px, 1fr)); gap: 12px; align-items: stretch; }
+@media (max-width: 1100px) { .past-top { grid-template-columns: repeat(3, minmax(0, 1fr)); } .past-top > .summary-box { grid-column: 1 / -1; } }
+@media (max-width: 640px) { .past-top { grid-template-columns: 1fr; } }
+.signed-list button { padding: 6px 12px; min-width: 0; }
+.signed-meta { padding: 7px 12px; gap: 2px; font-size: 13px; }
+.signed-head { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; }
+.signed-head .signed-list { flex: none; }
+.signed-head .signed-meta { flex: 1; min-width: 320px; justify-content: center; }
+.main .stack > .seg { align-self: flex-start; }
+/* Home in the app: full width like the other pages, a smaller title */
+.jobs-page .home-hero { padding-left: 24px; padding-right: 24px; }
+.jobs-page .home-hero-inner { max-width: none; }
+.jobs-title { font-size: clamp(24px, 2.4vw, 32px) !important; margin: 8px 0 4px !important; }
+.jobs-page .home-lead { font-size: 15px; max-width: 900px; margin-bottom: 0; }
+.jobs-page .space-switch.big { margin-bottom: 8px; }
+.options { grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); }
+.signed-head .signed-list { flex: 0 1 auto; min-width: 0; }
+@media (max-width: 640px) { .signed-head .signed-list, .signed-head .signed-meta { flex: 1 1 100%; min-width: 0; } }

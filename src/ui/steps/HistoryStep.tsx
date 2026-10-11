@@ -57,7 +57,6 @@ const HISTORY_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNod
 
 const SIMPLE_HISTORY_TABS: TabDef[] = [
   { id: 'simple-years', label: 'Year by year' },
-  { id: 'position', label: 'Your cash over time' },
   { id: 'season', label: 'Through the year' },
 ];
 
@@ -80,11 +79,11 @@ export function HistoryStep() {
     <div className="page">
       <PageHead eyebrow={eyebrow} title="Look back: how your cash has behaved"
         actions={advanced ? <Seg value={mode} onChange={setMode} options={[{ v: 'fy', label: 'Financial years' }, { v: 'calendar', label: 'Calendar years' }]} /> : undefined}>
-        The patterns in your past cash that the forecast will build on. Years run April to March.
+        Years run April to March.
       </PageHead>
       <StepTabs tabs={TABS} value={tab} onChange={setTab} numbered={false} />
       <Explain compact what={help.what} why={help.why} todo={help.todo} />
-      {h && tab === 'simple-years' && <SimpleYears h={h} />}
+      {h && tab === 'simple-years' && <><SimpleYears h={h} /><Overview h={h} part="position" chartOnly /></>}
       {h && tab === 'years' && <Overview h={h} part="years" />}
       {h && tab === 'position' && <Overview h={h} part="position" />}
       {h && tab === 'yoy' && <YoY h={h} part="table" />}
@@ -103,7 +102,7 @@ type H = NonNullable<ReturnType<typeof useHistoryData>>;
 
 // ------------------------------------------------------------------ overview
 
-function Overview({ h, part }: { h: H; part: 'years' | 'position' }) {
+function Overview({ h, part, chartOnly }: { h: H; part: 'years' | 'position'; chartOnly?: boolean }) {
   const [overlay, setOverlay] = useState(true);
   const { agg, years, annual, pos, opCats, colour, name } = h;
   const dates = useMemo(() => Array.from({ length: agg.D }, (_, d) => isoFromDay(agg.startDay + d)), [agg]);
@@ -134,7 +133,7 @@ function Overview({ h, part }: { h: H; part: 'years' | 'position' }) {
           </div>
         ))}
       </div>}
-      {part === 'position' && (() => {
+      {part === 'position' && !chartOnly && (() => {
         const first = pos.operational[0], lastV = pos.operational[pos.operational.length - 1];
         const change = lastV - first;
         return <div className="summary-box"><div className="eyebrow">In a sentence</div>Over these {(Math.round((pos.operational.length / 365.25) * 2) / 2).toLocaleString('en-GB')} years your everyday cash {change < 0 ? <>fell by <strong>{money(-change)}</strong>. That gap was covered by borrowing and by using savings: it’s the underlying need to borrow.</> : <>grew by <strong>{money(change)}</strong>, leaving spare cash to invest.</>}</div>;

@@ -143,22 +143,23 @@ export function ForecastStep() {
 
       {tab === 'result' && !locked && (
         <div className="stack">
-          <div className="grid g2">
+          <div className="result-top">
             <Kpi label="You may need to borrow" value={money(fc.borrowingRequirement)} sub={fc.borrowingRequirement > 0 ? `by ${day(fc.low.day)}, to keep at least ${money(fc.buffer)} in the bank` : `you stay above ${money(fc.buffer)} throughout`} />
             <Kpi light label="Lowest point" value={money(fc.low.amount)} sub={`on ${day(fc.low.day)}`} />
+            <div className="result-aside">
+              {!advanced && <p className="why-line" aria-live="polite">
+                {fc.drivers.length > 0 && <>Biggest calls on cash: <strong>{fc.drivers.map((d) => d.name.replace(/ \(.*\)$/, '').toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}</strong>. </>}
+                {fc.breaches.length > 0 ? <>Cash first drops below {money(fc.buffer)} on <strong>{day(fc.breaches[0].from)}</strong>.</> : <>Cash stays above {money(fc.buffer)} throughout.</>}
+              </p>}
+              <SignOffRow b={b} sc={sc} onSee={() => useStore.getState().goto('monitor')} />
+            </div>
           </div>
-          {advanced ? (
+          {advanced && (
             <div className="summary-box" aria-live="polite">
               <div className="eyebrow">In plain English · {sc.name}</div>
               <SummaryText text={fc.summary} />
             </div>
-          ) : (
-            <p className="why-line" aria-live="polite">
-              {fc.drivers.length > 0 && <>Biggest calls on cash: <strong>{fc.drivers.map((d) => d.name.replace(/ \(.*\)$/, '').toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}</strong>. </>}
-              {fc.breaches.length > 0 ? <>Cash first drops below {money(fc.buffer)} on <strong>{day(fc.breaches[0].from)}</strong>.</> : <>Cash stays above {money(fc.buffer)} throughout.</>}
-            </p>
           )}
-          <SignOffRow b={b} sc={sc} onSee={() => useStore.getState().goto('monitor')} />
           <Panel title={fc.register ? 'Your cash, with your loans and investments: past and forecast' : 'Your everyday cash: past and forecast'} sub={advanced ? `recalculated in ${fc.ms.toFixed(0)} ms` : undefined}
             right={advanced ? <>
               <Seg dark value={histMonths} onChange={setHistMonths} options={[{ v: 12, label: '1y' }, { v: 24, label: '2y' }, { v: 60, label: 'all' }]} ariaLabel="History shown" />
@@ -196,10 +197,12 @@ export function ForecastStep() {
       {tab === 's-start' && <><RegisterCard /><SimpleStart sc={sc} upd={upd} b={b} /></>}
       {tab === 'before' && space === 'example' && <PracticeNote>Add what you know that history can’t: try <strong>A one-off amount</strong>, say a £5m land sale in September, and watch the borrowing figure above change. Then check the starting cash, and add the deal register under <strong>Loans and investments</strong>.</PracticeNote>}
       {tab === 'before' && (
-        <div className="stack before-tab">
-          <section><SimpleItems sc={sc} upd={upd} /></section>
+        <div className="before-tab">
+          <div className="before-col">
+            <section><SimpleItems sc={sc} upd={upd} /></section>
+            <section><h3>Loans and investments {!useStore.getState().register && <span className="muted small">(optional)</span>}</h3><RegisterCard /></section>
+          </div>
           <section><h3>Your starting point</h3><SimpleStart sc={sc} upd={upd} b={b} /></section>
-          <section><h3>Loans and investments {!useStore.getState().register && <span className="muted small">(optional)</span>}</h3><RegisterCard /></section>
         </div>
       )}
       {tab === 'lines' && <BuildView sc={sc} upd={upd} b={b} />}
@@ -359,7 +362,7 @@ function SignOffRow({ b, sc, onSee }: { b: ForecastBundle; sc: Scenario; onSee: 
     </div>
   ) : (
     <div className="signoff-row">
-      <span className="muted">{latest ? <>Changed since it was signed off on {day(dayFromISO(latest.signedAt.slice(0, 10)))}.</> : <>Happy with it? Sign it off to keep it as it stands and track it against what actually happens.</>}</span>
+      <span className="muted">{latest ? <>Changed since it was signed off on {day(dayFromISO(latest.signedAt.slice(0, 10)))}.</> : <>Happy with it? Sign it off to track it against what happens.</>}</span>
       <button className="btn sm navy" onClick={() => void sign()}><i className="bi bi-patch-check" /> Sign off this forecast</button>
     </div>
   );

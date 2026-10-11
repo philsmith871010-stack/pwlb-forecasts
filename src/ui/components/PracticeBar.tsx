@@ -50,7 +50,7 @@ export function PracticeBar() {
         </>
       ) : (
         <>
-          <span className="pb-step"><strong>Done: that’s the whole cycle.</strong> <span className="pb-hint">Five years of statements sorted, a two-year forecast checked and signed off, and today’s statement checked against it. Your own council works the same way.</span></span>
+          <span className="pb-step"><strong>Done: that’s the whole cycle.</strong> <span className="pb-hint">Your own council works the same way.</span></span>
           <button className="btn sm" onClick={toTab('report')}>See the board report</button>
           <button className="btn sm primary" onClick={() => void s.switchWorkspace('mine').then(() => goto('home'))}>Start with my council <i className="bi bi-arrow-right" /></button>
         </>
