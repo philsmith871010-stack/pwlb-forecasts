@@ -2,15 +2,8 @@
 import { useStore } from '../../state/store';
 import { APP_NAME_PARTS } from '../../config';
 
-const JOBS = [
-  { icon: 'bi-bar-chart-line', title: 'History', text: 'Years of bank statements, sorted once. The forecast learns from them.' },
-  { icon: 'bi-graph-up-arrow', title: 'Forecast', text: 'When you’ll need to borrow and how much. Check it, then sign it off.' },
-  { icon: 'bi-calendar-day', title: 'Today’s statement', text: 'Each day: drop it in, it’s sorted in seconds and joins your history.' },
-  { icon: 'bi-activity', title: 'Monitor', text: 'Your signed-off forecasts against what actually happens.' },
-];
-
 export function HomePage() {
-  const { enter } = useStore();
+  const { enter, space } = useStore();
   return (
     <div className="home landing-one">
       <section className="home-hero landing">
@@ -21,22 +14,10 @@ export function HomePage() {
               <h1>{APP_NAME_PARTS[0]}<span>{APP_NAME_PARTS[1]}</span></h1>
               <p className="home-lead">Know when your council will need to borrow, and how much, straight from its bank statements.</p>
               <div className="landing-ctas">
-                <button className="btn primary xl" onClick={() => void enter('example')}><i className="bi bi-play-fill" /> Try it with an example council</button>
-                <button className="btn xl on-dark" onClick={() => void enter('mine')}>Start with my council’s data <i className="bi bi-arrow-right" /></button>
+                <button className="btn primary xl" onClick={() => void enter(space)}>Enter <i className="bi bi-arrow-right" /></button>
               </div>
-              <p className="landing-try">The example takes about five minutes and needs no files: you go through every step, just as with your own council.</p>
             </div>
             <Preview />
-          </div>
-          <div className="landing-jobs">
-            {JOBS.map((j) => (
-              <div key={j.title} className="landing-job"><i className={`bi ${j.icon}`} /><div><strong>{j.title}</strong><span>{j.text}</span></div></div>
-            ))}
-          </div>
-          <div className="home-trust">
-            <span><i className="bi bi-shield-lock-fill" /> Bank data never leaves this computer</span>
-            <span><i className="bi bi-robot" /> No AI: clear rules you can see</span>
-            <span><i className="bi bi-eye" /> Every number explained</span>
           </div>
         </div>
       </section>

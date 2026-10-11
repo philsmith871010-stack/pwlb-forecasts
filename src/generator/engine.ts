@@ -582,7 +582,9 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
   const positions: Pos[] = [];
   const deals: Pos[] = [];                     // every deal ever, for the register
   const open = (p: Pos) => { positions.push(p); deals.push(p); };
-  const mmf = N.MMF_FUNDS.map(() => 0);
+  // money market funds held at the start: the council's liquidity reserve
+  const RESERVE = 30e6;
+  const mmf = N.MMF_FUNDS.map((_, i, a) => Math.round(RESERVE / a.length / 5e4) * 5e4);
   mmf[0] = 12e6; mmf[1] = 8e6; mmf[2] = 5e6;
   open({ kind: 'dmadf', principal: 10e6, start: start - 20, mat: nextBusinessDay(start + 25), rate: bankRate(start), cp: 'DMADF', ref: rng.digits(6), deposit: true });
   open({ kind: 'la_loan', principal: 10e6, start: start - 100, mat: nextBusinessDay(start + 60), rate: 0.002, cp: `${N.TOWNS[3].toUpperCase()} CITY COUNCIL`, ref: `LA/${rng.digits(2)}/${rng.digits(3)}`, deposit: false });
@@ -667,8 +669,8 @@ function runTreasury(out: TrueTxn[], rng: Rng, start: Day, end: Day, opening: nu
       }
     } else if (bal < lo) {
       let need = target - bal;
-      // keep about £10m in funds as the liquidity reserve; borrow rather than run it down
-      let avail = Math.max(0, mmf.reduce((a, b) => a + b, 0) - 10e6);
+      // keep the liquidity reserve in funds; borrow rather than run it down
+      let avail = Math.max(0, mmf.reduce((a, b) => a + b, 0) - RESERVE);
       for (let i = 0; i < mmf.length && need > 0 && avail > 0; i++) {
         const w = Math.min(mmf[i], avail, Math.ceil(need / 5e4) * 5e4);
         avail -= Math.max(0, w);

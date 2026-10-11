@@ -399,3 +399,8 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
 ## Fix found by the new example
 
 - **An inexact amount to another council was taken as a loan's interest.** Estimated interest matches within 1%, and any line naming a council counted as plausible, so a £417,832 recharge to Bramford Borough Council was taken as interest on a loan from Bramford County Council. As the code's own comment intended, an inexact amount now needs the counterparty's name, a treasury counterparty, or the word interest. An exact amount still only needs to look like a deal. The accuracy report now lists everyday lines taken for deals (`wrongExclusions`), so a failure says which.
+
+## The example's opening cash, and a simpler landing page
+
+- **The example council holds £30m in money market funds** from the start, and keeps that as its liquidity reserve, borrowing short-term rather than running it down (was £10m, starting from nothing). Its starting cash is about £56m (£9m in the bank plus £47m in funds), not about £12m, which sat right at the £10m minimum. The forecast now first dips below the minimum on 2 Apr 2027, a year in, and may need about £50m by March 2028.
+- **The landing page is the name, one sentence, Enter and the preview.** The two path buttons, the four job cards and the trust line are gone: you choose your path inside. Enter opens the workspace you used last. For a new user, your council's Home has "New here? Try the example council first" under the next step.

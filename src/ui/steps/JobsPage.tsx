@@ -87,6 +87,7 @@ export function JobsPage() {
                 <span className="ns-why">{next.why}</span>
                 <span className="btn primary lg">{next.cta} <i className="bi bi-arrow-right" /></span>
               </button>
+              {!example && !span && <p className="jobs-try">New here? <button className="link-btn on-dark" onClick={() => void switchWorkspace('example')}>Try the example council first</button>: about five minutes, no files needed, every step just as with your own.</p>}
               <div className="jobs four">
                 {jobs.map((j) => (
                   <button key={j.id} className={`job ${j.status}`} onClick={() => goto(j.id)}>
