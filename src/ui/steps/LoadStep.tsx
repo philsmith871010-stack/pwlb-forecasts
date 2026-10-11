@@ -149,7 +149,7 @@ function DoneCard() {
         {needCheck.length > 0 && <li className="warn"><i className="bi bi-exclamation-triangle" /> {needCheck.length} file{needCheck.length > 1 ? 's have' : ' has'} an unusual layout. <button className="link-btn" onClick={() => goto('map')}>Check {needCheck.length > 1 ? 'them' : 'it'}</button></li>}
       </ul>
       <div className="done-next">
-        <span className="muted">{toCheck > 0 ? 'Next, you’ll confirm a few items we weren’t sure about.' : 'Everything was sorted confidently.'}</span>
+        <span className="muted">{toCheck > 0 ? '' : 'Everything was sorted confidently.'}</span>
         <button className="btn primary lg" onClick={() => { setStepTab('review', 'overview'); goto('review'); }}>Next: check the sorting <i className="bi bi-arrow-right" /></button>
       </div>
       {!demo && <div className="xs muted row" style={{ marginTop: 12, gap: 10 }}><AddMoreFiles /> <span>or use different files: <button className="link-btn" onClick={() => useStore.setState({ ingest: null, cat: null, agg: null, basis: null, sources: [], demo: null })}>Start again</button></span></div>}

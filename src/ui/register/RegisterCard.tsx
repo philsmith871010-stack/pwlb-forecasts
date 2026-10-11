@@ -60,7 +60,7 @@ export function RegisterCard({ quiet, hint }: { quiet?: boolean; hint?: string }
           <h3 style={{ margin: 0 }}>Add your deal register</h3>
           <p className="small" style={{ margin: '4px 0 0' }}>
             {hint ?? <>The spreadsheet of your loans and investments (the one used for PWLBtoday reports). With it, repayments, maturities and
-            interest are in the forecast, and the options say how much to borrow and for how long.</>}
+            interest are in the forecast. On its own, it shows what you owe and hold, and what falls due.</>}
           </p>
           {space === 'example' && !quiet && <div className="mt"><PracticeNote>With your own council you’d choose your deal register spreadsheet. Here, <strong>Choose register</strong> picks the example council’s: nothing is uploaded.</PracticeNote></div>}
           {registerError && <div className="callout red mt"><strong>We couldn’t read that register.</strong> {registerError}</div>}

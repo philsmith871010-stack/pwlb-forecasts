@@ -1040,3 +1040,12 @@ details.more-detail { margin-top: 2px; }
 .day-lines { border: 1px solid var(--pt-line); border-radius: var(--radius-md); overflow: hidden; max-height: 520px; overflow-y: auto; }
 .day-lines-head { padding: 6px 10px; background: var(--pt-line-soft); border-bottom: 1px solid var(--pt-line); font-size: 13px; position: sticky; top: 0; z-index: 2; }
 .day-lines .tbl td { padding: 4px 10px; }
+/* printing the report from inside the forecast: only its A4 pages */
+@media print {
+  .main:has(.r-doc) > :not(.page) { display: none !important; }
+  .page:has(> .r-doc) > :not(.r-doc) { display: none !important; }
+  .page:has(> .r-doc) { padding: 0 !important; }
+}
+.report-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.field.inline { flex-direction: row; align-items: center; gap: 8px; margin: 0; }
+.field.inline label { white-space: nowrap; margin: 0; }

@@ -35,7 +35,7 @@ export function TodayPage() {
 
       {space === 'mine' && !historyBase && !busy && !short && (
         <div className="callout navy mb small">
-          <strong>Tip:</strong> load a few years of statements under <button className="link-btn" onClick={() => goto('load')}>History</button> first. Then today’s lines are sorted with everything learned from them.
+          <strong>Tip:</strong> load your past statements under <button className="link-btn" onClick={() => goto('load')}>History</button> first, so today’s lines are sorted with everything learned from them.
         </div>
       )}
 

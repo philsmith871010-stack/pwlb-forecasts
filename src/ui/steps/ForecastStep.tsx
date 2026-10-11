@@ -49,7 +49,7 @@ const RESULT_TABS = ['result', 'options', 's-breakdown', 'breakdown', 'scenarios
 const FC_HELP: Record<string, { what: React.ReactNode; why?: React.ReactNode; todo?: React.ReactNode }> = {
   before: { what: 'Three short things before you see the result: anything coming up (a land sale, a grant ending, a pay award), your starting cash and minimum, and, if you have it, your deal register.', todo: 'Add anything you know about and check the starting cash. Your forecast updates as you go.' },
   lines: { what: 'Our proposal for each kind of income and spending, worked out from your history: how big it is, how it is growing, and when it is paid.', why: 'A forecast is only as good as its parts. Checking each line takes a few minutes and means every figure is one you have agreed.', todo: <>Open each line, check what we found, change anything you know better (e.g. salaries <strong>+3%</strong> for a pay award, or paid on the <strong>last working day</strong>), then click <strong>Looks right</strong>.</> },
-  report: { what: 'Take the forecast away: a ready-made report (print or save as PDF) and an Excel workbook with every number.', todo: 'Click View and download for the report, or Download Excel.' },
+  report: { what: 'Take the forecast away: a ready-made report (print or save as PDF) and an Excel workbook with every number.', todo: 'Check the council name, then Print or save as PDF, or Download Excel.' },
   options: { what: 'Borrowing and investing options worked out from your forecast and, if you added it, your deal register.', why: 'The forecast shows when cash runs short or sits idle. These options turn that into figures to take to your treasury meeting.', todo: 'Read the options, then check them against your treasury management strategy. Change the forecast and they update.' },
   's-start': { what: 'Three simple settings that frame the forecast: the cash you start with, the minimum you want to keep, and how far ahead to look.', todo: 'Check each one. The figures we’ve filled in are a sensible starting point.' },
   's-items': { what: 'Things you know are coming that past years can’t predict: a land sale, a grant that ends, a pay award.', why: 'These often decide whether the low point is £10m or £30m.', todo: 'Pick the kind of item, fill in the short form and click Add. Each will show on your forecast chart as an orange diamond. For figures that belong to one line (a grant’s payment dates, say), use that line’s grid or Import a schedule instead.' },
@@ -124,7 +124,7 @@ export function ForecastStep() {
   return (
     <div className="page">
       <PageHead eyebrow={eyebrow} title="Your cash forecast" actions={advanced ? <ScenarioBar /> : undefined}>
-        {locked ? <>We’ve drafted it from your history. Check each line, add what you know is coming, then see the result.</> : null}
+        {locked ? <>Drafted from your history: check each line, then see the result.</> : null}
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />
       {locked && tab !== 'lines' && !RESULT_TABS.includes(tab) && rv.left.length > 0 && (
@@ -195,7 +195,7 @@ export function ForecastStep() {
       {tab === 'options' && !locked && <StrategyView b={b} />}
       {tab === 'report' && !locked && <SaveStep embedded />}
       {tab === 's-start' && <><RegisterCard /><SimpleStart sc={sc} upd={upd} b={b} /></>}
-      {tab === 'before' && space === 'example' && <PracticeNote>Add what you know that history can’t: try <strong>A one-off amount</strong>, say a £5m land sale in September, and watch the borrowing figure above change. Then check the starting cash, and add the deal register under <strong>Loans and investments</strong>.</PracticeNote>}
+      {tab === 'before' && space === 'example' && <PracticeNote>Add what you know that history can’t: try <strong>A one-off amount</strong>, say a £5m land sale in September, and watch the borrowing figure above change.{!useStore.getState().register && <> Then add the deal register under <strong>Loans and investments</strong>.</>}</PracticeNote>}
       {tab === 'before' && (
         <div className="before-tab">
           <div className="before-col">
@@ -325,7 +325,6 @@ function ForecastStart() {
       </div>
       <section className="register-start">
         <h3>{register ? 'Your deal register on its own' : 'Meanwhile: your deal register'}</h3>
-        {!register && <p className="small muted" style={{ marginTop: 0 }}>On its own it shows what you owe and hold, and what falls due.</p>}
         <RegisterCard />
         {register && <RegisterOverview r={register} />}
       </section>

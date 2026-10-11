@@ -54,7 +54,7 @@ function SimpleSave({ embedded }: { embedded?: boolean }) {
     <div className="save-card primary">
           <i className="bi bi-file-earmark-richtext" />
           <h3>The report</h3>
-          <p>A clear seven-page summary for your manager, a treasury report or a section 151 briefing: the low point, how much you may need to borrow, options to discuss, charts and the assumptions behind it.</p>
+          <p>Seven pages for your manager or section 151 officer: the low point, the borrowing need, options, charts and assumptions.</p>
           <button className="btn primary lg" disabled={!b} onClick={() => setView('report')}><i className="bi bi-eye" /> View and download</button>
         </div>
   );
@@ -62,20 +62,27 @@ function SimpleSave({ embedded }: { embedded?: boolean }) {
     <div className="save-card">
           <i className="bi bi-file-earmark-excel" />
           <h3>Excel spreadsheet</h3>
-          <p>All the numbers: the forecast month by month, past years by category, growth rates and your assumptions, ready for your own spreadsheets.</p>
-          <button className="btn lg" disabled={!b || !agg || busy === 'xlsx'} onClick={async () => {
-            if (!b || !agg) return;
-            setBusy('xlsx');
-            try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `cash-flow-forecast-${team.authorityName.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
-            finally { setBusy(null); }
-          }}>{busy === 'xlsx' ? <span className="spinner" /> : <i className="bi bi-download" />} Download Excel</button>
+          <p>Every number, month by month and by category, for your own spreadsheets.</p>
+          <button className="btn lg" disabled={!b || !agg || busy === 'xlsx'} onClick={() => void downloadExcel()}>{busy === 'xlsx' ? <span className="spinner" /> : <i className="bi bi-download" />} Download Excel</button>
         </div>
   );
-  if (embedded) return (
-    <div className="save-cards two">
-      {reportCard}
-      {excelCard}
-    </div>
+  const downloadExcel = async () => {
+    if (!b || !agg) return;
+    setBusy('xlsx');
+    try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `cash-flow-forecast-${team.authorityName.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
+    finally { setBusy(null); }
+  };
+  // inside the forecast: the report itself, with the two ways to take it away
+  if (embedded && b) return (
+    <>
+      <div className="report-bar no-print">
+        <div className="field inline"><label htmlFor="rep-name">Council name</label><input id="rep-name" className="input" style={{ width: 220 }} value={team.authorityName} onChange={(e) => updateTeam((t) => ({ ...t, authorityName: e.target.value }))} /></div>
+        <span className="spacer" />
+        <button className="btn" disabled={!agg || busy === 'xlsx'} onClick={() => void downloadExcel()}>{busy === 'xlsx' ? <span className="spinner sm" /> : <i className="bi bi-file-earmark-excel" />} Download Excel</button>
+        <button className="btn primary" onClick={() => window.print()} title="Choose Save as PDF in the print dialog to keep a PDF"><i className="bi bi-file-earmark-pdf" /> Print or save as PDF</button>
+      </div>
+      <ReportView b={b} backtest={defaultBacktest} />
+    </>
   );
   return (
     <div className="page narrow">

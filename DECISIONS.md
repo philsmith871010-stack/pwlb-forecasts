@@ -441,3 +441,14 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
   The options are now the borrowing need (lasting or short term), loans falling due, LOBO call dates and cash that could be locked away. "Use it instead of new borrowing" now depends on borrowing being needed later in the forecast. The example register still carries a projections sheet, as the real template does; it's ignored.
 - **Today's statement, wide screens:** the category summary sits on the left and the chosen category's bank lines fill the right (largest first, to the penny). The largest category is shown until you choose another. Below 1100px the lines expand in place, as before.
 - **The report's options page figure matches the options.** "Could invest a year" (often £0) is now "Could lock away": the longest spell with at least £1m to spare on the cautious line, the same rule as the "Lock away" option (e.g. £28.2m for 6 months).
+
+## Eighth simplification pass
+
+- **Report & Excel shows the report itself**, with one bar above it: the council name, Download Excel, and Print or save as PDF. There's no card to click through first. Printing from here prints only the report's A4 pages; the header, tabs and practice bar are left out.
+- **Fewer repeated words:**
+  - the done card's "Next, you'll confirm a few items…" beside the "Next: check the sorting" button;
+  - the forecast's subtitle (now one short line, and only until the lines are checked);
+  - "Meanwhile: your deal register" no longer has a second line saying what the card already says;
+  - the Known items practice note only asks for the register when it isn't added;
+  - the report and Excel descriptions and the Today tip are shorter.
+- The register card no longer says the options cover "for how long" (a benchmark leftover).
