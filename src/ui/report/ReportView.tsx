@@ -173,17 +173,6 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           <div><div className="l">Could invest a year</div><div className="v">{money(b.strategy.ladder.find((r) => r.months === 12)?.amount ?? 0)}</div><div className="s">on the cautious line</div></div>
         </div>
         <ol className="r-options">{b.strategy.options.map((o, i) => <li key={i} className={o.tone}><strong>{o.title}.</strong> {o.body}</li>)}</ol>
-        {register?.lb && b.strategy.benchmark && (
-          <>
-            <h3>The long-term view: liability benchmark</h3>
-            <p className="r-caption" style={{ marginTop: 0 }}>The forecast is <strong>bottom up</strong> (bank history: when cash runs short); the benchmark is <strong>top down</strong> (balance sheet projections: how much long-term borrowing is needed, and for how long).</p>
-            <table className="r-tbl r-tbl-tight">
-              <thead><tr><th>Year</th><th className="n">CFR</th><th className="n">Benchmark</th><th className="n">Existing loans</th><th className="n">Room to borrow</th><th className="n">Over benchmark</th></tr></thead>
-              <tbody>{register.lb.filter((r) => !r.actual).slice(0, 5).map((r) => <tr key={r.fy}><td>{r.fy}</td><td className="n">{m(r.cfr * 1e6)}</td><td className="n"><strong>{m(r.lb * 1e6)}</strong></td><td className="n">{m(r.existingLoans * 1e6)}</td><td className="n">{m(r.need * 1e6)}</td><td className="n">{m(r.over * 1e6)}</td></tr>)}</tbody>
-            </table>
-            <p className="r-caption">CFR: capital financing requirement. Room to borrow: benchmark less existing loans. Over benchmark: existing loans above what the balance sheet needs.</p>
-          </>
-        )}
         {b.strategy.ladder.length > 0 && (
           <>
             <h3>Cash that could be invested for longer</h3>

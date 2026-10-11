@@ -136,7 +136,6 @@ export interface RegisterInfo {
   /** every dated cash event the register implies (the forecast takes those after the bank data ends) */
   events: { day: Day; amount: number; label: string; kind: string; ref: string }[];
   loboCalls: { day: Day; amount: number; label: string }[];
-  lb: { fy: string; yearEnd: number; lb: number; existingLoans: number; need: number; over: number; cfr: number; obs: number; liq: number; actual: boolean }[] | null;
   loans: { ref: string; type: string; lender: string; principal: number; rate: number | null; start: Day | null; maturity: Day | null; profile: string; nextCall: Day | null }[];
   investments: { ref: string; type: string; counterparty: string; principal: number; rate: number | null; start: Day | null; maturity: Day | null }[];
 }

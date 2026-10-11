@@ -31,7 +31,7 @@ export function RegisterCard({ quiet, hint }: { quiet?: boolean; hint?: string }
             {m && m.events >= 10 && m.matched / m.events < 0.3 && <div className="callout red mt small"><strong>Few of the register’s deals were found in these bank files</strong> ({int(m.matched)} of {int(m.events)} cash flows). Check that the register and the bank files are for the same council and cover the same period.</div>}
             <details className="more-detail">
               <summary>More detail</summary>
-              <p className="small muted" style={{ margin: '6px 0 0' }}>{register.name}. {int(register.loans.length)} loans, {int(register.investments.length)} investments{register.lb ? `, balance sheet projections to ${register.lb[register.lb.length - 1].fy}` : ''}.{m && m.matched > 0 ? ` ${int(m.matched)} bank lines matched to its deals.` : ''}</p>
+              <p className="small muted" style={{ margin: '6px 0 0' }}>{register.name}. {int(register.loans.length)} loans, {int(register.investments.length)} investments.{m && m.matched > 0 ? ` ${int(m.matched)} bank lines matched to its deals.` : ''}</p>
               {m && m.interest.estimated > 0 && <InterestCheck i={m.interest} />}
             <RegisterDetail />
             {ingest && register.asAt && Math.abs(register.asAt - ingest.maxDay) > 31 && (

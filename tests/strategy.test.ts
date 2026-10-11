@@ -41,18 +41,6 @@ describe('strategy', () => {
     for (let k = 1; k < st.ladder.length; k++) expect(st.ladder[k].amount).toBeLessThanOrEqual(st.ladder[k - 1].amount);
   });
 
-  it('caps lasting borrowing at the benchmark room and shapes maturities by it', () => {
-    const cum = Array.from({ length: 730 }, (_, d) => 20 - d * 0.1);
-    // room in £m: 40, then 30, then 30, then 10
-    const rows = [40, 30, 30, 10].map((room, k) => ({ fy: `${2026 + k}/${27 + k}`, yearEnd: 2027 + k, lb: (room + 100) / 1e6, existingLoans: 100 / 1e6, need: room / 1e6, over: 0, cfr: 0, actual: false }));
-    const st = buildStrategy(fakeFc(cum), { repayments: [], loboCalls: [], lb: rows, liquid: 0, debt: 0 });
-    const b = st.benchmark!;
-    expect(b.room).toBeCloseTo(40, 6);
-    expect(b.lastingWithinRoom).toBeCloseTo(Math.min(st.lasting, 40), 6);
-    expect(b.lastingAboveRoom).toBeCloseTo(Math.max(0, st.lasting - 40), 6);
-    const total = b.tranches.reduce((s, t) => s + t.amount, 0);
-    expect(total).toBeCloseTo(b.lastingWithinRoom, 6);
-  });
 
   it('works the quarterly need profile as a running maximum', () => {
     const cum = Array.from({ length: 365 }, (_, d) => (d < 150 ? -d : -150 + (d - 150)));

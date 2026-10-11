@@ -427,3 +427,16 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
 - **Forecast vs actual:** the forecasts to pick from sit beside what the chosen one said when signed off; the sentence and the three figures share a row.
 - **Home:** full width, with a smaller title.
 - **Line checks survive daily statements.** They stay valid while the history has grown by no more than a month since they were made. Before, any new day meant re-checking all 18 lines. A new quarter or year, or older data, still means checking again.
+
+## No liability benchmark; the day's lines beside the summary
+
+- **The liability benchmark is removed** as too complex for this tool. It's gone from:
+  - "What you could do": the "could be long-term borrowing", "more than your benchmark allows" and "above the benchmark" options, and the "long-term view" fold;
+  - the register-only view's chart;
+  - the register card;
+  - the board report's options page;
+  - the Excel workbook;
+  - the strategy and worker code (`lib/register/benchmark.ts` and its tests deleted).
+
+  The options are now the borrowing need (lasting or short term), loans falling due, LOBO call dates and cash that could be locked away. "Use it instead of new borrowing" now depends on borrowing being needed later in the forecast. The example register still carries a projections sheet, as the real template does; it's ignored.
+- **Today's statement, wide screens:** the category summary sits on the left and the chosen category's bank lines fill the right (largest first, to the penny). The largest category is shown until you choose another. Below 1100px the lines expand in place, as before.

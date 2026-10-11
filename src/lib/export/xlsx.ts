@@ -60,7 +60,6 @@ export async function buildWorkbook(o: {
       ...st.needBy.map((q) => [isoFromDay(q.day), r0(q.amount)]),
       [],
       ...st.options.map((x) => [x.title, x.body]),
-      ...(st.benchmark ? [[], ['Liability benchmark (£m)', 'Benchmark', 'Existing loans', 'Room to borrow', 'Above benchmark', 'CFR'], ...st.benchmark.rows.map((r) => [r.fy, r0(r.lb), r0(r.existingLoans), r0(r.need), r0(r.over), r0(r.cfr)])] : []),
     ], [34, 90, 16, 16, 16, 16]);
   }
 

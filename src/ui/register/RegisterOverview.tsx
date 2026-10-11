@@ -1,10 +1,9 @@
 // The deal register on its own, before any bank history is loaded: what's owed and invested,
-// the cash it brings in and takes out over the next two years, and the liability benchmark.
+// and the cash it brings in and takes out over the next two years.
 import { useMemo } from 'react';
 import { useStore } from '../../state/store';
 import { Kpi, Panel } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
-import { benchmarkChartOption } from '../forecast/StrategyView';
 import { money, day } from '../../lib/format';
 import { ymdFromDay, addMonths, MONTH_NAMES } from '../../lib/dates';
 import type { RegisterInfo } from '../../worker/types';
@@ -79,11 +78,6 @@ export function RegisterOverview({ r }: { r: RegisterInfo }) {
         <div className="callout small"><strong>LOBO call dates:</strong> {r.loboCalls.map((l) => `${day(l.day)} (${l.label.replace(/^LOBO · /, '')}, ${money(l.amount)})`).join('; ')}. Repayment is assumed at the call date, the cautious view.</div>
       )}
 
-      {r.lb && (
-        <Panel title="Your liability benchmark" sub="how much long-term borrowing the balance sheet needs, against loans you already have">
-          <EChart option={benchmarkChartOption(r.lb)} height={300} ariaLabel="Liability benchmark against existing loans" />
-        </Panel>
-      )}
 
       <div className="callout navy small">
         <strong>This is the register on its own.</strong> To see when your cash would run short, and how much to borrow, load your bank statements: the forecast then combines your everyday cash with everything above.{' '}

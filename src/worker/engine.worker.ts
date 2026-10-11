@@ -19,7 +19,6 @@ import { isBusinessDay, isoFromDay, Day } from '../lib/dates';
 import type { IngestSummary, CatSummary, TxnRow, ReviewGroup, DealQueue, TxnFilter, CategoryDetail, LoanPair, RegisterInfo } from './types';
 import { readRegisterWorkbook, registerFromSnapshot, LoadedRegister, REG } from '../lib/register';
 import { registerEvents, registerAccounts, liquidBalances, toDay, CashEvent } from '../lib/register/cashflows';
-import { liabilityBenchmark } from '../lib/register/benchmark';
 import { fromSession, type CashHistory } from '../lib/history/cashHistory';
 
 let ds: Dataset | null = null;
@@ -42,7 +41,6 @@ function registerInfo(): RegisterInfo | null {
     liquid: liquidBalances(reg),
     events: events.map((e) => ({ day: e.day, amount: e.amount, label: e.label, kind: e.kind, ref: e.ref })),
     loboCalls: reg.loans.filter((l) => live(l) && l.type === 'LOBO' && l.nextCall && asAt && l.nextCall > asAt).map((l) => ({ day: toDay(l.nextCall!), amount: l.principal, label: `LOBO · ${l.lender}` })),
-    lb: liabilityBenchmark(reg),
     loans: reg.loans.filter(live).map((l) => ({ ref: `loan:${l.row}`, type: l.type ?? l.typeRaw, lender: l.lender, principal: l.principal, rate: l.rate, start: dd(l.start), maturity: dd(l.maturity), profile: l.profile ?? 'Maturity', nextCall: dd(l.nextCall) })),
     investments: reg.termInvestments.filter(live).map((t) => ({ ref: `term:${t.row}`, type: t.type ?? '', counterparty: t.counterparty, principal: t.principal, rate: t.rate, start: dd(t.start), maturity: dd(t.maturity) })),
   };

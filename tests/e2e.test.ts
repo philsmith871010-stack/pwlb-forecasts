@@ -72,7 +72,6 @@ describe('end to end on generated data', async () => {
 describe('end to end with the example deal register', async () => {
   const { registerFromSnapshot } = await import('../src/lib/register');
   const { registerEvents, registerAccounts, liquidBalances } = await import('../src/lib/register/cashflows');
-  const { liabilityBenchmark } = await import('../src/lib/register/benchmark');
   const { buildStrategy } = await import('../src/lib/forecast/strategy');
   const g = generateDataset({ ...DEFAULT_GENERATOR_OPTIONS, seed: 'e2e-reg' });
   const ds = await ingest(g.files.map((f) => ({ name: f.name, data: f.text, size: f.text.length, mapping: detectMapping(f.text.slice(0, 96000), f.name).mapping })));
@@ -99,9 +98,8 @@ describe('end to end with the example deal register', async () => {
     // the headline line = everyday cash + funds + every register cash flow in the window
     const inWindow = future.filter((e) => e.day >= fc.start && e.day < fc.start + fc.H).reduce((s, e) => s + e.amount, 0);
     expect(fc.cumulative[fc.H - 1] - fc.cumulativeBefore[fc.H - 1]).toBeCloseTo(liq.total + inWindow, 0);
-    const st = buildStrategy(fc, { repayments: future.filter((e) => e.kind === 'loan_repayment'), loboCalls: [], lb: liabilityBenchmark(reg), liquid: liq.total, debt: 0 });
+    const st = buildStrategy(fc, { repayments: future.filter((e) => e.kind === 'loan_repayment'), loboCalls: [], liquid: liq.total, debt: 0 });
     expect(st.lasting + st.shortTerm).toBeCloseTo(st.shortfall, 0);
-    expect(st.benchmark).not.toBeNull();
     expect(st.options.length).toBeGreaterThan(1);
   });
 });

@@ -325,7 +325,7 @@ function ForecastStart() {
       </div>
       <section className="register-start">
         <h3>{register ? 'Your deal register on its own' : 'Meanwhile: your deal register'}</h3>
-        {!register && <p className="small muted" style={{ marginTop: 0 }}>On its own it shows what you owe and hold, what falls due, and your liability benchmark.</p>}
+        {!register && <p className="small muted" style={{ marginTop: 0 }}>On its own it shows what you owe and hold, and what falls due.</p>}
         <RegisterCard />
         {register && <RegisterOverview r={register} />}
       </section>

@@ -2,10 +2,8 @@
 // Expected figures are worked by hand here (as the register's own test_reader.js does).
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { readRegisterWorkbook, REG } from '../src/lib/register';
+import { readRegisterWorkbook } from '../src/lib/register';
 import { registerEvents, liquidBalances, toDay } from '../src/lib/register/cashflows';
-import { liabilityBenchmark } from '../src/lib/register/benchmark';
-import { dayFromYMD } from '../src/lib/dates';
 
 const D = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d));
 const near = (a: number, b: number, eps = 0.01) => Math.abs(a - b) <= eps;
@@ -80,17 +78,4 @@ describe('deal register: parity with PWLBreports', async () => {
     expect(liq.notice).toBe(5e6);
   });
 
-  it('works the liability benchmark from the Projections sheet', () => {
-    const lb = liabilityBenchmark(reg)!;
-    expect(lb.length).toBeGreaterThan(10);
-    for (const r of lb) {
-      expect(near(r.ntp, r.cfr - r.obs, 1e-9)).toBe(true);
-      expect(near(r.lb, r.ntp + Math.max(r.liq, -r.ntp), 1e-9)).toBe(true);
-    }
-    // the existing loans run off from the register when the column is blank
-    const y27 = lb.find((r) => r.yearEnd === 2027)!;
-    const dye = REG.debtYearEnds(reg, 5).find((x: { date: Date }) => x.date.getUTCFullYear() === 2027).total / 1e6;
-    expect(near(y27.existingLoans, dye, 1e-6)).toBe(true);
-    void dayFromYMD;
-  });
 });

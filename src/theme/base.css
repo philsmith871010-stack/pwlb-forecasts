@@ -1034,3 +1034,9 @@ details.more-detail { margin-top: 2px; }
 .options { grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); }
 .signed-head .signed-list { flex: 0 1 auto; min-width: 0; }
 @media (max-width: 640px) { .signed-head .signed-list, .signed-head .signed-meta { flex: 1 1 100%; min-width: 0; } }
+/* the day's statement on a wide screen: the summary, and the chosen category's lines beside it */
+.day-split { display: grid; grid-template-columns: minmax(420px, 0.9fr) minmax(0, 1.1fr); gap: 14px; align-items: start; }
+.day-split .day-tbl tr.open td { background: var(--pt-orange-soft); }
+.day-lines { border: 1px solid var(--pt-line); border-radius: var(--radius-md); overflow: hidden; max-height: 520px; overflow-y: auto; }
+.day-lines-head { padding: 6px 10px; background: var(--pt-line-soft); border-bottom: 1px solid var(--pt-line); font-size: 13px; position: sticky; top: 0; z-index: 2; }
+.day-lines .tbl td { padding: 4px 10px; }

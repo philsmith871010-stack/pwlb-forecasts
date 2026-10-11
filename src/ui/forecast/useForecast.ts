@@ -23,7 +23,7 @@ export function strategyRegister(r: RegisterInfo | null): StrategyRegister | nul
   if (!r) return null;
   return {
     repayments: r.events.filter((e) => e.kind === 'loan_repayment'),
-    loboCalls: r.loboCalls, lb: r.lb, liquid: r.liquid.total, debt: r.stats.debt,
+    loboCalls: r.loboCalls, liquid: r.liquid.total, debt: r.stats.debt,
   };
 }
 
