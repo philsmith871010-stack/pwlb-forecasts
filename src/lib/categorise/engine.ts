@@ -583,15 +583,17 @@ export function describeDays(days: number[], amounts: number[], maxDay: Day) {
   const cv = medAmt ? (1.4826 * mad) / medAmt : 0;
   // modal day of month & last-working-day pattern
   const domCount = new Map<number, number>();
-  let lwd = 0;
+  let lwd = 0, lwdRun = 0;
   for (const d of days) {
     const { y, m, d: dd } = ymdFromDay(d);
     domCount.set(dd, (domCount.get(dd) ?? 0) + 1);
     // last business day of month?
     let k = d + 1;
     while (!isBusinessDay(k) && ymdFromDay(k).m === m) k++;
-    if (ymdFromDay(k).m !== m || (ymdFromDay(k).y !== y)) lwd++;
+    if (ymdFromDay(k).m !== m || (ymdFromDay(k).y !== y)) { lwd++; lwdRun++; } else lwdRun = 0;
   }
+  // a payday that has moved to the last working day: the latest four decide, whatever went before
+  if (lwdRun >= 4) lwd = days.length;
   const dom = [...domCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
   const modeIn = (f: (d: number) => boolean) => [...domCount.entries()].filter(([d]) => f(d)).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0;
   const dom1 = modeIn((d) => d <= 14), dom2 = modeIn((d) => d >= 15);

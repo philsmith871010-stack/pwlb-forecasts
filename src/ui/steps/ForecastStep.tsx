@@ -123,7 +123,7 @@ export function ForecastStep() {
   const seeForecast = () => { upd((s) => ({ ...s, reviewDone: true, reviewFor: dataEndIso(b) })); setTab('result'); };
   return (
     <div className="page">
-      <PageHead eyebrow={eyebrow} title={locked ? 'Build your forecast' : 'Your cash forecast'} actions={advanced ? <ScenarioBar /> : undefined}>
+      <PageHead eyebrow={eyebrow} title="Your cash forecast" actions={advanced ? <ScenarioBar /> : undefined}>
         {locked ? <>We’ve drafted it from your history. Check each line, add what you know is coming, then see the result.</> : null}
       </PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} />

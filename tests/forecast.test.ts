@@ -100,3 +100,14 @@ describe('a regular payment under a new name', async () => {
     expect(grantsNextYear(false).forecastTotal).toBeLessThan(1e6);
   });
 });
+
+describe('a payday that moves to the last working day', async () => {
+  const { describeDays } = await import('../src/lib/categorise/engine');
+  const { dayFromYMD, lastWorkingDayOfMonth } = await import('../src/lib/dates');
+  it('follows the latest four paydays, whatever went before', () => {
+    const days: number[] = [];
+    for (let k = 0; k < 24; k++) { const y = 2023 + Math.floor((k + 3) / 12), m = ((k + 3) % 12) + 1; days.push(k < 20 ? dayFromYMD(y, m, 28) - (k % 3 === 0 ? 1 : 0) : lastWorkingDayOfMonth(y, m)); }
+    expect(describeDays(days, days.map(() => 1e6), days[days.length - 1]).lwdShare).toBeGreaterThan(0.7);
+    expect(describeDays(days.slice(0, 20), days.slice(0, 20).map(() => 1e6), days[19]).lwdShare).toBeLessThan(0.7);
+  });
+});

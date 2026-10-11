@@ -16,8 +16,11 @@ export function TodayPage() {
   const long = !!ingest && !!cat && !short;
   const span = historyBase ? historySpan(historyBase) : null;
   const sortRef = useRef<HTMLDivElement>(null);
+  // statements read on this page (not, say, years read under History earlier in the session)
+  const [readHere, setReadHere] = useState(false);
   const read = async (files: File[]) => {
     if (!files.length) return;
+    setReadHere(true);
     useStore.setState({ sources: [], ingest: null, cat: null });
     await addFiles(files);
     await runIngest();
@@ -44,7 +47,7 @@ export function TodayPage() {
 
       {!busy && !short && <TodayDrop onFiles={read} onPick={space === 'example' ? () => void useExampleStatement() : undefined} />}
 
-      {!busy && long && (
+      {!busy && long && readHere && (
         <div className="callout mt small">That covers <strong>{day(ingest!.minDay)}</strong> to <strong>{day(ingest!.maxDay)}</strong>, more than a few days, so it has gone into your history.{' '}
           <button className="link-btn" onClick={() => goto('review')}>Check the sorting</button> or <button className="link-btn" onClick={() => goto('history')}>look back</button>.</div>
       )}

@@ -65,7 +65,7 @@ export function SimpleReview() {
   return (
     <div className="page narrow">
       <PageHead eyebrow={eyebrow} title="Check the sorting">
-        We’ve sorted almost everything automatically. Help us with the few items we weren’t sure about, biggest amounts first.
+        Almost everything is sorted. Check the few we weren’t sure about, biggest first.
       </PageHead>
 
       <div className="progress-card">
@@ -76,7 +76,7 @@ export function SimpleReview() {
         <div style={{ flex: 1 }}>
           <div className="meter" style={{ height: 12 }}><div style={{ width: `${cat.valueCategorisedPct * 100}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
           <div className="small muted" style={{ marginTop: 8 }}>
-            {allDone ? 'Nothing left to check. Well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to check</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. You don’t have to do them all: small amounts make little difference. <button className="link-btn" onClick={() => goto('history')}>Done for now: look back</button></>}
+            {allDone ? 'Nothing left to check. Well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to check</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. Small amounts make little difference. <button className="link-btn" onClick={() => goto('history')}>Done for now: look back</button></>}
           </div>
         </div>
         {catBusy && <span className="spinner" title="Updating" />}
@@ -97,7 +97,7 @@ export function SimpleReview() {
           {groups.length > 0 && (
             <section className="review-sec">
               <h3>Items we weren’t sure about <span className="muted">({groups.length})</span></h3>
-              <p className="small muted">Choose what each one is and click <strong>Save</strong>. Not sure? Click <strong>Skip</strong>.</p>
+              <p className="small muted">Choose what it is, then <strong>Save</strong>. Not sure? <strong>Skip</strong>.</p>
               <div className="stack" style={{ gap: 12 }}>{groups.slice(0, 12).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => skip(`g${g.sigIdx}`)} />)}
                 {groups.length > 12 && <div className="small muted center">Showing the 12 largest. More appear as you go.</div>}</div>
             </section>

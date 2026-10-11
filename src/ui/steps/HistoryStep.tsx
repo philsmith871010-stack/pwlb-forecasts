@@ -560,9 +560,13 @@ function SimpleYears({ h }: { h: H }) {
   const full = rows.filter((r) => r.y.complete);
   const deficits = full.filter((r) => r.net < 0).length;
   const first = full[0], last = full[full.length - 1];
+  const m = (x: number) => money(x, { unit: 'm' });
+  const netWords = (x: number) => (x >= 0 ? `${m(x)} more came in than went out` : `${m(-x)} more went out than came in`);
   const sentence = full.length >= 2
-    ? <>In <strong>{deficits} of the last {full.length} full years</strong> the council spent more everyday cash than it received.{' '}
-        {first && last && <>In {first.y.label} <strong>{first.net >= 0 ? `${money(first.net)} more came in` : `${money(-first.net)} more went out`}</strong> than {first.net >= 0 ? 'went out' : 'came in'}; by {last.y.label} it was <strong>{last.net >= 0 ? `${money(last.net)} more in` : `${money(-last.net)} more out`}</strong>{Math.abs(last.net) > Math.abs(first.net) && last.net < 0 ? ', so the need to borrow is growing' : ''}.</>}</>
+    ? <>{deficits === 0 ? <>In <strong>each of the last {full.length} full years</strong> more everyday cash came in than went out.</>
+        : deficits === full.length ? <>In <strong>each of the last {full.length} full years</strong> the council spent more everyday cash than it received.</>
+        : <>In <strong>{deficits} of the last {full.length} full years</strong> the council spent more everyday cash than it received.</>}
+        {last && <> In {last.y.label}, <strong>{netWords(last.net)}</strong>{deficits === full.length && Math.abs(last.net) > Math.abs(first.net) ? ', so the need to borrow is growing' : ''}.</>}</>
     : <>Here is how much everyday money came in and went out each year.</>;
   return (
     <div className="stack">
@@ -571,9 +575,9 @@ function SimpleYears({ h }: { h: H }) {
         {rows.map((r) => (
           <div key={r.y.key} className="year-card">
             <div className="yc-year">{r.y.label}{!r.y.complete && <span className="badge soft" style={{ marginLeft: 6 }}>part year</span>}</div>
-            <div className="yc-row"><span>Money in</span><strong className="pos">{money(r.inn)}</strong></div>
-            <div className="yc-row"><span>Money out</span><strong className="neg">{money(-r.out)}</strong></div>
-            <div className={`yc-net ${r.net < 0 ? 'neg' : 'pos'}`}>{r.net < 0 ? `${money(-r.net)} more out` : `${money(r.net)} more in`}</div>
+            <div className="yc-row"><span>Money in</span><strong className="pos">{m(r.inn)}</strong></div>
+            <div className="yc-row"><span>Money out</span><strong className="neg">{m(-r.out)}</strong></div>
+            <div className={`yc-net ${r.net < 0 ? 'neg' : 'pos'}`}>{r.net < 0 ? `${m(-r.net)} more out` : `${m(r.net)} more in`}</div>
           </div>
         ))}
       </div>

@@ -118,10 +118,12 @@ describe('checking a line: payment day for one series', async () => {
 
   it('moves only that series to the last working day, keeping the total', () => {
     const fc0 = runForecast(req);
-    const sal = fc0.explain.find((e) => e.id === 'salaries')!;
-    const s = sal.series.filter((x) => x.cadence === 'monthly' && !x.lastWorkingDay).sort((a, z) => Math.abs(z.level) - Math.abs(a.level))[0];
+    // the largest monthly payment not already on the last working day, in whichever line it is
+    const sal = fc0.explain.filter((e) => e.series.some((x) => x.cadence === 'monthly' && !x.lastWorkingDay && x.active))
+      .sort((a, z) => Math.max(...z.series.map((x) => Math.abs(x.level))) - Math.max(...a.series.map((x) => Math.abs(x.level))))[0];
+    const s = sal.series.filter((x) => x.cadence === 'monthly' && !x.lastWorkingDay && x.active).sort((a, z) => Math.abs(z.level) - Math.abs(a.level))[0];
     expect(s).toBeDefined();
-    const fc1 = runForecast({ ...req, assumptions: [{ id: 't', kind: 'timing', categoryId: 'salaries', signature: s.signature, from: settings.start, rule: 'last_working_day' }] });
+    const fc1 = runForecast({ ...req, assumptions: [{ id: 't', kind: 'timing', categoryId: sal.id, signature: s.signature, from: settings.start, rule: 'last_working_day' }] });
     const c = sal.catIdx, H = fc0.H;
     const row = (fc: typeof fc0) => fc.daily.subarray(c * H, (c + 1) * H);
     const tot = (a: Float64Array) => a.reduce((x, v) => x + v, 0);
@@ -132,7 +134,7 @@ describe('checking a line: payment day for one series', async () => {
     const lwd = lastWorkingDayOfMonth(y, m) - fc0.start;
     const moved = row(fc1)[lwd] - row(fc0)[lwd];
     expect(Math.abs(moved / s.level - 1)).toBeLessThan(0.03); // the payment, plus a little growth
-    expect(fc1.explain.find((e) => e.id === 'salaries')!.series.find((x) => x.signature === s.signature)!.timing).toBe('user');
+    expect(fc1.explain.find((e) => e.id === sal.id)!.series.find((x) => x.signature === s.signature)!.timing).toBe('user');
   });
 
   it('moves a weekly payment to another weekday, keeping one a week', async () => {

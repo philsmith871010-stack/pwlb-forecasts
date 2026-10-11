@@ -75,7 +75,7 @@ export function JobsPage() {
             <button role="tab" aria-selected={example} className={example ? 'on' : ''} onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /> Example council</button>
           </div>
           <h1 className="jobs-title">{example ? 'Northbridge Council (example)' : team.authorityName === 'My Council' ? 'Your council’s cash' : team.authorityName}</h1>
-          {example && <p className="home-lead">A practice run on a made-up council: eight short steps, about five minutes. Every step works exactly as it will for your own; wherever you’d choose a file, a click picks the example’s instead. Nothing here touches your own council’s work.{' '}
+          {example && <p className="home-lead">A practice run on a made-up council: eight short steps, about five minutes, exactly as with your own. Wherever you’d choose a file, a click picks the example’s. Your own council’s work isn’t touched.{' '}
             {(span || latest) && <button className="link-btn on-dark" onClick={() => void restart()}>Start the practice again</button>}</p>}
           {exampleBusy ? (
             <div className="jobs-busy"><span className="spinner" /> Setting up the example council: five years of statements, sorted…</div>
@@ -98,7 +98,6 @@ export function JobsPage() {
                   </button>
                 ))}
               </div>
-              <p className="jobs-flow">Each job builds on the one before: the history teaches the forecast, each day’s statement keeps the history current, and monitoring compares your signed-off forecasts with what happens.</p>
             </>
           )}
         </div>

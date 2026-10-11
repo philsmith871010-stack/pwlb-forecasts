@@ -404,3 +404,13 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
 
 - **The example council holds £30m in money market funds** from the start, and keeps that as its liquidity reserve, borrowing short-term rather than running it down (was £10m, starting from nothing). Its starting cash is about £56m (£9m in the bank plus £47m in funds), not about £12m, which sat right at the £10m minimum. The forecast now first dips below the minimum on 2 Apr 2027, a year in, and may need about £50m by March 2028.
 - **The landing page is the name, one sentence, Enter and the preview.** The two path buttons, the four job cards and the trust line are gone: you choose your path inside. Enter opens the workspace you used last. For a new user, your council's Home has "New here? Try the example council first" under the next step.
+
+## Seventh simplification pass
+
+- **Payday that has moved:** a monthly payment whose latest four payments were all on the last working day is projected there, whatever came before. A payment due in the last five days before the forecast starts, but not in the statements yet, is counted on the first forecast day instead of dropped. Together these restore the March payday the example's forecast was missing: on 31 Mar the forecast now expects −£11.6m against −£11.7m actual (it expected −£2.0m). Real councils whose payday has moved would have seen the same gap.
+- **Look back's sentence:** how many full years ran short, then the latest full year in plain words ("In 2024/25, £0.9m more came in than went out"). Year cards are all in £m.
+- **Check the sorting:** shorter instructions (the subtitle, the progress text and the section subtitle each said much the same).
+- **The forecast page keeps one title**, "Your cash forecast", rather than "Build your forecast" until lines are checked.
+- **The register card lists only what the register holds** ("£223.1m of loans and £46.6m in funds", no "£0 in fixed-term investments").
+- **Today's statement no longer shows "That covers … gone into your history"** for years read earlier under History; only for statements read on that page.
+- **Home:** the closing paragraph about how the jobs depend on each other is gone (the numbered cards say it). The example's intro and Monitor's practice note are shorter.

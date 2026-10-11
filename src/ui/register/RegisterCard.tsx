@@ -22,7 +22,11 @@ export function RegisterCard({ quiet, hint }: { quiet?: boolean; hint?: string }
           <div style={{ flex: 1 }}>
             <h3 style={{ margin: 0 }}>Deal register added {register.example && <span className="badge navy">example</span>}</h3>
             <p className="small" style={{ margin: '4px 0 0' }}>
-              <strong>{money(register.stats.debt)}</strong> of loans, <strong>{money(register.investments.reduce((s, t) => s + t.principal, 0))}</strong> in fixed-term investments and <strong>{money(register.liquid.total)}</strong> in funds, as at {register.asAt ? day(register.asAt) : 'its date'}. Repayments, interest and maturities are in the forecast.
+              {(() => {
+                // only what the register holds: no "£0 in fixed-term investments"
+                const parts = [[register.stats.debt, 'of loans'], [register.investments.reduce((s, t) => s + t.principal, 0), 'in fixed-term investments'], [register.liquid.total, 'in funds']].filter(([v]) => (v as number) > 0) as [number, string][];
+                return parts.map(([v, w], i) => <span key={w}>{i ? (i === parts.length - 1 ? ' and ' : ', ') : ''}<strong>{money(v)}</strong> {w}</span>);
+              })()}, as at {register.asAt ? day(register.asAt) : 'its date'}. Repayments, interest and maturities are in the forecast.
             </p>
             {m && m.events >= 10 && m.matched / m.events < 0.3 && <div className="callout red mt small"><strong>Few of the register’s deals were found in these bank files</strong> ({int(m.matched)} of {int(m.events)} cash flows). Check that the register and the bank files are for the same council and cover the same period.</div>}
             <details className="more-detail">

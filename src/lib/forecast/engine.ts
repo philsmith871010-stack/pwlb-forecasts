@@ -461,7 +461,10 @@ export function runForecast(req: ForecastRequest): ForecastResult {
           const stopDay = stopS ? dayFromISO(stopS.from) : Infinity;
           let rowArr = seriesRows.get(c)?.get(s.signature);
           if (!rowArr) { rowArr = new Float64Array(H); if (!seriesRows.has(c)) seriesRows.set(c, new Map()); seriesRows.get(c)!.set(s.signature, rowArr); }
-          for (const day of dates) {
+          for (const due of dates) {
+            // due in the last few days before the forecast starts but not in the statements yet:
+            // it's late, not skipped (a payday on a weekend, say), so it's counted on the first day
+            const day = due < start && start - due <= 5 ? start : due;
             if (day < start || day >= stopDay) continue;
             const amt = level * G(last, day);
             put(c, day, amt);
