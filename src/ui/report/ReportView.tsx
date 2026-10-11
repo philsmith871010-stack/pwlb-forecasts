@@ -170,7 +170,11 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
           <div className="hl"><div className="l">Borrowing needed</div><div className="v">{money(b.strategy.shortfall)}</div><div className="s">{b.strategy.shortfallDay ? `by ${fmtDay(b.strategy.shortfallDay)}` : 'none'}</div></div>
           <div><div className="l">Lasting (over a year)</div><div className="v">{money(b.strategy.lasting)}</div><div className="s">does not recover in 12 months</div></div>
           <div><div className="l">Short term</div><div className="v">{money(b.strategy.shortTerm)}</div><div className="s">recovers within 12 months</div></div>
-          <div><div className="l">Could invest a year</div><div className="v">{money(b.strategy.ladder.find((r) => r.months === 12)?.amount ?? 0)}</div><div className="s">on the cautious line</div></div>
+          {(() => {
+            // the same rule as the "Lock away" option: the longest spell with at least £1m to spare
+            const best = b.strategy.ladder.filter((r) => r.amount >= 1e6).pop();
+            return <div><div className="l">Could lock away</div><div className="v">{money(best?.amount ?? 0)}</div><div className="s">{best ? `for ${best.months} month${best.months > 1 ? 's' : ''}, on the cautious line` : 'nothing for a month or more'}</div></div>;
+          })()}
         </div>
         <ol className="r-options">{b.strategy.options.map((o, i) => <li key={i} className={o.tone}><strong>{o.title}.</strong> {o.body}</li>)}</ol>
         {b.strategy.ladder.length > 0 && (
