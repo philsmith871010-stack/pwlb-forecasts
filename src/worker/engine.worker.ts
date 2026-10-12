@@ -21,6 +21,7 @@ import { readRegisterWorkbook, registerFromSnapshot, LoadedRegister, REG } from 
 import { registerEvents, registerAccounts, liquidBalances, toDay, CashEvent } from '../lib/register/cashflows';
 import { fromSession, type CashHistory } from '../lib/history/cashHistory';
 import type { Rule } from '../lib/model';
+import { findExceptions, knownFrom, type ExceptionItem, type ExceptionSettings } from '../lib/governance/exceptions';
 
 let ds: Dataset | null = null;
 let res: CatResult | null = null;
@@ -399,6 +400,12 @@ const api = {
     const rows: TxnRow[] = [];
     for (let k = offset; k < Math.min(idx.length, offset + limit); k++) rows.push(row(idx[k]));
     return { total: idx.length, rows, sumIn, sumOut };
+  },
+
+  /** Lines in this session that deserve a second look, against what `base` (the saved history before them) knew. */
+  exceptions(base: CashHistory | null, st: ExceptionSettings): (ExceptionItem & { lines: TxnRow[] })[] {
+    const d = need(ds, 'Data'), r = need(res, 'Categorisation');
+    return findExceptions(d, r, knownFrom(base), st).map((e) => ({ ...e, lines: e.rows.map(row) }));
   },
 
   /** The lines in this session a rule would match: how many, how many it would move to another category, and the largest. */

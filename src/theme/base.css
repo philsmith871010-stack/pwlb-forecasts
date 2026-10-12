@@ -1092,3 +1092,14 @@ details.more-detail { margin-top: 2px; }
 .jobs.five .job.waiting { opacity: 1; }
 .jobs.five .job:disabled:hover { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.18); }
 .form-grid.rule-form { margin-top: 0; padding-top: 0; border-top: 0; }
+/* Daily → Exceptions */
+.exc-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.exc-card.open { border-left: 4px solid var(--pt-orange); }
+.exc-card.checked { border-left: 4px solid #1e7b34; opacity: .85; }
+.exc-card.query { border-left: 4px solid #b04632; }
+.exc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.exc-head .num { margin-left: auto; font-weight: 700; }
+.exc-status { margin-top: 8px; font-size: 13px; }
+.exc-status.checked i { color: #1e7b34; }
+.exc-status.query i { color: #b04632; }
+.exc-top .select { width: auto; }

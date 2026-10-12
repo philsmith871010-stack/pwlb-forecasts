@@ -1,9 +1,10 @@
 // Today's statement: drop it in, see the day sorted, sort anything new, save. One screen.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import { PageHead, Progress } from '../components/common';
 import { DayCard, AlreadyLoaded } from '../history/HistoryCards';
 import { EarlyCheck } from '../forecast/EarlyCheck';
+import { EXCEPTION_KINDS, latestReviews } from '../../lib/governance/exceptions';
 import { SortCard, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
 import { historySpan } from '../../lib/history/cashHistory';
@@ -50,12 +51,24 @@ export function TodayPage() {
       {!busy && short && (
         <>
           <DayCard onSort={() => sortRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          <ExceptionsNote />
           <div className="mt"><EarlyCheck from={ingest!.minDay} to={ingest!.maxDay} /></div>
           <div ref={sortRef}><TodaySorting /></div>
         </>
       )}
     </div>
   );
+}
+
+/** How many lines in what was just read deserve a second look (Daily → Exceptions). */
+function ExceptionsNote() {
+  const { exceptions, team, goto } = useStore();
+  const reviews = useMemo(() => latestReviews(team.exceptionReviews), [team.exceptionReviews]);
+  if (!exceptions) return null;
+  const open = exceptions.filter((e) => !reviews.has(e.key)).length;
+  return open
+    ? <div className="callout small mt"><i className="bi bi-flag" /> <strong>{open} exception{open === 1 ? '' : 's'} to check</strong> in this statement: {[...new Set(exceptions.filter((e) => !reviews.has(e.key)).map((e) => EXCEPTION_KINDS.find((k) => k.kind === e.kind)!.label.toLowerCase()))].join(', ')}. <button className="link-btn" onClick={() => goto('exceptions')}>Check them</button></div>
+    : <div className="callout green small mt"><i className="bi bi-check2-circle" /> No exceptions in this statement{exceptions.length ? ' still to check' : ''}.</div>;
 }
 
 /** The drop box. `onPick` replaces the file chooser (the example picks its own statement). */

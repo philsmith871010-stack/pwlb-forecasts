@@ -1,5 +1,6 @@
 import type { SignedForecast, SignOffChange } from './forecast/signoff';
 import type { Arrival } from './forecast/early';
+import type { ExceptionReview, ExceptionSettings } from './governance/exceptions';
 // Shared types: rules, bank profiles, forecasts and the team file.
 import type { Category, ForecastMethod } from './categories';
 import type { ColumnMapping } from './ingest/detect';
@@ -193,7 +194,8 @@ export interface TeamFile {
   savedAt: string;
   savedBy: string;
   settings: { financialYearStart: string; currency: 'GBP'; liquidityBuffer: number; includeHistorySummary: boolean; /** keep the cash history in the team file (default yes) */ keepCashHistory?: boolean;
-    /** the sign-off Home and Today's statement report on (by id); otherwise the newest with a month of statements */ trackedSignOff?: string };
+    /** the sign-off Home and Today's statement report on (by id); otherwise the newest with a month of statements */ trackedSignOff?: string;
+    /** thresholds for exceptions (lib/governance/exceptions); defaults when missing */ exceptions?: ExceptionSettings };
   bankProfiles: BankProfile[];
   categories: Category[];
   rules: Rule[];
@@ -208,6 +210,8 @@ export interface TeamFile {
   signedOff?: SignedForecast[];
   /** sign-offs withdrawn (made by mistake) and restored: a log, only added to, so it merges like the sign-offs (see lib/forecast/signoff) */
   signOffChanges?: SignOffChange[];
+  /** exceptions looked at: checked, or a query raised (keyed by a hash, no bank details; see lib/governance/exceptions) */
+  exceptionReviews?: ExceptionReview[];
   changeLog: ChangeLogEntry[];
 }
 

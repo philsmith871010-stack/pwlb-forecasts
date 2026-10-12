@@ -90,4 +90,10 @@ describe('main menu', () => {
     expect(r.by.monitor).toMatchObject({ tone: 'ready', status: '£7.4m ahead of “Base”' });
     expect(r.by.monitor.detail).toBe('At the end of Apr 2026, £3.4m of it timing');
   });
+
+  it('exceptions to check put Daily first among its jobs, opening on them', () => {
+    const r = run({ history: history('2021-04-01', '2026-03-31'), exceptionsOpen: 3 });
+    expect(r.by.today).toMatchObject({ tone: 'action', status: '3 exceptions to check', entry: 'exceptions' });
+    expect(r.by.today.detail).toMatch(/Up to date/);
+  });
 });

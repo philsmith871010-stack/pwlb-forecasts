@@ -9,6 +9,7 @@
 import type { Dataset } from '../ingest/ingest';
 import { type CatResult, DEAL_NO, describeDays, type Cadence } from '../categorise/engine';
 import type { Aggregates, ForecastBasis, SeriesBasis } from '../analysis/aggregates';
+import { payeeHash } from '../governance/exceptions';
 import type { Day } from '../dates';
 
 /** kind of a daily total */
@@ -50,6 +51,12 @@ export interface CashHistory {
    * statement loaded again can be told from a part export of it. Missing in histories saved before.
    */
   lines?: number[][];
+  /**
+   * every payee seen, one-way hashed (governance/exceptions `payeeHash`): enough to tell a new payee
+   * from a known one, nothing more. Missing in histories saved before; filled again when the whole
+   * history is loaded.
+   */
+  seen?: string[];
   series: HistorySeries[];
 }
 
@@ -134,7 +141,8 @@ export function fromSession(ds: Dataset, res: CatResult, knownSeries: { sig: str
     if (cur) cur.occ.push(...s.occ); else series.set(key, { ...s, occ: [...s.occ] });
   }
   const lines = lineMaps.map((m) => [...m].flat());
-  return { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, lines, series: [...series.values()].filter((s) => s.occ.length) };
+  const seen = [...new Set(Array.from(res.sig, (s) => payeeHash(res.signatures[s])))];
+  return { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, lines, seen, series: [...series.values()].filter((s) => s.occ.length) };
 }
 
 // ---------------------------------------------------------------- merging
@@ -218,7 +226,11 @@ export function mergeHistory(base: CashHistory | null, add: CashHistory): { hist
     if (cur) cur.occ = [...cur.occ, ...occ].sort((a, b) => a[0] - b[0]);
     else series.set(key, { ...s, occ });
   }
-  return { history: { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, lines, series: [...series.values()] }, report };
+  // payees seen: both; or, for a history saved before they were kept, only once these files cover all of it
+  const bs = historySpan(base), as = historySpan(add);
+  const covers = !!bs && !!as && as.from <= bs.from + 31 && as.to >= bs.to;
+  const seen = base.seen ? [...new Set([...base.seen, ...(add.seen ?? [])])] : covers ? add.seen : undefined;
+  return { history: { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, lines, seen, series: [...series.values()] }, report };
 }
 
 // ---------------------------------------------------------------- back to a forecast basis

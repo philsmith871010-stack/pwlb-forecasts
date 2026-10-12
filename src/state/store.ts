@@ -8,6 +8,8 @@ import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
 import { signForecast, knownItemsOf, rollForward, type SignedForecast } from '../lib/forecast/signoff';
 import { exampleSignOffs } from '../lib/forecast/exampleSignoffs';
 import type { ForecastResult } from '../lib/forecast/engine';
+import { DEFAULT_EXCEPTION_SETTINGS, type ExceptionItem } from '../lib/governance/exceptions';
+import type { TxnRow } from '../worker/types';
 import { addToHistory, basisFromHistory, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport, type OverlapReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
@@ -16,7 +18,7 @@ import { isoFromDay, addMonths, dayFromYMD, isBusinessDay, type Day } from '../l
 import { setExactAmounts as setExactAmountsFormat } from '../lib/format';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
-export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'rules' | 'history' | 'pastday' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today' | 'monitor';
+export type StepId = 'exceptions' | 'load' | 'map' | 'categorise' | 'review' | 'rules' | 'history' | 'pastday' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today' | 'monitor';
 /** Full step list (advanced tools on). */
 export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] = [
   { id: 'load', label: 'Add your data', sub: 'Bank statement files', icon: 'bi-cloud-arrow-up' },
@@ -59,7 +61,7 @@ export const STREAMS: Stream[] = [
     { id: 'pastday', label: 'A past day' },
     { id: 'data', label: 'All transactions', advanced: true },
   ] },
-  { id: 'today', label: 'Daily', short: 'Daily', icon: 'bi-calendar-day', what: 'Add each day’s statement and sort anything new.', steps: [{ id: 'today', label: 'Today’s statement' }] },
+  { id: 'today', label: 'Daily', short: 'Daily', icon: 'bi-calendar-day', what: 'Add each day’s statement, sort anything new and check exceptions.', steps: [{ id: 'today', label: 'Today’s statement' }, { id: 'exceptions', label: 'Exceptions' }] },
   { id: 'forecast', label: 'Forecast', short: 'Forecast', icon: 'bi-graph-up-arrow', what: 'Build it, check it, sign it off.', steps: [
     { id: 'forecast', label: 'Build the forecast' },
     { id: 'backtest', label: 'Test it', advanced: true },
@@ -94,6 +96,9 @@ export interface Source {
   profileId?: string;
   profileName?: string;
 }
+
+/** an exception with its bank lines, for showing */
+export type ExceptionView = ExceptionItem & { lines: TxnRow[] };
 
 export interface Busy { phase: string; frac: number; rows?: number }
 
@@ -141,6 +146,9 @@ interface State {
   historyBase: CashHistory | null;
   /** what adding this session's files to the history did */
   historyReport: MergeReport | null;
+  /** lines in this session that deserve a second look (Daily → Exceptions), and the history they were judged against */
+  exceptions: ExceptionView[] | null;
+  exceptionBase: CashHistory | null;
   /** how the latest files joined the saved history (for "already loaded" and the part-export choice) */
   historyAdd: { base: CashHistory; session: CashHistory; overlap: OverlapReport; matched: { from: string; to: string; why: string }[]; kept: number } | null;
   /** looking at the saved history alone, without loading bank files */
@@ -201,6 +209,8 @@ interface Actions {
   runCategorise: () => Promise<void>;
   useSavedHistory: () => void;
   useFileFigures: () => void;
+  /** find this session's exceptions again (after new thresholds, or re-sorting) */
+  refreshExceptions: () => Promise<void>;
   forgetHistory: () => void;
   saveTeam: (mode?: 'save' | 'saveAs' | 'download') => Promise<void>;
   resolveMerge: (apply: boolean) => Promise<void>;
@@ -286,6 +296,8 @@ export const useStore = create<State & Actions>((set, get) => ({
   historyBase: null,
   historyReport: null,
   historyAdd: null,
+  exceptions: null,
+  exceptionBase: null,
   historyOnly: false,
   registerBusy: false,
   registerError: null,
@@ -618,6 +630,11 @@ export const useStore = create<State & Actions>((set, get) => ({
         set((s) => ({ team: { ...s.team, signedOff: exampleSignOffs(eh!, s.team.categories, s.team.settings.liquidityBuffer) } }));
       }
       persistTeam(JSON.stringify(get().team));
+      // judged against the history as it was before these files (a new payee is new to that). The
+      // first history loaded isn't checked: exceptions are for statements added to one
+      const judgedAgainst = keepSaved ? hb : base;
+      set({ exceptionBase: judgedAgainst, exceptions: null });
+      if (judgedAgainst) void get().refreshExceptions();
       if (!get().activeScenarioId && !get().team.forecasts.length) {
         const wasDirty = get().dirty;
         const id = get().newScenario('Base');
@@ -627,6 +644,15 @@ export const useStore = create<State & Actions>((set, get) => ({
       set({ catBusy: null });
       get().toast(`Categorisation failed: ${(e as Error).message}`, 'err');
     }
+  },
+
+  refreshExceptions: async () => {
+    if (!get().cat || !get().exceptionBase) { set({ exceptions: null }); return; }
+    try {
+      const st = { ...DEFAULT_EXCEPTION_SETTINGS, ...get().team.settings.exceptions };
+      const list = await engine().exceptions(get().exceptionBase, st);
+      set({ exceptions: list });
+    } catch { set({ exceptions: null }); }
   },
 
   // the user prefers this file's figures for the days it has less on than was saved

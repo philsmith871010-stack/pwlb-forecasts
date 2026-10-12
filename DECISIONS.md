@@ -568,3 +568,22 @@ Now each upload joins the history through `addToHistory`:
 - **Users can choose any convention** on Check each line. It's kept as a timing change (`rule: 'convention'`, e.g. "weekday:2:2"). Timing changes made earlier (a day of the month, the last working day) still work.
 - The late-payment check uses the same dates, so "due on" is right too.
 - Twice-monthly and weekly payments are unchanged: their weekday or set days were already kept.
+
+## Exceptions: a governance check on the money that moved
+
+- **A step in Daily** ("Exceptions", after Today's statement). Statements added to the history are checked for lines that deserve a second look (`lib/governance/exceptions.ts`):
+  - **possible duplicate:** the same payee and amount within a few days, in the statements or against a regular payment's dates in the history;
+  - **out of line:** more than a set multiple of the payee's usual amount;
+  - **new payee:** money out to a payee not in the history before;
+  - **large one-off:** a one-off, unusually large for its category;
+  - **non-working day:** money moving on a weekend or bank holiday;
+  - **not sorted,** or sorted only by a weak guess.
+
+  Transfers between the council's own accounts and loans and investments are left out, except where they're unsorted. A line flagged for something that also moved on a non-working day says so too.
+- **Thresholds are the council's own** (kept in the team file): the smallest line raised (default £25,000, a tenth of it for duplicates and unsorted lines), out of line at 2.5× the usual, and duplicates within 5 days.
+- **Payees are recognised by the core of their name** (`payeeKey`). "BACS NORTHSHIRE CONSULTING LLP INV" and "NORTHSHIRE CONSULTING LLP" are one payee. Without this, a normal week raised four false "new payees".
+- **The history keeps every payee seen, but only as a one-way hash** (`seen`): enough to tell new from known, nothing more. A history saved before this learns them when it's loaded again in full.
+- **Only statements added to a history are checked,** not the first history loaded, which would raise years of items nobody needs on day one. A normal week of the generated council raises three, all fair: housing benefit at 2.8× its usual, and two large payments to other councils sorted only by a weak guess.
+- **Each exception is marked Checked** (with an optional note) **or Query raised** (with a reason), with who and when. A name is required first, so the record is an audit trail. Reviews are kept in the team file under a hash of the line, with no bank details. The latest for each counts, and copies merge like sign-offs. The log, with each exception's line and status, downloads as CSV.
+- **Daily's card and header** say "N exceptions to check", and Daily opens on them. Today's statement points to them after a day is read.
+- **This is a detective control on bank statements,** alongside purchase-to-pay controls (invoices, approvals), not instead of them. The page says so.

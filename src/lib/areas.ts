@@ -9,7 +9,7 @@ import { isoFromDay, dayFromISO, ymdFromDay, MONTH_NAMES } from './dates';
 
 /** the areas, in the order they depend on each other (as on the main menu) */
 export type AreaId = 'setup' | 'review' | 'today' | 'forecast' | 'monitor';
-export type StepRef = 'load' | 'history' | 'pastday' | 'today' | 'forecast' | 'monitor';
+export type StepRef = 'load' | 'history' | 'pastday' | 'today' | 'exceptions' | 'forecast' | 'monitor';
 const ORDER: AreaId[] = ['setup', 'review', 'today', 'forecast', 'monitor'];
 
 const monthOf = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
@@ -42,10 +42,12 @@ export interface AreaInput {
   /** sign-offs that count (withdrawn ones left out) */
   active: SignedForecast[];
   tracking: Tracking | null;
+  /** exceptions in the statements read this session not yet looked at (Daily → Exceptions) */
+  exceptionsOpen?: number;
 }
 
 /** Each area's lock and state, and the one to do next, from what the council has so far. */
-export function computeAreas({ history: h, expected, forecasts, rules: allRules, active, tracking: tr }: AreaInput): { areas: AreaState[]; next: AreaId } {
+export function computeAreas({ history: h, expected, forecasts, rules: allRules, active, tracking: tr, exceptionsOpen = 0 }: AreaInput): { areas: AreaState[]; next: AreaId } {
   const span = h ? historySpan(h) : null;
   const days = historyDays(h);
   const years = Math.round((days / 365.25) * 2) / 2;
@@ -75,6 +77,13 @@ export function computeAreas({ history: h, expected, forecasts, rules: allRules,
     : upToDate
       ? { id: 'today', locked: null, tone: 'done', status: 'Up to date', detail: `Latest statement ${day(span!.to)}`, entry: 'today' }
       : { id: 'today', locked: null, tone: 'action', status: `Statements from ${day(span!.to + 1)} to add`, detail: behind > CATCH_UP_DAYS ? 'More than two weeks behind: catching up is quicker under Set up and train.' : `Latest statement ${day(span!.to)}`, entry: 'today' };
+  // exceptions to look at come first: they're about money that has already moved
+  if (!today.locked && exceptionsOpen > 0) {
+    today.tone = 'action';
+    today.detail = today.status === 'Up to date' ? `Up to date to ${day(span!.to)}` : today.status;
+    today.status = `${exceptionsOpen} exception${exceptionsOpen === 1 ? '' : 's'} to check`;
+    today.entry = 'exceptions';
+  }
 
   // ---- Forecast
   const fcs = forecasts;
