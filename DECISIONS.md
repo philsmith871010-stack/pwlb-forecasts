@@ -554,3 +554,17 @@ Now each upload joins the history through `addToHistory`:
   - A late one arriving the next month pushed that month's payment out.
   - Most of a month late, the payment counts as stopped, so **every** later one dropped out too (about £42m over a year for a £3.5m monthly grant). Confirming "still coming" keeps it regular and puts them all back.
   - On Monitor, a payment confirmed late that was due inside the period read and hadn't come by then is timing (actuals behind by it). Once it comes in, it isn't timing any more. "Not coming" isn't timing, because it's a real difference. The sentence says "due 7 Nov, hadn't come in by then (late: expected …)", and Home and the menu card include it in "of it timing".
+
+## Payment conventions
+
+- **Before:** a monthly (or less frequent) payment was booked on its usual day of the month, or on the last working day. Weekends and bank holidays were handled by a fixed rule: money out moved to the working day before, money in to the next. Conventions like "the second Tuesday" or "the third working day" weren't recognised, and a payment that rolls the other way landed on the wrong day. On the generated council, the 20 schools' budget shares (paid out on the 1st, or the next working day) were put on the previous month's last working day in 5 months of 12.
+- **Now each regular payment's convention is learned from its own dates** (`lib/forecast/conventions.ts`, `detectConvention`). For each candidate rule, its latest dates (up to 12) are re-projected, and the rule that produces most of them exactly wins. It needs at least 4 dates and 75% matched. The candidate rules:
+  - a day of the month, or the next working day / the working day before / that day regardless;
+  - the nth weekday of the month (first to fourth, or last);
+  - the nth working day of the month, from the start or from the end.
+  Ties go to the plainest rule, and for a day of the month to the usual roll for its direction. Without a clear convention, the old rule is used.
+- **On the generated council**, holding out the last year: payments booked on exactly the right day rose from **79.0% to 96.2%** (within a day: 79.7% to 96.9%), and none got worse.
+- **Shown in plain words** wherever regular payments are listed: Check each line, and Review history's regular payments ("on the 15th, or the next working day if that isn't one", "on the second Tuesday", "on the third working day").
+- **Users can choose any convention** on Check each line. It's kept as a timing change (`rule: 'convention'`, e.g. "weekday:2:2"). Timing changes made earlier (a day of the month, the last working day) still work.
+- The late-payment check uses the same dates, so "due on" is right too.
+- Twice-monthly and weekly payments are unchanged: their weekday or set days were already kept.

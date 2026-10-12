@@ -448,9 +448,9 @@ const api = {
     };
   },
 
-  seriesInfo(): { id: number; signature: string; cadence: string; categoryIdx: number; typicalAmount: number; occurrences: number; active: boolean; classification: string; lastDay: Day; firstDay: Day; trendPct: number; dayOfMonth: number; lastWorkingDay: boolean; regularity: number; total: number }[] {
+  seriesInfo(): { id: number; signature: string; cadence: string; categoryIdx: number; typicalAmount: number; occurrences: number; active: boolean; classification: string; lastDay: Day; firstDay: Day; trendPct: number; dayOfMonth: number; lastWorkingDay: boolean; convention?: string; regularity: number; total: number }[] {
     const r = need(res, 'Categorisation');
-    return r.seriesList.map((s) => ({ id: s.id, signature: s.signature, cadence: s.cadence, categoryIdx: s.categoryIdx, typicalAmount: s.typicalAmount, occurrences: s.occurrences, active: s.active, classification: s.classification, lastDay: s.lastDay, firstDay: s.firstDay, trendPct: s.trendPct, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, regularity: s.regularity, total: s.total }));
+    return r.seriesList.map((s) => ({ id: s.id, signature: s.signature, cadence: s.cadence, categoryIdx: s.categoryIdx, typicalAmount: s.typicalAmount, occurrences: s.occurrences, active: s.active, classification: s.classification, lastDay: s.lastDay, firstDay: s.firstDay, trendPct: s.trendPct, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, convention: s.convention, regularity: s.regularity, total: s.total }));
   },
 
   // ------------------------------------------------------------- backtests

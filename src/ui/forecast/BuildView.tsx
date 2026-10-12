@@ -14,6 +14,7 @@ import { ImportWizard } from './ImportWizard';
 import { LineWizard } from './LineWizard';
 import { money, day, pct } from '../../lib/format';
 import { MONTH_NAMES, weekday, dayFromISO, isoFromDay } from '../../lib/dates';
+import { parseConvention, conventionWords, conventionToken } from '../../lib/forecast/conventions';
 
 type Upd = (fn: (s: Scenario) => Scenario) => void;
 type SeriesX = CategoryExplain['series'][number];
@@ -35,6 +36,9 @@ const ord = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2
 function whenWords(s: SeriesX): string {
   if (s.cadence === 'weekly' || s.cadence === 'fortnightly' || s.cadence === 'four_weekly') return `on ${WEEKDAYS[weekday(s.lastDay)]}s`;
   if (s.cadence === 'semi_monthly') return 'mid-month and month-end';
+  // the convention its dates follow, e.g. "on the 15th, or the next working day if that isn't one"
+  const c = parseConvention(s.convention ?? undefined);
+  if (c) return conventionWords(c);
   if (s.lastWorkingDay) return 'on the last working day of the month';
   return `on or near the ${ord(s.dayOfMonth)}`;
 }
@@ -169,9 +173,9 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
   const setLevel = (v: string) => setAssumption((a) => a.kind === 'step' && a.categoryId === e.id && a.note === LEVEL_NOTE,
     v.trim() === '' || isNaN(+v) || +v === 0 ? null : () => ({ id: uid('as'), kind: 'step', categoryId: e.id, pct: +v, effective: sc.settings.start, note: LEVEL_NOTE }));
   const setTiming = (sig: string, v: string) => setAssumption((a) => a.kind === 'timing' && a.signature === sig,
-    v === 'history' ? null : () => (v.startsWith('w')
+    v === 'history' ? null : () => (/^w\d$/.test(v)
       ? { id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: 'weekday', weekday: +v.slice(1) }
-      : { id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: v === 'lwd' ? 'last_working_day' : 'day_of_month', dayOfMonth: v === 'lwd' ? undefined : +v }));
+      : { id: uid('as'), kind: 'timing', categoryId: e.id, signature: sig, from: sc.settings.start, rule: 'convention', convention: v }));
   const toggleSeries = (sig: string) => setAssumption((a) => a.kind === 'stop' && a.categoryId === e.id && a.signature === sig,
     removedSigs.has(sig) ? null : () => ({ id: uid('as'), kind: 'stop', categoryId: e.id, signature: sig, from: sc.settings.start }));
   const setStop = (date: string | null) => setAssumption((a) => a.kind === 'stop' && a.categoryId === e.id && !a.signature,
@@ -231,9 +235,7 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
                       <td>{HOW_OFTEN[s.cadence] ?? s.cadence}</td>
                       <td>{!(editing || changed) ? <span className="small">{whenShown(sc, e.id, s)}</span> : DAY_SET.includes(s.cadence) ? (
                         <select className="select sm" aria-label={`When ${s.signature} is paid`} value={timingValue(sc, e.id, s)} onChange={(ev) => setTiming(s.signature, ev.target.value)}>
-                          <option value="history">As before ({s.lastWorkingDay ? 'last working day' : `the ${ord(s.dayOfMonth)}`})</option>
-                          <option value="lwd">Last working day</option>
-                          {Array.from({ length: 28 }, (_, k) => <option key={k} value={k + 1}>On the {ord(k + 1)}</option>)}
+                          <ConventionOptions found={whenWords(s)} />
                         </select>
                       ) : WEEK_SET.includes(s.cadence) ? (
                         <select className="select sm" aria-label={`Which day ${s.signature} is paid`} value={timingValue(sc, e.id, s)} onChange={(ev) => setTiming(s.signature, ev.target.value)}>
@@ -323,16 +325,30 @@ function LineCard({ e, sc, upd, b, checked, open, onOpen, onConfirm, colour, his
 function whenShown(sc: Scenario, catId: string, s: SeriesX): string {
   const v = timingValue(sc, catId, s);
   if (v === 'history') return whenWords(s);
-  if (v === 'lwd') return 'on the last working day';
-  if (v.startsWith('w')) return `on ${WEEKDAYS[+v.slice(1)]}s`;
-  return `on the ${ord(+v)}`;
+  if (/^w\d$/.test(v)) return `on ${WEEKDAYS[+v.slice(1)]}s`;
+  const c = parseConvention(v);
+  return c ? conventionWords(c) : whenWords(s);
 }
 
 function timingValue(sc: Scenario, catId: string, s: SeriesX): string {
   const a = [...sc.assumptions].reverse().find((x) => x.kind === 'timing' && x.signature === s.signature && x.categoryId === catId) as Extract<Assumption, { kind: 'timing' }> | undefined;
   if (!a) return 'history';
   if (a.rule === 'weekday') return `w${a.weekday}`;
-  return a.rule === 'last_working_day' ? 'lwd' : String(a.dayOfMonth ?? s.dayOfMonth);
+  if (a.rule === 'convention') return a.convention ?? 'history';
+  // set before conventions: the last working day, or a day of the month rolled as usual for its direction
+  return a.rule === 'last_working_day' ? 'working:-1' : `dom:${a.dayOfMonth ?? s.dayOfMonth}:${s.level < 0 ? 'prev' : 'next'}`;
+}
+
+/** Every convention a monthly (or less often) payment can follow, grouped, for choosing one. */
+function ConventionOptions({ found }: { found: string }) {
+  const days = Array.from({ length: 31 }, (_, k) => k + 1);
+  return <>
+    <option value="history">As found: {found}</option>
+    <optgroup label="A day of the month, or the next working day">{days.map((d) => <option key={d} value={`dom:${d}:next`}>The {ord(d)}, or the next working day</option>)}</optgroup>
+    <optgroup label="A day of the month, or the working day before">{days.map((d) => <option key={d} value={`dom:${d}:prev`}>The {ord(d)}, or the working day before</option>)}</optgroup>
+    <optgroup label="A working day of the month">{[1, 2, 3, 4, 5, -3, -2, -1].map((n) => { const c = { kind: 'working', n } as const; return <option key={n} value={conventionToken(c)}>{conventionWords(c).replace(/^on the /, 'The ').replace(/^./, (x) => x.toUpperCase())}</option>; })}</optgroup>
+    <optgroup label="A weekday in the month">{[1, 2, 3, 4, -1].flatMap((n) => [1, 2, 3, 4, 5].map((w) => { const c = { kind: 'weekday', n, weekday: w } as const; return <option key={`${n}-${w}`} value={conventionToken(c)}>{conventionWords(c).replace(/^on the /, 'The ')}</option>; }))}</optgroup>
+  </>;
 }
 
 function addDaysIso(iso: string, n: number): string {

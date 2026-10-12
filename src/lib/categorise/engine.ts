@@ -14,6 +14,7 @@ import type { Alias, Rule, SeriesOverride, TxnOverride, Classification } from '.
 import type { Dataset } from '../ingest/ingest';
 import { ROW_DATE_SWAPPED, ROW_DUP_CANDIDATE } from '../ingest/ingest';
 import { cleanNarrative, signatureOf } from './normalise';
+import { detectConvention, conventionWords } from '../forecast/conventions';
 import { STARTER_RULES, TREASURY_COUNTERPARTIES, LA_PATTERN } from './starterRules';
 import { ymdFromDay, isBusinessDay, Day } from '../dates';
 import { hashString } from '../rng';
@@ -92,6 +93,8 @@ export interface Series {
   /** second day of month for twice-monthly series */
   dayOfMonth2?: number;
   lastWorkingDay: boolean;
+  /** the payment convention its dates follow, in words ("on the second Tuesday"), for monthly or less often */
+  convention?: string;
   trendPct: number;
   active: boolean;
   total: number;
@@ -671,6 +674,7 @@ export function detectSeries(
         cadence, regularity, occurrences: days.length, firstDay: days[0], lastDay: days[days.length - 1],
         typicalAmount: medAmt * (key & 1 ? -1 : 1), amountCV: cv, dayOfMonth: cadence === 'semi_monthly' ? dom1 : dom, dayOfMonth2: cadence === 'semi_monthly' ? dom2 : undefined, lastWorkingDay: lwdShare > 0.7 && cadence === 'monthly',
         trendPct: trend, active: dd.active, total,
+        convention: ['monthly', 'quarterly', 'half_yearly', 'annual'].includes(cadence) ? (() => { const c = detectConvention(days, key & 1 ? -1 : 1); return c ? conventionWords(c.convention) : undefined; })() : undefined,
         classification: overrideBySig.get(signatures[s]) ?? 'recurring', recurring: recurring || cadence === 'daily',
       };
       seriesList.push(ser);

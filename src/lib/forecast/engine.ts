@@ -2,7 +2,23 @@
 // recompute on every keystroke. Every number traces back to: historic data (profile, series),
 // an assumption, a pasted schedule or a one-off the user entered.
 
+import { detectConvention, dateFor, parseConvention, conventionToken, type Convention } from './conventions';
 import type { Arrival } from './early';
+
+const MONTHLY_TYPE = ['monthly', 'quarterly', 'half_yearly', 'annual'];
+
+/**
+ * The convention a regular payment's dates follow: as the user set it (a timing change), else as
+ * its own dates show. Monthly, quarterly, half-yearly and annual payments only; null otherwise.
+ */
+function timingConvention(tm: Extract<Assumption, { kind: 'timing' }> | undefined, s: SeriesBasis): Convention | null {
+  if (!MONTHLY_TYPE.includes(s.cadence)) return null;
+  const sign = s.amounts.length ? s.amounts[s.amounts.length - 1] : -1;
+  if (tm?.rule === 'convention') return parseConvention(tm.convention);
+  if (tm?.rule === 'last_working_day') return { kind: 'working', n: -1 };
+  if (tm?.rule === 'day_of_month') return { kind: 'dom', day: tm.dayOfMonth ?? s.dayOfMonth, roll: sign < 0 ? 'prev' : 'next' };
+  return detectConvention(s.days, sign)?.convention ?? null;
+}
 
 /** A regular payment's projected date an early arrival stands in for: within this many days of the due date it was given. */
 export const DUE_MATCH_DAYS = 10;
@@ -82,7 +98,9 @@ export interface CategoryExplain {
   clamps: Clamp[];
   sigmaMonthly: number;
   distribution: 'day_of_month' | 'weekday' | 'even' | 'series';
-  series: { signature: string; cadence: string; level: number; next: Day | null; projected: number; active: boolean; dayOfMonth: number; lastWorkingDay: boolean; regularity: number; lastDay: Day; timing: 'history' | 'user' }[];
+  series: { signature: string; cadence: string; level: number; next: Day | null; projected: number; active: boolean; dayOfMonth: number; lastWorkingDay: boolean; regularity: number; lastDay: Day; timing: 'history' | 'user';
+    /** the payment convention its dates follow (as found, or as set), e.g. "dom:15:next" (lib/forecast/conventions), or null */
+    convention: string | null }[];
   notes: string[];
   forecastTotal: number;
   historyAnnual: number;
@@ -462,6 +480,8 @@ export function runForecast(req: ForecastRequest): ForecastResult {
         let projected = 0, next: Day | null = null;
         // the user may have said when this payment is made
         const tm = [...req.assumptions].reverse().find((a) => a.kind === 'timing' && a.signature === s.signature && a.categoryId === id) as Extract<Assumption, { kind: 'timing' }> | undefined;
+        // the day each payment falls on: the convention the user set, else the one its own dates follow
+        const conv = timingConvention(tm, s);
         // a payment confirmed as late is still a regular payment, however long since it last came
         const stillComing = (req.arrivals ?? []).some((a) => a.answer === 'late' && a.kind === 'series' && a.signature === s.signature && a.categoryId === id);
         if ((s.active || stillComing) && last >= dataEnd - 400) {
@@ -472,7 +492,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
             if (delta > 3) delta -= 7;
             anchor = last + delta;
           }
-          const sched = tm && tm.rule !== 'weekday' ? { ...s, lastWorkingDay: tm.rule === 'last_working_day', dayOfMonth: tm.rule === 'day_of_month' ? tm.dayOfMonth ?? s.dayOfMonth : s.dayOfMonth } : s;
+          const sched = { ...s, convention: conv };
           // payments confirmed as late (still coming): once one has come, the ones after follow on
           // from the date it was due, so a late payment doesn't push the next one out
           const lates = (req.arrivals ?? []).filter((a) => a.answer === 'late' && a.kind === 'series' && a.signature === s.signature && a.categoryId === id);
@@ -519,7 +539,7 @@ export function runForecast(req: ForecastRequest): ForecastResult {
           if (d <= end && (next === null || d < next)) next = d;
         }
         forecastTotal += projected;
-        seriesExplain.push({ signature: s.signature, cadence: s.cadence, level, next, projected, active: s.active || stillComing, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, regularity: s.regularity, lastDay: last, timing: tm ? 'user' : 'history' });
+        seriesExplain.push({ signature: s.signature, cadence: s.cadence, level, next, projected, active: s.active || stillComing, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, regularity: s.regularity, lastDay: last, timing: tm ? 'user' : 'history', convention: conv ? conventionToken(conv) : null });
       }
       for (const x of renamed) notes.push(`${x.signature} stopped under that name, but the same payment carries on from ${fmtDay(x.from)} (probably a new name), so it is still projected.`);
       const stopped = catSeries.filter((s) => !s.active);
@@ -833,7 +853,7 @@ export function fmtMoney(x: number, dp = 1): string {
 }
 
 /** Next occurrence dates for a series after `last`, up to `end`. */
-export function projectDates(s: Pick<SeriesBasis, 'cadence' | 'dayOfMonth' | 'lastWorkingDay'> & { amounts?: Float64Array; dayOfMonth2?: number }, last: Day, end: Day): Day[] {
+export function projectDates(s: Pick<SeriesBasis, 'cadence' | 'dayOfMonth' | 'lastWorkingDay'> & { amounts?: Float64Array; dayOfMonth2?: number; days?: ArrayLike<number>; convention?: Convention | null }, last: Day, end: Day): Day[] {
   const out: Day[] = [];
   const sign = s.amounts && s.amounts.length ? s.amounts[s.amounts.length - 1] : -1;
   if (s.cadence === 'semi_monthly') {
@@ -862,13 +882,15 @@ export function projectDates(s: Pick<SeriesBasis, 'cadence' | 'dayOfMonth' | 'la
   const monthsStep: Record<string, number> = { monthly: 1, quarterly: 3, half_yearly: 6, annual: 12 };
   const ms = monthsStep[s.cadence];
   if (!ms) return out;
+  // the convention given, else the one its own dates follow, else the usual day of the month
+  const conv = s.convention !== undefined ? s.convention : s.days ? detectConvention(s.days, sign)?.convention ?? null : null;
   const { y, m } = ymdFromDay(last);
   for (let k = 1; ; k++) {
     const mi = y * 12 + (m - 1) + k * ms;
     const yy = Math.floor(mi / 12), mm = (mi % 12) + 1;
     if (dayFromYMD(yy, mm, 1) > end) break;
-    const day = s.lastWorkingDay ? lastWorkingDayOfMonth(yy, mm) : rollFor(dayFromYMD(yy, mm, Math.min(s.dayOfMonth, daysInMonth(yy, mm))), sign);
-    if (day <= end && day > last) out.push(day);
+    const day = conv ? dateFor(conv, yy, mm) : s.lastWorkingDay ? lastWorkingDayOfMonth(yy, mm) : rollFor(dayFromYMD(yy, mm, Math.min(s.dayOfMonth, daysInMonth(yy, mm))), sign);
+    if (day !== null && day <= end && day > last) out.push(day);
   }
   return out;
 }

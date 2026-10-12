@@ -430,7 +430,7 @@ function CategoryDeepDive({ h }: { h: H }) {
                     <tbody>{detail.series.map((s) => (
                       <tr key={s.id}>
                         <td className="mono xs" style={{ maxWidth: 220, whiteSpace: 'normal' }}>{s.signature}</td>
-                        <td className="xs">{s.cadence.replace('_', '-')}{s.cadence === 'monthly' ? (s.lastWorkingDay ? ', last working day' : `, ~${s.dayOfMonth}th`) : ''}</td>
+                        <td className="xs">{s.cadence.replace('_', '-')}{s.convention ? `, ${s.convention}` : s.cadence === 'monthly' ? (s.lastWorkingDay ? ', last working day' : `, ~${s.dayOfMonth}th`) : ''}</td>
                         <td className="num"><Money v={s.typicalAmount} /></td>
                         <td className="num">{s.trendPct ? pct(s.trendPct, 1, true) + ' p.a.' : '–'}</td>
                         <td className="xs">{day(s.firstDay)} – {s.active ? <span className="badge green">active</span> : day(s.lastDay)}</td>
@@ -497,7 +497,7 @@ function RecurringView({ h }: { h: H }) {
               <tr key={s.id}>
                 <td className="mono xs">{s.signature}</td>
                 <td><CatBadge cat={h.cats[s.categoryIdx]} /></td>
-                <td className="xs">{s.cadence.replace('_', '-')}{s.cadence === 'monthly' ? (s.lastWorkingDay ? ' (last working day)' : ` (~${s.dayOfMonth})`) : ''}</td>
+                <td className="xs">{s.cadence.replace('_', '-')}{s.convention ? ` (${s.convention})` : s.cadence === 'monthly' ? (s.lastWorkingDay ? ' (last working day)' : ` (~${s.dayOfMonth})`) : ''}</td>
                 <td className="num">{s.occurrences}</td>
                 <td className="num"><Money v={s.typicalAmount} /></td>
                 <td className="xs">{day(s.firstDay)} – {s.active ? 'now' : day(s.lastDay)}</td>

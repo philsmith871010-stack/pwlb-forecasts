@@ -68,7 +68,7 @@ export type Assumption =
   | { id: string; kind: 'growth'; categoryId: string; pct: number; mode: GrowthMode; note?: string }
   | { id: string; kind: 'step'; categoryId: string; pct: number; effective: string; backdateFrom?: string; arrearsPaidOn?: string; note?: string }
   /** moves payments to a day: a whole category, or (with `signature`) just one regular payment series */
-  | { id: string; kind: 'timing'; categoryId: string; from: string; rule: 'last_working_day' | 'day_of_month' | 'weekday'; dayOfMonth?: number; /** 0 = Sunday … 6 = Saturday (rule 'weekday', series only) */ weekday?: number; signature?: string; note?: string }
+  | { id: string; kind: 'timing'; categoryId: string; from: string; rule: 'last_working_day' | 'day_of_month' | 'weekday' | 'convention'; dayOfMonth?: number; /** 0 = Sunday … 6 = Saturday (rule 'weekday', series only) */ weekday?: number; /** rule 'convention': e.g. "dom:15:next", "weekday:2:2", "working:3" (see lib/forecast/conventions) */ convention?: string; signature?: string; note?: string }
   /** stops a whole category, or (with `signature`) just one regular payment series */
   | { id: string; kind: 'stop'; categoryId: string; from: string; signature?: string; note?: string }
   | { id: string; kind: 'start'; categoryId: string; from: string; until?: string; amount: number; cadence: 'weekly' | 'fortnightly' | 'monthly' | 'quarterly' | 'half_yearly' | 'annual'; dayOfMonth?: number; note?: string }
