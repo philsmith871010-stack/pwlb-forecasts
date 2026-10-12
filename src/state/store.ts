@@ -198,6 +198,8 @@ interface Actions {
   resolveMerge: (apply: boolean) => Promise<void>;
   setMergeChoice: (key: string, v: 'mine' | 'theirs') => void;
   newScenario: (name: string, from?: Scenario) => string;
+  /** withdraw a sign-off (it stays in the file, no longer monitored), or restore one */
+  changeSignOff: (id: string, action: 'withdraw' | 'restore', reason?: string) => void;
   /** freeze this forecast as it stands, to compare with what actually happens */
   signOff: (fc: ForecastResult, sc: Scenario, note?: string, by?: string) => SignedForecast;
   updateScenario: (id: string, fn: (s: Scenario) => Scenario) => void;
@@ -696,6 +698,11 @@ export const useStore = create<State & Actions>((set, get) => ({
     const rec = signForecast(fc, sc, { id: uid('so'), signedAt: new Date().toISOString(), signedBy: by || get().user || 'Not named', note: note || undefined, knownItems: knownItemsOf(sc, get().team.categories) });
     get().updateTeam((t) => ({ ...t, signedOff: [...(t.signedOff ?? []), rec] }));
     return rec;
+  },
+
+  changeSignOff: (id, action, reason) => {
+    const c = { id, action, at: new Date().toISOString(), by: get().user || 'Not named', reason: reason || undefined };
+    get().updateTeam((t) => ({ ...t, signOffChanges: [...(t.signOffChanges ?? []), c] }));
   },
 
   newScenario: (name, from) => {

@@ -6,10 +6,10 @@ import { Kpi, Panel, Seg } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, pct, day } from '../../lib/format';
 import { addMonths, dayFromYMD, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
-import { compareSigned, reforecastSigned, fullMonthsLabel, monthEndIndex, firstFairMonthEnd, MIN_COMPARE_DAYS } from '../../lib/forecast/signoff';
+import { compareSigned, reforecastSigned, withdrawals, type SignedForecast, fullMonthsLabel, monthEndIndex, firstFairMonthEnd, MIN_COMPARE_DAYS } from '../../lib/forecast/signoff';
 
 const monthName = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
-import { useTracking } from './useTracking';
+import { useTracking, useActiveSignOffs } from './useTracking';
 import { backtestFromHistory, type BacktestResult } from '../../lib/forecast/backtest';
 import { historySpan, type CashHistory } from '../../lib/history/cashHistory';
 import type { Category } from '../../lib/categories';
@@ -39,14 +39,16 @@ const CHOICES = [{ v: 6, label: '6 months ago' }, { v: 12, label: 'A year ago' }
 
 /** "Forecast vs actual": your signed-off forecasts against what happened, or a test of the method. */
 export function PastCheck({ sc }: { sc: Scenario }) {
-  const signed = useStore((s) => s.team.signedOff ?? []);
+  const signed = useActiveSignOffs();
+  // with every sign-off withdrawn there's still somewhere to restore them
+  const any = useStore((s) => (s.team.signedOff ?? []).length > 0);
   const [view, setView] = useState<'signed' | 'method'>('signed');
-  const v = signed.length ? view : 'method';
+  const v = any ? view : 'method';
   return (
     <div className="stack">
-      {signed.length > 0 && <Seg value={v} onChange={setView} options={[{ v: 'signed', label: `Signed-off forecasts (${signed.length})` }, { v: 'method', label: 'Test the method' }]} ariaLabel="What to compare" />}
+      {any && <Seg value={v} onChange={setView} options={[{ v: 'signed', label: `Signed-off forecasts (${signed.length})` }, { v: 'method', label: 'Test the method' }]} ariaLabel="What to compare" />}
       {v === 'signed' ? <SignedView sc={sc} /> : <MethodCheck sc={sc} />}
-      {!signed.length && <p className="xs muted" style={{ margin: 0 }}>When you sign off a forecast (under <strong>Forecast</strong>, on <strong>Your forecast</strong>), it’s kept exactly as it stands and compared here with what actually happens as new statements come in. Until then, test the method below.</p>}
+      {!any && <p className="xs muted" style={{ margin: 0 }}>When you sign off a forecast (under <strong>Forecast</strong>, on <strong>Your forecast</strong>), it’s kept exactly as it stands and compared here with what actually happens as new statements come in. Until then, test the method below.</p>}
     </div>
   );
 }
@@ -68,6 +70,51 @@ function HomeChoice({ id, tracked }: { id: string; tracked: boolean }) {
   );
 }
 
+/** Withdraw a sign-off made by mistake: it stays in the team file, marked withdrawn, and can be restored. */
+function WithdrawButton({ rec }: { rec: SignedForecast }) {
+  const { askConfirm, changeSignOff, toast } = useStore();
+  const go = async () => {
+    let reason = '';
+    const yes = await askConfirm({
+      title: `Withdraw “${rec.scenarioName}”, signed off ${day(dayFromISO(rec.signedAt.slice(0, 10)))}?`,
+      body: 'It’s no longer compared with what happens, or reported on Home. Nothing is deleted: it stays in the team file, marked withdrawn by you, and you can restore it under Withdrawn.',
+      ok: 'Withdraw', danger: true,
+      note: { label: 'Why', placeholder: 'e.g. signed off by mistake; replaced by the mid-year review', onValue: (v) => { reason = v; } },
+    });
+    if (!yes) return;
+    changeSignOff(rec.id, 'withdraw', reason);
+    toast('Withdrawn. You can restore it under Withdrawn on this page.');
+  };
+  return <div className="xs"><button className="link-btn muted" onClick={() => void go()}><i className="bi bi-x-circle" /> Withdraw this sign-off</button></div>;
+}
+
+/** Sign-offs withdrawn, with who withdrew them, when and why; each can be restored. */
+function Withdrawn() {
+  const { team, changeSignOff, toast } = useStore();
+  const w = withdrawals(team.signOffChanges);
+  const list = (team.signedOff ?? []).filter((x) => w.has(x.id)).sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+  if (!list.length) return null;
+  return (
+    <details className="fold">
+      <summary>Withdrawn ({list.length})</summary>
+      <table className="tbl simple-tbl">
+        <thead><tr><th>Forecast</th><th>Signed off</th><th>Withdrawn</th><th /></tr></thead>
+        <tbody>{list.map((x) => {
+          const c = w.get(x.id)!;
+          return (
+            <tr key={x.id}>
+              <td><strong>{x.scenarioName}</strong> <span className="xs muted">from {day(dayFromISO(x.start))}{x.note ? ` · “${x.note}”` : ''}</span></td>
+              <td className="small">{day(dayFromISO(x.signedAt.slice(0, 10)))} · {x.signedBy}</td>
+              <td className="small">{day(dayFromISO(c.at.slice(0, 10)))} · {c.by}{c.reason ? <span className="muted"> · “{c.reason}”</span> : null}</td>
+              <td><button className="btn sm ghost" onClick={() => { changeSignOff(x.id, 'restore'); toast('Restored: it’s monitored again.'); }}>Restore</button></td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    </details>
+  );
+}
+
 /** How many sign-offs to list before "Show all". */
 const SHOW_SIGNED = 6;
 
@@ -75,7 +122,7 @@ const SHOW_SIGNED = 6;
 function SignedView({ sc }: { sc: Scenario }) {
   const { team, historyBase, monitorPick } = useStore();
   const h = team.cashHistory ?? historyBase;
-  const list = [...(team.signedOff ?? [])].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+  const list = [...useActiveSignOffs()].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
   // open on the one you came here from, else the one Home and Today's statement report on
   const tracked = useTracking();
   const [id, setId] = useState(monitorPick ?? tracked?.rec.id ?? list[0]?.id);
@@ -92,7 +139,7 @@ function SignedView({ sc }: { sc: Scenario }) {
   const early = useMemo(() => (rec && (!r || r.H < MIN_COMPARE_DAYS) ? pathOption({
     cutoff: dayFromISO(rec.start), actual: r ? r.actualCum : [], signed: rec.everyday, signedName: 'Signed-off forecast', fresh: null,
   }) : null), [rec, r]);
-  if (!rec) return null;
+  if (!rec) return <><div className="callout navy small">No signed-off forecast is being monitored: {(team.signedOff ?? []).length === 1 ? 'the one there was has' : 'all of them have'} been withdrawn. Sign off a forecast under <strong>Forecast</strong>, or restore one below.</div><Withdrawn /></>;
   const outlook: Outlook | undefined = r ? { signed: rec.everyday, fresh, freshName: freshSc.name, sameScenario: freshSc.id === rec.scenarioId } : undefined;
   // several sign-offs on one day are told apart by the time
   const sameDay = (x: typeof rec) => list.filter((y) => y.signedAt.slice(0, 10) === x.signedAt.slice(0, 10)).length > 1;
@@ -118,6 +165,7 @@ function SignedView({ sc }: { sc: Scenario }) {
         {rec.note && <div className="muted">“{rec.note}”</div>}
         {rec.knownItems.length > 0 && <div className="muted">Added by hand: {rec.knownItems.join('; ')}.</div>}
         {list.length > 1 && <HomeChoice id={rec.id} tracked={tracked?.rec.id === rec.id} />}
+        <WithdrawButton rec={rec} />
       </div>
       </div>
       {r && r.H >= MIN_COMPARE_DAYS ? <PastResult r={r} outlook={outlook} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
@@ -131,6 +179,7 @@ function SignedView({ sc }: { sc: Scenario }) {
             <EChart option={early} height={300} ariaLabel="The signed-off forecast of everyday cash" />
           </Panel>}
         </>}
+      <Withdrawn />
     </>
   );
 }

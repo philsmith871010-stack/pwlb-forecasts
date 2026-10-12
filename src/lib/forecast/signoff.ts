@@ -11,6 +11,36 @@ import type { Category } from '../categories';
 import { basisFromHistory, historySpan, type CashHistory } from '../history/cashHistory';
 import { Day, dayFromISO, isoFromDay, monthIndex, monthFromIndex, ymdFromDay, isBusinessDay, MONTH_NAMES } from '../dates';
 
+/**
+ * A sign-off withdrawn (made by mistake, or no longer the one to judge against) or restored. The
+ * sign-off itself is never edited or deleted: whether it counts is the latest of these for its id.
+ * Kept as a log, only added to, so two copies of the team file merge without a withdrawn sign-off
+ * coming back (or a restored one going away).
+ */
+export interface SignOffChange {
+  id: string;
+  action: 'withdraw' | 'restore';
+  /** ISO timestamp */
+  at: string;
+  by: string;
+  reason?: string;
+}
+
+/** The latest change to each sign-off, by id: those whose latest change is a withdrawal are withdrawn. */
+export function withdrawals(changes: SignOffChange[] | undefined): Map<string, SignOffChange> {
+  const out = new Map<string, SignOffChange>();
+  const latest = new Map<string, SignOffChange>();
+  for (const c of changes ?? []) { const cur = latest.get(c.id); if (!cur || c.at >= cur.at) latest.set(c.id, c); }
+  for (const [id, c] of latest) if (c.action === 'withdraw') out.set(id, c);
+  return out;
+}
+
+/** The sign-offs that count: everything signed off, less those withdrawn. */
+export function activeSignOffs(signed: SignedForecast[] | undefined, changes: SignOffChange[] | undefined): SignedForecast[] {
+  const w = withdrawals(changes);
+  return (signed ?? []).filter((x) => !w.has(x.id));
+}
+
 export interface SignedForecast {
   v: 1;
   /** unique and stable: the database key later */

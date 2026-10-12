@@ -3,7 +3,7 @@
 import { useStore, expectedStatementDay, type StepId } from '../../state/store';
 import { historySpan, MIN_HISTORY_DAYS } from '../../lib/history/cashHistory';
 import { day, money } from '../../lib/format';
-import { useTracking, aheadWords, asOfWords } from '../forecast/useTracking';
+import { useTracking, useActiveSignOffs, aheadWords, asOfWords } from '../forecast/useTracking';
 import { usePractice } from '../components/PracticeBar';
 import { ymdFromDay, dayFromISO, MONTH_NAMES } from '../../lib/dates';
 
@@ -20,6 +20,7 @@ export function JobsPage() {
     if (await askConfirm({ title: 'Start the practice again?', body: 'The example council goes back to the start, with no history or forecasts, so you can go through every step again. Your own council isn’t affected.', ok: 'Start again' })) { forgetWorkspace(); goto('home'); }
   };
   const tr = useTracking();
+  const active = useActiveSignOffs();
   const example = space === 'example';
 
   // ---- where this council is
@@ -32,7 +33,7 @@ export function JobsPage() {
   const behind = span ? Math.max(0, expected - span.to) : 0;
   const upToDate = !!span && behind === 0;
   // in the example, only your own sign-offs count as yours (its treasury team's are for comparing)
-  const signed = [...(team.signedOff ?? [])].filter((x) => !example || !x.id.startsWith('so_example_')).sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+  const signed = [...active].filter((x) => !example || !x.id.startsWith('so_example_')).sort((a, b) => b.signedAt.localeCompare(a.signedAt));
   const latest = signed[0];
 
   // ---- the one thing to do next

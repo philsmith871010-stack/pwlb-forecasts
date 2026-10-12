@@ -9,6 +9,7 @@ import { SaveStep } from './SaveStep';
 import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef, PracticeNote } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast, type ForecastBundle } from '../forecast/useForecast';
+import { useActiveSignOffs } from '../forecast/useTracking';
 import { isoFromDay, dayFromISO } from '../../lib/dates';
 import { ForecastChart } from '../forecast/ForecastChart';
 import { SetupSection, MethodsSection, AssumptionsSection, OneOffsSection, PasteSection } from '../forecast/Controls';
@@ -334,9 +335,9 @@ function ForecastStart() {
 
 /** Sign off the forecast as it stands, or show that this version already has been. */
 function SignOffRow({ b, sc }: { b: ForecastBundle; sc: Scenario }) {
-  const { team, user, setUser, askConfirm, signOff, toast, space, goto } = useStore();
+  const { user, setUser, askConfirm, signOff, toast, space, goto } = useStore();
   const fc = b.fc;
-  const mine = (team.signedOff ?? []).filter((x) => x.scenarioId === sc.id).sort((a, z) => a.signedAt.localeCompare(z.signedAt));
+  const mine = useActiveSignOffs().filter((x) => x.scenarioId === sc.id).sort((a, z) => a.signedAt.localeCompare(z.signedAt));
   const latest = mine[mine.length - 1];
   const start = isoFromDay(fc.start);
   // the same forecast as the last sign-off: same period and the same headline

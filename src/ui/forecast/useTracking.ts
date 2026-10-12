@@ -2,18 +2,25 @@
 // statement and Forecast vs actual, so they always agree.
 import { useMemo } from 'react';
 import { useStore } from '../../state/store';
-import { trackSignOffs, type Tracking } from '../../lib/forecast/signoff';
+import { trackSignOffs, activeSignOffs, type Tracking } from '../../lib/forecast/signoff';
 import { ymdFromDay, MONTH_NAMES } from '../../lib/dates';
 
 export type { Tracking };
 
 /** One answer for Home, Today's statement and Forecast vs actual (see `trackSignOffs`). */
 export function useTracking(): Tracking | null {
-  const signed = useStore((s) => s.team.signedOff);
+  const signed = useActiveSignOffs();
   const chosen = useStore((s) => s.team.settings.trackedSignOff);
   const history = useStore((s) => s.team.cashHistory ?? s.historyBase);
   const categories = useStore((s) => s.team.categories);
-  return useMemo(() => trackSignOffs(signed ?? [], history, categories, chosen), [signed, chosen, history, categories]);
+  return useMemo(() => trackSignOffs(signed, history, categories, chosen), [signed, chosen, history, categories]);
+}
+
+/** The sign-offs that count: withdrawn ones left out. */
+export function useActiveSignOffs() {
+  const signed = useStore((s) => s.team.signedOff);
+  const changes = useStore((s) => s.team.signOffChanges);
+  return useMemo(() => activeSignOffs(signed, changes), [signed, changes]);
 }
 
 /** "£11.2m ahead of" / "£3.0m behind" / "in line with": everyday cash against the signed-off forecast. */

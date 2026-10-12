@@ -10,7 +10,8 @@ import { DEFAULT_CATEGORIES } from '../src/lib/categories';
 import { runForecast } from '../src/lib/forecast/engine';
 import { fromSession, basisFromHistory, historyBefore, type CashHistory } from '../src/lib/history/cashHistory';
 import { isoFromDay, dayFromISO, dayFromYMD, addMonths } from '../src/lib/dates';
-import { signForecast, compareSigned, rollForward, completeTo, monthEndIndex, trackSignOffs, fullMonthsLabel, MIN_COMPARE_DAYS } from '../src/lib/forecast/signoff';
+import { signForecast, compareSigned, rollForward, completeTo, monthEndIndex, trackSignOffs, fullMonthsLabel, activeSignOffs, withdrawals, MIN_COMPARE_DAYS, type SignOffChange } from '../src/lib/forecast/signoff';
+import { emptyTeamFile, parseTeamFile, serialiseTeamFile, mergeTeamFiles } from '../src/lib/teamfile';
 import type { Scenario } from '../src/lib/model';
 
 const cfg = { categories: DEFAULT_CATEGORIES, rules: [], aliases: [], seriesOverrides: [], txnOverrides: [], useStarterRules: true };
@@ -123,5 +124,43 @@ describe('signing off and monitoring, month after month', async () => {
   it('keeps what the team wrote when signing off', () => {
     const rec = signAt(sc('Base', m0), m0, '2024-01-01T10:00:00Z', 'Budget 2024/25, agreed with the s151 officer');
     expect(rec.note).toBe('Budget 2024/25, agreed with the s151 officer');
+  });
+
+  it('a sign-off made by mistake can be withdrawn, and restored, without being deleted', () => {
+    const base = sc('Base', m0);
+    const a = signAt(base, m0, '2024-01-01T10:00:00Z', 'Budget');
+    const b = signAt(base, addMonths(m0, 2), '2024-03-01T10:00:00Z', 'Signed off by mistake');
+    const w: SignOffChange = { id: b.id, action: 'withdraw', at: '2024-03-02T09:00:00Z', by: 'Alex', reason: 'by mistake' };
+    expect(activeSignOffs([a, b], [w]).map((x) => x.id)).toEqual([a.id]);
+    expect(withdrawals([w]).get(b.id)?.reason).toBe('by mistake');
+    // Home no longer reports on it, even when the team had chosen it
+    const h = asAt(addMonths(m0, 3) + 7);
+    expect(trackSignOffs(activeSignOffs([a, b], [w]), h, DEFAULT_CATEGORIES, b.id)!.rec.id).toBe(a.id);
+    // the latest change decides, whatever order the log is in
+    const r: SignOffChange = { id: b.id, action: 'restore', at: '2024-03-05T09:00:00Z', by: 'Sam' };
+    expect(activeSignOffs([a, b], [r, w]).map((x) => x.id)).toEqual([a.id, b.id]);
+    expect(withdrawals([w, r]).size).toBe(0);
+  });
+
+  it('a withdrawal survives saving, and merging with a copy that never had it', () => {
+    const base = sc('Base', m0);
+    const a = signAt(base, m0, '2024-01-01T10:00:00Z');
+    const b = signAt(base, addMonths(m0, 2), '2024-03-01T10:00:00Z');
+    const w: SignOffChange = { id: b.id, action: 'withdraw', at: '2024-03-02T09:00:00Z', by: 'Alex' };
+    const mine = { ...emptyTeamFile('X'), signedOff: [a, b], signOffChanges: [w] };
+    const back = parseTeamFile(serialiseTeamFile(mine, 'me', 'test').json).team!;
+    expect(back.signOffChanges).toEqual([w]);
+    // a colleague's older copy still has the sign-off, not withdrawn: it stays withdrawn
+    const theirs = { ...emptyTeamFile('X'), signedOff: [a, b] };
+    const m1 = mergeTeamFiles(theirs, mine).merged;
+    expect(activeSignOffs(m1.signedOff, m1.signOffChanges).map((x) => x.id)).toEqual([a.id]);
+    // and a restore made in one copy wins over the earlier withdrawal in the other
+    const r: SignOffChange = { id: b.id, action: 'restore', at: '2024-03-05T09:00:00Z', by: 'Sam' };
+    const m2 = mergeTeamFiles(mine, { ...mine, signOffChanges: [w, r] }).merged;
+    expect(m2.signOffChanges).toHaveLength(2);
+    expect(activeSignOffs(m2.signedOff, m2.signOffChanges)).toHaveLength(2);
+    // a log entry that isn't one is dropped on reading
+    const junk = parseTeamFile(JSON.stringify({ ...JSON.parse(serialiseTeamFile(mine, 'me', 'test').json), signOffChanges: [w, { id: 1 }, { id: 'x', action: 'delete', at: 'z' }] })).team!;
+    expect(junk.signOffChanges).toEqual([w]);
   });
 });

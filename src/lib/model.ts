@@ -1,4 +1,4 @@
-import type { SignedForecast } from './forecast/signoff';
+import type { SignedForecast, SignOffChange } from './forecast/signoff';
 // Shared types: rules, bank profiles, forecasts and the team file.
 import type { Category, ForecastMethod } from './categories';
 import type { ColumnMapping } from './ingest/detect';
@@ -200,6 +200,8 @@ export interface TeamFile {
   forecasts: Scenario[];
   /** forecasts as they stood when signed off: never edited, only added (see lib/forecast/signoff) */
   signedOff?: SignedForecast[];
+  /** sign-offs withdrawn (made by mistake) and restored: a log, only added to, so it merges like the sign-offs (see lib/forecast/signoff) */
+  signOffChanges?: SignOffChange[];
   changeLog: ChangeLogEntry[];
 }
 

@@ -1,4 +1,4 @@
-import type { SignedForecast } from './forecast/signoff';
+import type { SignedForecast, SignOffChange } from './forecast/signoff';
 import { mergeHistory, type CashHistory } from './history/cashHistory';
 // The shared team JSON file: everything the team needs except transaction data.
 import { DEFAULT_CATEGORIES } from './categories';
@@ -53,6 +53,7 @@ export function parseTeamFile(text: string): ValidationResult {
     cashHistory: validHistory(o.cashHistory) ? (o.cashHistory as CashHistory) : undefined,
     forecasts: arr<Scenario>('forecasts').filter((f) => f && f.id && f.settings),
     signedOff: arr<SignedForecast>('signedOff').filter((x) => x && x.v === 1 && x.id && x.everyday && Array.isArray(x.everyday.cum)),
+    signOffChanges: arr<SignOffChange>('signOffChanges').filter((c) => c && typeof c.id === 'string' && (c.action === 'withdraw' || c.action === 'restore') && typeof c.at === 'string'),
     changeLog: arr<TeamFile['changeLog'][number]>('changeLog'),
   };
   if (!team.categories.length) { team.categories = base.categories; warnings.push('No categories found — default categories added.'); }
@@ -126,6 +127,8 @@ export function mergeTeamFiles(mine: TeamFile, theirs: TeamFile): MergeResult {
     forecasts: unionBy('forecast', mine.forecasts, theirs.forecasts, (f) => f.name),
     // sign-offs never change once made: everyone's are kept
     signedOff: unionByKey(mine.signedOff ?? [], theirs.signedOff ?? [], (x) => x.id).sort((a, b) => a.signedAt.localeCompare(b.signedAt)),
+    // withdrawals and restores likewise: the latest for each sign-off decides
+    signOffChanges: unionByKey(mine.signOffChanges ?? [], theirs.signOffChanges ?? [], (c) => `${c.id}|${c.at}|${c.action}`).sort((a, b) => a.at.localeCompare(b.at)),
     aliases: unionAliases(mine.aliases, theirs.aliases),
     seriesOverrides: unionByKey(mine.seriesOverrides, theirs.seriesOverrides, (s) => s.signature),
     txnOverrides: unionByKey(mine.txnOverrides, theirs.txnOverrides, (t) => t.key),
