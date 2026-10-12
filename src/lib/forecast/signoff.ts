@@ -9,7 +9,7 @@ import type { BacktestResult } from './backtest';
 import type { Scenario } from '../model';
 import type { Category } from '../categories';
 import { basisFromHistory, historySpan, type CashHistory } from '../history/cashHistory';
-import { Day, dayFromISO, isoFromDay, monthIndex, monthFromIndex, ymdFromDay, MONTH_NAMES } from '../dates';
+import { Day, dayFromISO, isoFromDay, monthIndex, monthFromIndex, ymdFromDay, isBusinessDay, MONTH_NAMES } from '../dates';
 
 export interface SignedForecast {
   v: 1;
@@ -36,6 +36,17 @@ export interface SignedForecast {
   everyday: { cum: number[]; lower: number[]; upper: number[] };
   /** each category forecast, one figure per calendar month from the start's month (whole pounds) */
   cats: { id: string; name: string; months: number[] }[];
+}
+
+/**
+ * A forecast starts the day after the latest statement. A saved forecast whose start the history
+ * has since passed (new statements came in) moves forward to it, keeping its length: otherwise it
+ * would forecast days that have already happened, from a balance taken after them.
+ */
+export function rollForward<S extends { start: string; end: string }>(settings: S, dataEnd: Day): S {
+  const s0 = dayFromISO(settings.start), first = dataEnd + 1;
+  if (s0 >= first) return settings;
+  return { ...settings, start: isoFromDay(first), end: isoFromDay(Math.max(first, dayFromISO(settings.end) + first - s0)) };
 }
 
 /** Everyday cash, like for like with the actuals: change since the start, per day, with the likely range. */
@@ -111,7 +122,7 @@ export function compareSigned(rec: SignedForecast, h: CashHistory, categories: C
 
   // categories over the complete months so far
   const m0 = monthIndex(start);
-  const lastFull = monthIndex(end + 1) - 1; // the month before the one `end + 1` falls in
+  const lastFull = monthIndex(completeTo(end) + 1) - 1; // the month before the one the next day falls in
   const nFull = Math.max(0, lastFull - m0 + 1);
   const cats: BacktestResult['categories'] = rec.cats.map((c) => {
     const r = rowOf(c.id);
@@ -199,6 +210,39 @@ export function firstFairMonthEnd(start: Day): Day {
  * earlier or later than forecast doesn't swing the figure. Null before the first month end.
  */
 export function monthEndIndex(r: Pick<BacktestResult, 'cutoff' | 'H'>): number | null {
-  for (let d = r.H - 1; d >= 0; d--) if (ymdFromDay(r.cutoff + d + 1).d === 1) return d;
+  // statements to the last working day complete a month that ends on a weekend or bank holiday
+  if (r.H > 0 && ymdFromDay(completeTo(r.cutoff + r.H - 1) + 1).d === 1) return r.H - 1;
+  for (let d = r.H - 2; d >= 0; d--) if (ymdFromDay(r.cutoff + d + 1).d === 1) return d;
   return null;
+}
+
+/**
+ * How far statements to `end` really reach: to the month's last day when only weekends or bank
+ * holidays (no bank activity) are left in it, so a month ending on a Saturday counts as complete
+ * from Friday's statement.
+ */
+export function completeTo(end: Day): Day {
+  let d = end + 1;
+  while (ymdFromDay(d).d !== 1) { if (isBusinessDay(d)) return end; d++; }
+  return d - 1;
+}
+
+export type Tracking =
+  // `asOf` is the latest month end compared (or the latest day, `soFar`, before the first one)
+  | { rec: SignedForecast; r: BacktestResult; gap: number; asOf: number; soFar: boolean }
+  | { rec: SignedForecast; r: null };
+
+/**
+ * The sign-off to report on: the one the team chose (`chosen`), else the newest with a month or
+ * more of actuals; read at the latest month end. Before it has a month of actuals, it's waiting.
+ */
+export function trackSignOffs(signed: SignedForecast[], history: CashHistory | null | undefined, categories: Category[], chosen?: string): Tracking | null {
+  const list = [...signed].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+  if (!list.length || !history) return null;
+  const own = list.find((x) => x.id === chosen);
+  const compared = (own ? [own] : list).map((rec) => ({ rec, r: compareSigned(rec, history, categories) }));
+  const pick = compared.find((x) => x.r && x.r.H >= MIN_COMPARE_DAYS);
+  if (!pick) return { rec: own ?? list[0], r: null };
+  const r = pick.r!, me = monthEndIndex(r), d = me ?? r.H - 1;
+  return { rec: pick.rec, r, gap: r.actualCum[d] - r.forecastCum[d], asOf: r.cutoff + d, soFar: me === null };
 }

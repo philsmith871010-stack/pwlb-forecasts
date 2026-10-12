@@ -110,9 +110,10 @@ export function App() {
 function ConfirmDialog() {
   const box = useStore((s) => s.confirmBox);
   const [v, setV] = useState('');
-  useEffect(() => { setV(box?.input?.value ?? ''); }, [box]);
+  const [note, setNote] = useState('');
+  useEffect(() => { setV(box?.input?.value ?? ''); setNote(''); }, [box]);
   if (!box) return null;
-  const ok = () => { if (box.input) box.input.onValue(v.trim()); box.resolve(true); };
+  const ok = () => { if (box.input) box.input.onValue(v.trim()); if (box.note) box.note.onValue(note.trim()); box.resolve(true); };
   return (
     <Modal title={box.title} onClose={() => box.resolve(false)}
       footer={<><button className="btn" onClick={() => box.resolve(false)}>Cancel</button>
@@ -122,6 +123,12 @@ function ConfirmDialog() {
         <div className="field" style={{ marginTop: 14 }}>
           <label htmlFor="confirm-input">{box.input.label}</label>
           <input id="confirm-input" className="input" autoFocus value={v} placeholder={box.input.placeholder} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) ok(); }} />
+        </div>
+      )}
+      {box.note && (
+        <div className="field" style={{ marginTop: 10 }}>
+          <label htmlFor="confirm-note">{box.note.label} <span className="muted">(optional)</span></label>
+          <input id="confirm-note" className="input" value={note} placeholder={box.note.placeholder} maxLength={200} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (!box.input || v.trim())) ok(); }} />
         </div>
       )}
     </Modal>

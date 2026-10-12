@@ -5,7 +5,7 @@ import type { TeamFile, Rule, Scenario, TxnOverride, SeriesOverride, ForecastSet
 import { uid } from '../lib/model';
 import { emptyTeamFile, parseTeamFile, serialiseTeamFile, teamHash, fsAccessSupported, readHandle, writeHandle, saveAsWithPicker, downloadText, mergeTeamFiles, MergeConflict } from '../lib/teamfile';
 import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
-import { signForecast, knownItemsOf, type SignedForecast } from '../lib/forecast/signoff';
+import { signForecast, knownItemsOf, rollForward, type SignedForecast } from '../lib/forecast/signoff';
 import { exampleSignOffs } from '../lib/forecast/exampleSignoffs';
 import type { ForecastResult } from '../lib/forecast/engine';
 import { mergeHistory, basisFromHistory, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
@@ -106,7 +106,7 @@ interface State {
   /** the example's practice run: the screens visited so far (kept in this browser) */
   practiceSeen: string[];
   /** an in-app confirmation waiting for an answer (the browser's own pop-ups can be blocked) */
-  confirmBox: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput; resolve: (yes: boolean) => void } | null;
+  confirmBox: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput; note?: ConfirmNote; resolve: (yes: boolean) => void } | null;
   /** every figure in pounds and pence, rather than £m / £k */
   exactAmounts: boolean;
   space: Workspace;
@@ -144,6 +144,8 @@ interface State {
   reached: number;
   workspace: boolean;
   activeScenarioId: string | null;
+  /** the sign-off Forecast vs actual opens on (set when you go there from one) */
+  monitorPick: string | null;
   compareIds: string[];
   toasts: Toast[];
   showTips: boolean;
@@ -178,7 +180,7 @@ interface Actions {
   enter: (ws: Workspace) => Promise<void>;
   markSeen: (key: string) => void;
   setExactAmounts: (v: boolean) => void;
-  askConfirm: (o: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput }) => Promise<boolean>;
+  askConfirm: (o: { title: string; body: string; ok: string; danger?: boolean; input?: ConfirmInput; note?: ConfirmNote }) => Promise<boolean>;
   switchWorkspace: (ws: Workspace) => Promise<void>;
   pickExampleFiles: () => Promise<void>;
   useExampleStatement: () => Promise<void>;
@@ -206,6 +208,8 @@ interface Actions {
 
 /** an optional box in the confirm dialog (e.g. your name); `onValue` gets what was typed on OK */
 export interface ConfirmInput { label: string; value: string; placeholder?: string; onValue: (v: string) => void }
+/** an optional second, free-text field (may be left empty) */
+export interface ConfirmNote { label: string; placeholder?: string; onValue: (v: string) => void }
 
 const LS_USER = 'cfi.user';
 const LS_WS = 'cfi.workspace';
@@ -278,6 +282,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   reached: 0,
   workspace: false,
   activeScenarioId: null,
+  monitorPick: null,
   compareIds: [],
   toasts: [],
   showTips: lsGet('cfi.tips') === '1',
@@ -585,7 +590,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       const hits = new Map(summary.ruleHits.map((h) => [h.id, h.hits]));
       set((s) => ({
         cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1, historyReport: keepSaved ? null : report, historyOnly: false,
-        team: { ...s.team, cashHistory: keepSaved ? hb! : history, rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
+        team: { ...s.team, cashHistory: keepSaved ? hb! : history, forecasts: rolled(s.team.forecasts, basis.dataEnd), rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
       }));
       // the example: its treasury team signed off two forecasts in the past year
       const eh = get().team.cashHistory;
@@ -609,7 +614,8 @@ export const useStore = create<State & Actions>((set, get) => ({
     if (!h) return;
     const basis = basisFromHistory(h, get().team.categories.map((c) => c.id));
     if (!basis) return;
-    set({ basis, agg: basis.agg, historyOnly: true, catVersion: get().catVersion + 1 });
+    set((s) => ({ basis, agg: basis.agg, historyOnly: true, catVersion: s.catVersion + 1, team: { ...s.team, forecasts: rolled(s.team.forecasts, basis.dataEnd) } }));
+    persistTeam(JSON.stringify(get().team));
     if (!get().activeScenarioId && !get().team.forecasts.length) set({ activeScenarioId: get().newScenario('Base') });
   },
 
@@ -709,6 +715,11 @@ export const useStore = create<State & Actions>((set, get) => ({
   setActiveScenario: (id) => set({ activeScenarioId: id }),
   setCompare: (ids) => set({ compareIds: ids.slice(0, 3) }),
 }));
+
+/** Saved forecasts moved to start the day after the latest statement (unchanged ones kept as they are). */
+function rolled(forecasts: Scenario[], dataEnd: number): Scenario[] {
+  return forecasts.map((f) => { const st = rollForward(f.settings, dataEnd); return st === f.settings ? f : { ...f, settings: st }; });
+}
 
 function applyProfile(src: Source, team: TeamFile): Source {
   const sig = headerSignature(src.report.mapping.columns, src.report.mapping.delimiter);

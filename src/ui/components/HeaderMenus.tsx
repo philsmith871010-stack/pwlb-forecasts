@@ -99,7 +99,11 @@ export function SettingsMenu() {
   const { showTips, setShowTips, advanced, setAdvanced, goto, cat, step, space, forgetWorkspace, exactAmounts, setExactAmounts } = useStore();
   const { open, el } = useOpenTeamFile();
   const save = useSaveTeamFile();
+  // the file input lives outside the menu: the menu closes as the file chooser opens, and an input
+  // inside it would be gone before the chosen file arrives (browsers without a file picker API)
   return (
+    <>
+    {el}
     <Popover button={(o, toggle) => (
       <button className="icon-btn header-icon" aria-label="Settings" aria-expanded={o} onClick={toggle} title="Settings"><i className="bi bi-gear" /></button>
     )}>
@@ -119,10 +123,10 @@ export function SettingsMenu() {
           <button className="menu-item" onClick={() => { close(); void open(); }}><i className="bi bi-upload" /> Load a copy…</button>
           <button className="menu-item danger" onClick={() => { close(); void useStore.getState().askConfirm({ title: `Clear ${space === 'example' ? 'the example council’s' : 'your council’s'} saved work?`, body: 'Rules, saved history and forecasts will be removed from this browser. Download a copy first if you might want them.', ok: 'Clear saved work', danger: true }).then((yes) => { if (yes) forgetWorkspace(); }); }}><i className="bi bi-trash" /> Clear saved work…</button>
           <div className="menu-note xs muted"><i className="bi bi-shield-lock" /> Your work is saved in this browser as you go: rules, a cash history (daily totals, never bank lines) and forecasts. Nothing is uploaded.</div>
-          {el}
         </div>
       )}
     </Popover>
+    </>
   );
 }
 

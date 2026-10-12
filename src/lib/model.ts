@@ -186,7 +186,8 @@ export interface TeamFile {
   authorityName: string;
   savedAt: string;
   savedBy: string;
-  settings: { financialYearStart: string; currency: 'GBP'; liquidityBuffer: number; includeHistorySummary: boolean; /** keep the cash history in the team file (default yes) */ keepCashHistory?: boolean };
+  settings: { financialYearStart: string; currency: 'GBP'; liquidityBuffer: number; includeHistorySummary: boolean; /** keep the cash history in the team file (default yes) */ keepCashHistory?: boolean;
+    /** the sign-off Home and Today's statement report on (by id); otherwise the newest with a month of statements */ trackedSignOff?: string };
   bankProfiles: BankProfile[];
   categories: Category[];
   rules: Rule[];

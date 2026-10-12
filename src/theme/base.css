@@ -876,6 +876,8 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 .signed-list button span { font-size: 12.5px; color: var(--pt-muted-2); }
 .signed-list button.on { border-color: var(--pt-navy); box-shadow: 0 0 0 1px var(--pt-navy) inset; }
 .signed-list button:hover:not(.on) { border-color: var(--pt-orange); }
+.signed-list button .signed-note { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+.signed-list .signed-more { justify-content: center; align-items: center; color: var(--pt-muted-2); border-style: dashed; }
 .signed-meta { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--pt-line-soft); }
 .signed-meta .bi-patch-check-fill { color: #1e7b34; margin-right: 4px; }
 @media (max-width: 640px) { .signed-list button { min-width: 0; flex: 1 1 100%; } }
@@ -988,6 +990,8 @@ details.fold[open] { padding-bottom: 8px; }
 /* "How this works" sits at the top right of the page, not on a line of its own */
 .page { position: relative; }
 .page > .howto, .page > .stack > .howto { position: absolute; top: 18px; right: 24px; margin: 0; }
+/* a page head with its own buttons (the scenario bar) keeps that corner: the link sits below the head instead */
+.page:has(> .page-head .actions) > .howto { position: static; display: flex; width: fit-content; margin: -8px 0 10px auto; }
 /* Check each line: one slim progress row, then the lines as a tight list */
 .build-progress { padding: 8px 14px; gap: 14px; flex-wrap: wrap; }
 .build-progress .bp-big { font-size: 20px; }

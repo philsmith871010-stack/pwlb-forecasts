@@ -7,6 +7,7 @@ import type { ForecastBasis } from '../../lib/analysis/aggregates';
 import type { Category } from '../../lib/categories';
 import type { RegisterInfo } from '../../worker/types';
 import { buildStrategy, Strategy, StrategyRegister } from '../../lib/forecast/strategy';
+import { rollForward } from '../../lib/forecast/signoff';
 
 export interface ForecastBundle {
   fc: ForecastResult;
@@ -34,7 +35,7 @@ export function computeForecast(basis: ForecastBasis, sc: Scenario, categories: 
   const mode = sc.settings.openingMode ?? 'bank';
   const defaultOpening = mode === 'operational' ? operationalEnd : bankEnd;
   const req: ForecastRequest = {
-    basis, categories, settings: { ...sc.settings, openingPosition: mode === 'manual' ? sc.settings.openingPosition ?? bankEnd : null },
+    basis, categories, settings: { ...rollForward(sc.settings, basis.dataEnd), openingPosition: mode === 'manual' ? sc.settings.openingPosition ?? bankEnd : null },
     assumptions: sc.assumptions, oneOffs: sc.oneOffs, pastedSchedules: sc.pastedSchedules, treasurySchedule: sc.treasurySchedule,
     fyStartMonth, liquidityBuffer: buffer, defaultOpening,
     register: register ? { liquid: register.liquid.total, events: register.events } : null,

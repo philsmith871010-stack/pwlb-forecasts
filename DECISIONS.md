@@ -463,3 +463,21 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
 
 - **Today's statement has "A past day"** beside it once there's a saved history. Pick any date the history holds (or step to the previous or next day with money moving) and see that day by category, grouped as on today's card, with one-offs marked, the regular payments that day, everyday cash and, when every account's opening balance is known, the balance at the end of the day. The history keeps daily totals by category, not bank lines, so each figure is the day's net for that category and there are no lines to open; the card says how to see them (load that day's statement).
 - **Forecast vs actual runs to the end of the signed-off period.** After what actually happened, a blue dashed line carries on from the latest statement: a fresh forecast made today from the whole history, with its own likely range, which starts at nothing and widens. It's drawn against the forecast as signed off, with its range, and the sentence says where the period is now heading against what was signed off. The fresh forecast uses the scenario that was signed off as it stands now, or your current forecast when that scenario isn't among your forecasts (as with the example's sign-offs), and says which. Like the comparison, it's everyday cash only, so the opening balance and deal register don't come into it. Once the period is over there's nothing left to forecast and the chart is as before.
+
+## Signing off and monitoring, tested as a team would use it
+
+A browser run went through a council's routine: load history, check the lines, sign off, add a month of statements, sign off again, sign off a second scenario, add another month, reload, save a copy and open it in a fresh browser. It found these, now fixed:
+
+- **A saved forecast now moves on as statements arrive.** It used to keep its first start date. After a month of new statements it forecast that month again from the balance at its end, which counted the month twice. A sign-off made then would also have been backdated. Now a forecast starts the day after the latest statement and keeps its length (`rollForward`), both when it's worked out and on the saved forecast.
+- **"Load a copy…" works in every browser.** In browsers without a file picker API (Firefox, Safari) it did nothing: its file input was inside the settings menu, which closes as the file chooser opens. The input now sits outside the menu.
+- **A month ending on a weekend or bank holiday counts as complete** once the last working day's statement is in (`completeTo`). November 2024, ending on a Saturday, was otherwise never judged.
+- **In advanced mode, "How this works" no longer covers** the scenario bar's Duplicate and rename buttons.
+
+Improvements to choosing what's monitored:
+
+- **Signing off asks what it's for** (optional): "Budget 2024/25", "Refreshed after October". The note shows wherever the sign-off is listed.
+- **The Forecast page says why it's no longer the signed-off version.** Either new statements have moved it on (the earlier sign-off is still monitored, so sign off again to monitor this one too), or it was changed. Each message links straight to that sign-off.
+- **Monitor opens on the sign-off you came from**, or just made. Each sign-off in the list shows its start, its headline and who signed it, with the time when several were signed on one day. It also shows the note. Past six, the older ones fold away behind "Show all".
+- **Before there's anything to compare,** Monitor shows the signed-off forecast and its range ("What it will be measured against") and when it's first judged. It no longer shows only a line of text.
+- **The team can choose which sign-off Home reports on** (`settings.trackedSignOff`, kept in the team file), such as the budget forecast rather than the latest refresh. Until they choose, it's the newest with a month of statements, as before (`trackSignOffs`), and a house mark shows which one it is.
+- `tests/signoff.test.ts` covers rolling forward, month ends, which sign-off is reported on (chosen, newest, too early, a choice that's gone) and each sign-off judged over its own period.

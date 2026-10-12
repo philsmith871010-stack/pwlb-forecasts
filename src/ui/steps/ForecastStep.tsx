@@ -151,7 +151,7 @@ export function ForecastStep() {
                 {fc.drivers.length > 0 && <>Biggest calls on cash: <strong>{fc.drivers.map((d) => d.name.replace(/ \(.*\)$/, '').toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}</strong>. </>}
                 {fc.breaches.length > 0 ? <>Cash first drops below {money(fc.buffer)} on <strong>{day(fc.breaches[0].from)}</strong>.</> : <>Cash stays above {money(fc.buffer)} throughout.</>}
               </p>}
-              <SignOffRow b={b} sc={sc} onSee={() => useStore.getState().goto('monitor')} />
+              <SignOffRow b={b} sc={sc} />
             </div>
           </div>
           {advanced && (
@@ -333,35 +333,45 @@ function ForecastStart() {
 }
 
 /** Sign off the forecast as it stands, or show that this version already has been. */
-function SignOffRow({ b, sc, onSee }: { b: ForecastBundle; sc: Scenario; onSee: () => void }) {
-  const { team, user, setUser, askConfirm, signOff, toast, space } = useStore();
+function SignOffRow({ b, sc }: { b: ForecastBundle; sc: Scenario }) {
+  const { team, user, setUser, askConfirm, signOff, toast, space, goto } = useStore();
   const fc = b.fc;
   const mine = (team.signedOff ?? []).filter((x) => x.scenarioId === sc.id).sort((a, z) => a.signedAt.localeCompare(z.signedAt));
   const latest = mine[mine.length - 1];
+  const start = isoFromDay(fc.start);
   // the same forecast as the last sign-off: same period and the same headline
-  const current = latest && latest.start === isoFromDay(fc.start) && latest.end === isoFromDay(fc.start + fc.H - 1) && latest.borrowingNeed === Math.round(fc.borrowingRequirement) && latest.low === Math.round(fc.low.amount);
+  const current = latest && latest.start === start && latest.end === isoFromDay(fc.start + fc.H - 1) && latest.borrowingNeed === Math.round(fc.borrowingRequirement) && latest.low === Math.round(fc.low.amount);
+  // new statements have moved the forecast on since it was signed off (rather than someone changing it)
+  const movedOn = latest && !current && latest.start < start;
+  const see = (id: string) => { useStore.setState({ monitorPick: id }); goto('monitor'); };
   const sign = async () => {
-    let name = user;
+    let name = user, note = '';
     const yes = await askConfirm({
       title: 'Sign off this forecast?',
-      body: `It’s kept exactly as it stands (may need to borrow ${money(fc.borrowingRequirement)} by ${day(fc.low.day)}), and compared with what actually happens as new statements come in. You can still change the forecast afterwards; the signed-off version stays as it was.`,
+      body: `It’s kept exactly as it stands (may need to borrow ${money(fc.borrowingRequirement)} by ${day(fc.low.day)}, from ${day(fc.start)}), and compared with what actually happens as new statements come in. You can still change the forecast afterwards; the signed-off version stays as it was.`,
       ok: 'Sign off',
       // the practice run signs as "You (practice)", and doesn't keep it as your name
       input: { label: 'Signed off by', value: space === 'example' ? user || 'You (practice)' : user, placeholder: 'Your name', onValue: (v) => { name = v; } },
+      note: { label: 'What it’s for', placeholder: 'e.g. Budget 2025/26, agreed with the s151 officer', onValue: (v) => { note = v; } },
     });
     if (!yes) return;
     if (name !== user && space !== 'example') setUser(name);
-    signOff(fc, sc, undefined, name);
-    toast(`Signed off. See it against what happens under Forecast vs actual.`);
+    const rec = signOff(fc, sc, note, name);
+    useStore.setState({ monitorPick: rec.id });
+    toast(`Signed off. See it against what happens under Monitor.`);
   };
+  const when = (iso: string) => day(dayFromISO(iso.slice(0, 10)));
   return current ? (
     <div className="signoff-row on">
-      <i className="bi bi-patch-check-fill" /> <span>Signed off on <strong>{day(dayFromISO(latest.signedAt.slice(0, 10)))}</strong> by <strong>{latest.signedBy}</strong>.</span>
-      <button className="link-btn" onClick={onSee}>See it against what happens</button>
+      <i className="bi bi-patch-check-fill" /> <span>Signed off on <strong>{when(latest.signedAt)}</strong> by <strong>{latest.signedBy}</strong>{latest.note ? <span className="muted"> · “{latest.note}”</span> : null}.</span>
+      <button className="link-btn" onClick={() => see(latest.id)}>See it against what happens</button>
     </div>
   ) : (
     <div className="signoff-row">
-      <span className="muted">{latest ? <>Changed since it was signed off on {day(dayFromISO(latest.signedAt.slice(0, 10)))}.</> : <>Happy with it? Sign it off to track it against what happens.</>}</span>
+      <span className="muted">{movedOn
+        ? <>Signed off on {when(latest.signedAt)}, from {day(dayFromISO(latest.start))}. New statements have since moved this forecast on to start {day(fc.start)}. That sign-off is still monitored; sign off again to monitor this one too. <button className="link-btn" onClick={() => see(latest.id)}>See the earlier one</button></>
+        : latest ? <>Changed since it was signed off on {when(latest.signedAt)}. <button className="link-btn" onClick={() => see(latest.id)}>See the signed-off one</button></>
+        : <>Happy with it? Sign it off to track it against what happens.</>}</span>
       <button className="btn sm navy" onClick={() => void sign()}><i className="bi bi-patch-check" /> Sign off this forecast</button>
     </div>
   );

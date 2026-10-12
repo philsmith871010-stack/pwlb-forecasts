@@ -52,13 +52,35 @@ export function PastCheck({ sc }: { sc: Scenario }) {
 }
 
 /** Your signed-off forecasts, newest first, each against what has happened since. */
+/** Which sign-off Home and Today's statement report on: this one, or (the default) the newest with a month of statements. */
+function HomeChoice({ id, tracked }: { id: string; tracked: boolean }) {
+  const chosen = useStore((s) => s.team.settings.trackedSignOff);
+  const updateTeam = useStore((s) => s.updateTeam);
+  const set = (v: string | undefined) => updateTeam((t) => ({ ...t, settings: { ...t.settings, trackedSignOff: v } }));
+  return (
+    <div className="xs">
+      {chosen === id
+        ? <><i className="bi bi-house-door-fill" /> Home reports on this one, as your team chose. <button className="link-btn" onClick={() => set(undefined)}>Go back to the newest</button></>
+        : tracked
+          ? <><i className="bi bi-house-door" /> Home reports on this one: the newest with a month of statements. <button className="link-btn" onClick={() => set(id)}>Keep reporting on it</button></>
+          : <button className="link-btn" onClick={() => set(id)}><i className="bi bi-house-door" /> Report on this one on Home</button>}
+    </div>
+  );
+}
+
+/** How many sign-offs to list before "Show all". */
+const SHOW_SIGNED = 6;
+
+/** Your signed-off forecasts, newest first, each against what has happened since. */
 function SignedView({ sc }: { sc: Scenario }) {
-  const { team, historyBase } = useStore();
+  const { team, historyBase, monitorPick } = useStore();
   const h = team.cashHistory ?? historyBase;
   const list = [...(team.signedOff ?? [])].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
-  // open on the one Home and Today's statement report on
+  // open on the one you came here from, else the one Home and Today's statement report on
   const tracked = useTracking();
-  const [id, setId] = useState(tracked?.rec.id ?? list[0]?.id);
+  const [id, setId] = useState(monitorPick ?? tracked?.rec.id ?? list[0]?.id);
+  useEffect(() => { if (monitorPick) { setId(monitorPick); useStore.setState({ monitorPick: null }); } }, [monitorPick]);
+  const [all, setAll] = useState(false);
   const rec = list.find((x) => x.id === id) ?? list[0];
   const r = useMemo(() => (rec && h ? compareSigned(rec, h, team.categories) : null), [rec, h, team.categories]);
   // the rest of its period as it looks now: a fresh forecast from the latest statement, with the
@@ -67,30 +89,48 @@ function SignedView({ sc }: { sc: Scenario }) {
   const fy = +team.settings.financialYearStart.split('-')[0] || 4;
   const fresh = useMemo(() => (rec && h && r ? reforecastSigned(rec, h, freshSc, team.categories, team.settings.liquidityBuffer, fy) : null),
     [rec, h, r, freshSc, team.categories, team.settings.liquidityBuffer, fy]);
+  const early = useMemo(() => (rec && (!r || r.H < MIN_COMPARE_DAYS) ? pathOption({
+    cutoff: dayFromISO(rec.start), actual: r ? r.actualCum : [], signed: rec.everyday, signedName: 'Signed-off forecast', fresh: null,
+  }) : null), [rec, r]);
   if (!rec) return null;
   const outlook: Outlook | undefined = r ? { signed: rec.everyday, fresh, freshName: freshSc.name, sameScenario: freshSc.id === rec.scenarioId } : undefined;
+  // several sign-offs on one day are told apart by the time
+  const sameDay = (x: typeof rec) => list.filter((y) => y.signedAt.slice(0, 10) === x.signedAt.slice(0, 10)).length > 1;
+  const signedWhen = (x: typeof rec) => `${day(dayFromISO(x.signedAt.slice(0, 10)))}${sameDay(x) ? `, ${new Date(x.signedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''}`;
+  const shown = all || list.length <= SHOW_SIGNED ? list : [...list.slice(0, SHOW_SIGNED - 1), ...(list.slice(0, SHOW_SIGNED - 1).includes(rec) ? [] : [rec])];
+  const firstJudged = monthName(firstFairMonthEnd(dayFromISO(rec.start)));
   return (
     <>
       <div className="signed-head">
       <div className="signed-list" role="radiogroup" aria-label="Signed-off forecast">
-        {list.map((x) => (
+        {shown.map((x) => (
           <button key={x.id} role="radio" aria-checked={x.id === rec.id} className={x.id === rec.id ? 'on' : ''} onClick={() => setId(x.id)}>
-            <strong>{x.scenarioName}</strong>
-            <span>Signed off {day(dayFromISO(x.signedAt.slice(0, 10)))} · {x.signedBy}</span>
+            <strong>{x.scenarioName}{x.id === tracked?.rec.id && list.length > 1 && <i className="bi bi-house-door xs muted" title="The one Home reports on" style={{ marginLeft: 6 }} />}</strong>
+            <span>From {day(dayFromISO(x.start))} · borrow {money(x.borrowingNeed)}</span>
+            <span>Signed off {signedWhen(x)} · {x.signedBy}</span>
+            {x.note && <span className="signed-note" title={x.note}>“{x.note}”</span>}
           </button>
         ))}
+        {list.length > SHOW_SIGNED && <button className="signed-more" onClick={() => setAll(!all)}>{all ? 'Show fewer' : `Show all ${list.length}`}</button>}
       </div>
       <div className="signed-meta small">
-        <div><i className="bi bi-patch-check-fill" /> When signed off it said: may need to borrow <strong>{money(rec.borrowingNeed)}</strong>, lowest point {money(rec.low)} on {day(dayFromISO(rec.lowDay))}.</div>
+        <div><i className="bi bi-patch-check-fill" /> When signed off it said: may need to borrow <strong>{money(rec.borrowingNeed)}</strong>, lowest point {money(rec.low)} on {day(dayFromISO(rec.lowDay))}. It runs {day(dayFromISO(rec.start))} to {day(dayFromISO(rec.end))}.</div>
         {rec.note && <div className="muted">“{rec.note}”</div>}
         {rec.knownItems.length > 0 && <div className="muted">Added by hand: {rec.knownItems.join('; ')}.</div>}
+        {list.length > 1 && <HomeChoice id={rec.id} tracked={tracked?.rec.id === rec.id} />}
       </div>
       </div>
-      {r && r.H < MIN_COMPARE_DAYS ? <div className="callout navy small">Too early to tell: {r.H === 1 ? 'one day' : `${r.H} days`} of statements since it started. It’s judged at month ends, from the end of {monthName(firstFairMonthEnd(r.cutoff))}.</div>
-        : r ? <PastResult r={r} outlook={outlook} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
+      {r && r.H >= MIN_COMPARE_DAYS ? <PastResult r={r} outlook={outlook} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
         chartNote="Exactly as signed off, including anything added by hand. Everyday cash only: loans, investments and transfers between your own accounts are left out."
         catsLabel={fullMonthsLabel(r) ? `over the complete months so far, ${fullMonthsLabel(r)}` : ''} />
-        : <div className="callout navy small">Nothing to compare yet: no statements from {day(dayFromISO(rec.start))} onwards have come in. As each new statement arrives, it’s compared with this forecast.</div>}
+        : <>
+          <div className="callout navy small">{r
+            ? <>Too early to tell: {r.H === 1 ? 'one day' : `${r.H} days`} of statements since it started. It’s judged at month ends, from the end of {firstJudged}.</>
+            : <>Nothing to compare yet: no statements from {day(dayFromISO(rec.start))} onwards have come in. As each one arrives it’s compared with this forecast, which is first judged at the end of {firstJudged}.</>}</div>
+          {early && <Panel title="What it will be measured against" sub={`change in everyday cash from ${day(dayFromISO(rec.start))}, as signed off`}>
+            <EChart option={early} height={300} ariaLabel="The signed-off forecast of everyday cash" />
+          </Panel>}
+        </>}
     </>
   );
 }
@@ -123,6 +163,60 @@ function MethodCheck({ sc }: { sc: Scenario }) {
         chartNote="Everyday cash only: loans, investments and transfers between your own accounts are left out, as in the forecast. The forecast used the method you’d use today, with nothing added by hand." />}
     </>
   );
+}
+
+/**
+ * The chart: what actually happened, a forecast with its likely range and, when given, a fresh
+ * forecast picking up from the latest actual figure with its own range. Change since `cutoff`.
+ */
+function pathOption({ cutoff, actual, signed, signedName, fresh }: {
+  cutoff: number; actual: number[]; signedName: string;
+  signed: { cum: number[]; lower: number[]; upper: number[] };
+  fresh: { start: number; cum: number[]; lower: number[]; upper: number[] } | null;
+}) {
+  const N = Math.max(signed.cum.length, actual.length);
+  const last = actual.length ? actual[actual.length - 1] : 0;
+  const x: string[] = [], f: (number | string)[] = [], a: (number | string)[] = [], lo: (number | string)[] = [], w: (number | string)[] = [];
+  const nf: (number | string)[] = [], nlo: (number | string)[] = [], nw: (number | string)[] = [];
+  const off = fresh ? fresh.start - cutoff : N; // index of the fresh forecast's first day
+  // every other day, always including the latest actual day so the fresh forecast joins it
+  const idx = new Set<number>();
+  for (let d = 0; d < N; d += 2) idx.add(d);
+  if (actual.length) idx.add(actual.length - 1);
+  idx.add(N - 1);
+  for (const d of [...idx].sort((p, q) => p - q)) {
+    const { y, m, d: dd } = ymdFromDay(cutoff + d);
+    x.push(`${dd} ${MONTH_NAMES[m - 1]} ${String(y).slice(2)}`);
+    const ok = d < signed.cum.length;
+    f.push(ok ? signed.cum[d] : '-'); lo.push(ok ? signed.lower[d] : '-'); w.push(ok ? signed.upper[d] - signed.lower[d] : '-');
+    a.push(d < actual.length ? actual[d] : '-');
+    const k = d - off;
+    if (fresh && k >= -1 && k < fresh.cum.length) {
+      // the fresh forecast starts from the latest actual figure, with no spread on day one
+      nf.push(k < 0 ? last : last + fresh.cum[k]);
+      nlo.push(k < 0 ? last : last + fresh.lower[k]); nw.push(k < 0 ? 0 : fresh.upper[k] - fresh.lower[k]);
+    } else { nf.push('-'); nlo.push('-'); nw.push('-'); }
+  }
+  const narrow = window.innerWidth < 640;
+  const band = (name: string, lower: (number | string)[], width: (number | string)[], stack: string, rgb: string) => [
+    { name: `_lo${stack}`, type: 'line', data: lower, stack, stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
+    { name, type: 'line', data: width, stack, stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false }, areaStyle: { color: `rgba(${rgb},.16)` }, itemStyle: { color: `rgba(${rgb},.4)` } },
+  ];
+  const legend = [...(actual.length ? ['What actually happened'] : []), signedName, 'Likely range', ...(fresh ? ['Fresh forecast from today', 'Fresh likely range'] : [])];
+  return {
+    tooltip: { trigger: 'axis', valueFormatter: (v: number) => (typeof v === 'number' ? money(v) : '–') },
+    legend: { ...(narrow ? { bottom: 0, left: 0 } : { top: 0, right: 0 }), data: legend },
+    grid: narrow ? { left: 52, right: 12, top: 16, bottom: fresh ? 96 : 70 } : { left: 64, right: 20, top: 34, bottom: 28 },
+    xAxis: { type: 'category', data: x, axisLabel: { interval: Math.floor(x.length / 6) } },
+    yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
+    series: [
+      ...band('Likely range', lo, w, 'b', '253,126,20'),
+      ...(fresh ? band('Fresh likely range', nlo, nw, 'n', '13,110,253') : []),
+      { name: signedName, type: 'line', data: f, showSymbol: false, lineStyle: { color: '#fd7e14', width: 2.4, type: 'dashed' }, itemStyle: { color: '#fd7e14' } },
+      ...(fresh ? [{ name: 'Fresh forecast from today', type: 'line', data: nf, showSymbol: false, lineStyle: { color: '#0d6efd', width: 2, type: 'dashed' }, itemStyle: { color: '#0d6efd' } }] : []),
+      ...(actual.length ? [{ name: 'What actually happened', type: 'line', data: a, showSymbol: false, lineStyle: { color: '#0a2540', width: 2 }, itemStyle: { color: '#0a2540' } }] : []),
+    ],
+  };
 }
 
 /** A signed-off forecast's whole period: as signed off, and the rest of it forecast afresh from today. */
@@ -161,52 +255,11 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook }: { r:
   const N = outlook ? outlook.signed.cum.length : r.H;
   const endFresh = fresh ? last + fresh.cum[fresh.cum.length - 1] : null;
   const endSigned = outlook ? outlook.signed.cum[N - 1] : null;
-  const option = useMemo(() => {
-    const x: string[] = [], f: (number | string)[] = [], a: (number | string)[] = [], lo: (number | string)[] = [], w: (number | string)[] = [];
-    const nf: (number | string)[] = [], nlo: (number | string)[] = [], nw: (number | string)[] = [];
-    const sf = outlook?.signed;
-    const off = fresh ? fresh.start - r.cutoff : N; // index of the fresh forecast's first day
-    // every other day, always including today so the fresh forecast joins the actual line
-    const idx: number[] = [];
-    for (let d = 0; d < N; d += 2) idx.push(d);
-    if (fresh && !idx.includes(off - 1)) idx.push(off - 1);
-    if (idx[idx.length - 1] !== N - 1) idx.push(N - 1);
-    idx.sort((p, q) => p - q);
-    for (const d of idx) {
-      const { y, m, d: dd } = ymdFromDay(r.cutoff + d);
-      x.push(`${dd} ${MONTH_NAMES[m - 1]} ${String(y).slice(2)}`);
-      f.push(sf ? sf.cum[d] : r.forecastCum[d]);
-      lo.push(sf ? sf.lower[d] : r.lowerCum[d]); w.push(sf ? sf.upper[d] - sf.lower[d] : r.upperCum[d] - r.lowerCum[d]);
-      a.push(d < r.H ? r.actualCum[d] : '-');
-      const k = d - off;
-      if (fresh && k >= -1 && k < fresh.cum.length) {
-        // the fresh forecast starts from today's actual figure, with no spread on day one
-        nf.push(k < 0 ? last : last + fresh.cum[k]);
-        nlo.push(k < 0 ? last : last + fresh.lower[k]); nw.push(k < 0 ? 0 : fresh.upper[k] - fresh.lower[k]);
-      } else { nf.push('-'); nlo.push('-'); nw.push('-'); }
-    }
-    const narrow = window.innerWidth < 640;
-    const signedName = outlook ? 'Signed-off forecast' : 'Forecast made then';
-    const band = (name: string, lower: (number | string)[], width: (number | string)[], stack: string, rgb: string) => [
-      { name: `_lo${stack}`, type: 'line', data: lower, stack, stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
-      { name, type: 'line', data: width, stack, stackStrategy: 'all', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false }, areaStyle: { color: `rgba(${rgb},.16)` }, itemStyle: { color: `rgba(${rgb},.4)` } },
-    ];
-    const legend = ['What actually happened', signedName, 'Likely range', ...(fresh ? ['Fresh forecast from today', 'Fresh likely range'] : [])];
-    return {
-      tooltip: { trigger: 'axis', valueFormatter: (v: number) => (typeof v === 'number' ? money(v) : '–') },
-      legend: { ...(narrow ? { bottom: 0, left: 0 } : { top: 0, right: 0 }), data: legend },
-      grid: narrow ? { left: 52, right: 12, top: 16, bottom: fresh ? 96 : 70 } : { left: 64, right: 20, top: 34, bottom: 28 },
-      xAxis: { type: 'category', data: x, axisLabel: { interval: Math.floor(x.length / 6) } },
-      yAxis: { type: 'value', axisLabel: { formatter: axisMoney }, scale: true },
-      series: [
-        ...band('Likely range', lo, w, 'b', '253,126,20'),
-        ...(fresh ? band('Fresh likely range', nlo, nw, 'n', '13,110,253') : []),
-        { name: signedName, type: 'line', data: f, showSymbol: false, lineStyle: { color: '#fd7e14', width: 2.4, type: 'dashed' }, itemStyle: { color: '#fd7e14' } },
-        ...(fresh ? [{ name: 'Fresh forecast from today', type: 'line', data: nf, showSymbol: false, lineStyle: { color: '#0d6efd', width: 2, type: 'dashed' }, itemStyle: { color: '#0d6efd' } }] : []),
-        { name: 'What actually happened', type: 'line', data: a, showSymbol: false, lineStyle: { color: '#0a2540', width: 2 }, itemStyle: { color: '#0a2540' } },
-      ],
-    };
-  }, [r, outlook]); // eslint-disable-line react-hooks/exhaustive-deps
+  const option = useMemo(() => pathOption({
+    cutoff: r.cutoff, actual: r.actualCum.slice(0, r.H), fresh,
+    signed: outlook?.signed ?? { cum: r.forecastCum, lower: r.lowerCum, upper: r.upperCum },
+    signedName: outlook ? 'Signed-off forecast' : 'Forecast made then',
+  }), [r, outlook, fresh]);
 
   const rows = r.categories.filter((c) => !c.excluded && Math.abs(c.error) >= 0.5e6).slice(0, 6);
   return (
