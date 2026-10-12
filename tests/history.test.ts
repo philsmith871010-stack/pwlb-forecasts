@@ -8,10 +8,10 @@ import { categorise } from '../src/lib/categorise/engine';
 import { buildBasis } from '../src/lib/analysis/aggregates';
 import { DEFAULT_CATEGORIES } from '../src/lib/categories';
 import { runForecast } from '../src/lib/forecast/engine';
-import { fromSession, mergeHistory, basisFromHistory, historySpan, historyBytes, historyBefore } from '../src/lib/history/cashHistory';
+import { fromSession, mergeHistory, basisFromHistory, historySpan, historyBytes, historyBefore, pastDaySummary } from '../src/lib/history/cashHistory';
 import { isoFromDay, addMonths, dayFromISO } from '../src/lib/dates';
 import { runBacktest, backtestFromHistory } from '../src/lib/forecast/backtest';
-import { signForecast, compareSigned } from '../src/lib/forecast/signoff';
+import { signForecast, compareSigned, reforecastSigned } from '../src/lib/forecast/signoff';
 import { exampleSignOffs } from '../src/lib/forecast/exampleSignoffs';
 import { emptyTeamFile, parseTeamFile, serialiseTeamFile, mergeTeamFiles } from '../src/lib/teamfile';
 
@@ -73,6 +73,37 @@ describe('cash history', async () => {
     expect(Math.abs(r.forecastCum[end] - bt.forecastCum[end])).toBeLessThan(2);
     // nothing to compare until statements after the start come in
     expect(compareSigned({ ...rec, start: isoFromDay(full.dataEnd + 1) }, h, DEFAULT_CATEGORIES)).toBeNull();
+  });
+
+  it('forecasts the rest of a signed-off period afresh from the latest statement', () => {
+    const h = fromSession(ds, res);
+    const cutoff = addMonths(full.dataEnd + 1, -6);
+    const st = { ...settings, start: isoFromDay(cutoff), end: isoFromDay(addMonths(cutoff, 12) - 1) };
+    const sc = { id: 'fc1', name: 'Base', updatedAt: '', settings: st, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [] };
+    const f = runForecast({ basis: basisFromHistory(historyBefore(h, cutoff), catIds)!, categories: DEFAULT_CATEGORIES, settings: st, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 0 });
+    const rec = signForecast(f, sc, { id: 'so1', signedAt: '2025-04-02T10:00:00Z', signedBy: 'Test', knownItems: [] });
+    const fresh = reforecastSigned(rec, h, sc, DEFAULT_CATEGORIES, 10e6, 4)!;
+    const r = compareSigned(rec, h, DEFAULT_CATEGORIES)!;
+    // picks up the day after the latest statement and runs to the signed-off end
+    expect(fresh.start).toBe(full.dataEnd + 1);
+    expect(r.H + fresh.cum.length).toBe(rec.everyday.cum.length);
+    // its range starts narrow and widens
+    const last = fresh.cum.length - 1;
+    expect(fresh.upper[last] - fresh.lower[last]).toBeGreaterThan(fresh.upper[0] - fresh.lower[0]);
+    // nothing left to forecast once the period is over
+    expect(reforecastSigned({ ...rec, end: isoFromDay(full.dataEnd) }, h, sc, DEFAULT_CATEGORIES, 10e6, 4)).toBeNull();
+  });
+
+  it('looks up a past day by category, adding up to the day’s flows', () => {
+    const h = fromSession(ds, res);
+    const d = ds.day[Math.floor(ds.n / 2)];
+    const sum = pastDaySummary(h, d)!;
+    let flow = 0;
+    for (let i = 0; i < ds.n; i++) if (ds.day[i] === d) flow += ds.amount[i];
+    expect(sum.rows.reduce((t, r) => t + r.net, 0)).toBeCloseTo(flow, 2);
+    expect(sum.accounts).toBeGreaterThan(0);
+    // the day before the history starts isn't held
+    expect(pastDaySummary(h, ds.minDay - 1)).toBeNull();
   });
 
   it('keeps everyone’s sign-offs when team files are saved and merged', () => {

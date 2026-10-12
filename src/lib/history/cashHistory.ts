@@ -273,6 +273,58 @@ export function basisFromHistory(h: CashHistory, catIds: string[]): ForecastBasi
   return { agg, series, dataEnd: span.to };
 }
 
+// ---------------------------------------------------------------- a past day
+
+export interface PastDaySummary {
+  /** one row per category and kind, net for the day */
+  rows: { cat: string; kind: number; net: number }[];
+  /** accounts that hold this day */
+  accounts: number;
+  /** regular payments that day: payee, category and amount */
+  regular: { sig: string; cat: string; amount: number }[];
+  /** total balance at the end of the day, when every account's opening balance is known */
+  closing: number | null;
+}
+
+/** Days the history holds any money moving on, ascending. */
+export function daysWithFlows(h: CashHistory): number[] {
+  const s = new Set<number>();
+  for (const c of h.cells) for (let k = 0; k < c.length; k += 4) s.add(c[k]);
+  return [...s].sort((a, b) => a - b);
+}
+
+/** One day of the saved history, by category. Null when no account's statements cover it. */
+export function pastDaySummary(h: CashHistory, d: number): PastDaySummary | null {
+  const held = h.accounts.map((a) => a.ranges.some(([f, t]) => d >= f && d <= t));
+  if (!held.some(Boolean)) return null;
+  const byKey = new Map<string, { cat: string; kind: number; net: number }>();
+  let closing = 0, closingKnown = true;
+  h.accounts.forEach((a, i) => {
+    const cells = h.cells[i];
+    let before = 0, upTo = 0;
+    for (let k = 0; k < cells.length; k += 4) {
+      const cd = cells[k], v = cells[k + 3];
+      if (a.openingDay !== null && cd < a.openingDay) before += v;
+      if (cd <= d) upTo += v;
+      if (cd !== d) continue;
+      const cat = h.cats[cells[k + 1]], kind = cells[k + 2], key = `${cat}|${kind}`;
+      const r = byKey.get(key) ?? { cat, kind, net: 0 };
+      r.net += v / 100;
+      byKey.set(key, r);
+    }
+    if (a.opening === null || a.openingDay === null) closingKnown = false;
+    else closing += a.opening + (upTo - before) / 100;
+  });
+  const regular: PastDaySummary['regular'] = [];
+  for (const s of h.series) for (const [od, p] of s.occ) if (od === d) regular.push({ sig: s.sig, cat: s.cat, amount: p / 100 });
+  regular.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  return {
+    rows: [...byKey.values()].filter((r) => Math.round(r.net * 100) !== 0),
+    accounts: held.filter(Boolean).length, regular,
+    closing: closingKnown ? Math.round(closing * 100) / 100 : null,
+  };
+}
+
 /** Rough size in the team file, for telling the user. */
 export const historyBytes = (h: CashHistory) => JSON.stringify(h).length;
 

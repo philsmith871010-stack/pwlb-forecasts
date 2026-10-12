@@ -67,7 +67,7 @@ A forecast recomputes in 10–30 ms; changing an assumption updates the chart an
 
 ## How it works — one menu, three jobs
 
-- **Today's statement:** drop in a day's bank statement. It's sorted with the team's rules; sort anything new on the same screen; the day joins the saved history.
+- **Today's statement:** drop in a day's bank statement. It's sorted with the team's rules; sort anything new on the same screen; the day joins the saved history. Or pick **A past day**: any date the saved history holds, as totals by category (and the regular payments that day).
 - **History:** load statements (years the first time, the latest period after that), check the sorting, look back at how cash behaves.
 - **Forecast:** start from the saved history, statements or the example. Then: check each line, known future items, cash and investments (including the deal register), your forecast, what you could do, report and Excel.
 
@@ -78,6 +78,7 @@ The team file opens and saves from the header from anywhere. Settings (the gear)
 The team file can keep a **cash history**: daily totals by category for each bank account, and the dates and amounts of regular payments (never individual bank lines). With it:
 
 - **Day to day:** open the team file and add today's statement. You see the day sorted by category, sort anything new, and the day joins the history.
+- **Forecast vs actual (Monitor):** each signed-off forecast against what happened so far, then a fresh forecast with its likely range from the latest statement to the end of the signed-off period, so you can see where the period is now heading against what was signed off.
 - **Periodic review:** add the latest month, quarter or year (nothing is counted twice; gaps are pointed out), or go straight to Look back and Look ahead from the saved history without loading any files.
 
 ## Deal register (optional, recommended)

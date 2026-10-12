@@ -1,8 +1,9 @@
 // Today's statement: drop it in, see the day sorted, sort anything new, save. One screen.
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Progress } from '../components/common';
+import { PageHead, Progress, Seg } from '../components/common';
 import { DayCard } from '../history/HistoryCards';
+import { PastDayCard } from '../history/PastDay';
 import { SortCard, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
 import { historySpan } from '../../lib/history/cashHistory';
@@ -11,6 +12,10 @@ import { day } from '../../lib/format';
 export function TodayPage() {
   const s = useStore();
   const { ingest, cat, historyBase, ingestBusy, catBusy, addFiles, runIngest, goto, space, useExampleStatement } = s;
+  // any day already in the saved history can be looked up instead
+  const saved = s.team.cashHistory ?? historyBase;
+  const [view, setView] = useState<'today' | 'past'>('today');
+  const past = view === 'past' && !!saved;
   const busy = !!ingestBusy || (!!catBusy && !cat);
   const short = !!ingest && !!cat && ingest.maxDay - ingest.minDay <= 3;
   const long = !!ingest && !!cat && !short;
@@ -27,13 +32,20 @@ export function TodayPage() {
   };
   return (
     <div className="page narrow">
-      <PageHead title="Today’s statement">
-        {short ? null
+      <PageHead title={past ? 'A past day' : 'Today’s statement'}>
+        {past ? <>Choose any day in your saved history to see what its statement came to, by category.</>
+          : short ? null
           : span ? <>Your saved history runs to <strong>{day(span.to)}</strong>. Drop in the statement for the days since: we’ll sort it with your team’s rules and add it to your history.</>
           : <>Drop in a bank statement for a day or a few days. We’ll sort it with your team’s rules.</>}
       </PageHead>
 
-      {space === 'mine' && !historyBase && !busy && !short && (
+      {saved && !busy && (
+        <div className="mb"><Seg value={view} onChange={setView} ariaLabel="Which day" options={[{ v: 'today', label: 'Today’s statement' }, { v: 'past', label: 'A past day' }]} /></div>
+      )}
+
+      {past && !busy && <PastDayCard h={saved!} />}
+
+      {!past && space === 'mine' && !historyBase && !busy && !short && (
         <div className="callout navy mb small">
           <strong>Tip:</strong> load your past statements under <button className="link-btn" onClick={() => goto('load')}>History</button> first, so today’s lines are sorted with everything learned from them.
         </div>
@@ -45,14 +57,14 @@ export function TodayPage() {
           <div className="mt"><Progress frac={(ingestBusy ?? catBusy)?.frac ?? 0} /></div></div>
       )}
 
-      {!busy && !short && <TodayDrop onFiles={read} onPick={space === 'example' ? () => void useExampleStatement() : undefined} />}
+      {!past && !busy && !short && <TodayDrop onFiles={read} onPick={space === 'example' ? () => void useExampleStatement() : undefined} />}
 
-      {!busy && long && readHere && (
+      {!past && !busy && long && readHere && (
         <div className="callout mt small">That covers <strong>{day(ingest!.minDay)}</strong> to <strong>{day(ingest!.maxDay)}</strong>, more than a few days, so it has gone into your history.{' '}
           <button className="link-btn" onClick={() => goto('review')}>Check the sorting</button> or <button className="link-btn" onClick={() => goto('history')}>look back</button>.</div>
       )}
 
-      {!busy && short && (
+      {!past && !busy && short && (
         <>
           <DayCard onSort={() => sortRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           <div ref={sortRef}><TodaySorting /></div>

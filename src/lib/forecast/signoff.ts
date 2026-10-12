@@ -4,7 +4,7 @@
 // Each record is self-contained and never changes once made (immutable, keyed by `id`), so it can
 // move as is into a shared database later: one row per sign-off, scoped to the council, with the
 // figures as a JSON payload. Today the records live in the team file (`TeamFile.signedOff`).
-import type { ForecastResult } from './engine';
+import { runForecast, type ForecastResult } from './engine';
 import type { BacktestResult } from './backtest';
 import type { Scenario } from '../model';
 import type { Category } from '../categories';
@@ -38,10 +38,11 @@ export interface SignedForecast {
   cats: { id: string; name: string; months: number[] }[];
 }
 
-export function signForecast(fc: ForecastResult, sc: Scenario, meta: { id: string; signedAt: string; signedBy: string; note?: string; knownItems: string[] }): SignedForecast {
+/** Everyday cash, like for like with the actuals: change since the start, per day, with the likely range. */
+export function everydayPath(fc: ForecastResult): SignedForecast['everyday'] {
   const H = fc.H;
+  // the modelled categories only (no deal register)
   const modelled = fc.explain.filter((e) => e.method !== 'exclude');
-  // everyday cash, like for like with the actuals: the modelled categories only (no deal register)
   const cum: number[] = [], lower: number[] = [], upper: number[] = [];
   let s = 0;
   for (let d = 0; d < H; d++) {
@@ -52,6 +53,13 @@ export function signForecast(fc: ForecastResult, sc: Scenario, meta: { id: strin
     lower.push(Math.round(s + fc.lower[d] - mid));
     upper.push(Math.round(s + fc.upper[d] - mid));
   }
+  return { cum, lower, upper };
+}
+
+export function signForecast(fc: ForecastResult, sc: Scenario, meta: { id: string; signedAt: string; signedBy: string; note?: string; knownItems: string[] }): SignedForecast {
+  const H = fc.H;
+  const modelled = fc.explain.filter((e) => e.method !== 'exclude');
+  const { cum, lower, upper } = everydayPath(fc);
   const m0 = monthIndex(fc.start), nm = monthIndex(fc.start + H - 1) - m0 + 1;
   const cats = modelled.map((e) => {
     const months = new Array(nm).fill(0);
@@ -127,6 +135,27 @@ export function compareSigned(rec: SignedForecast, h: CashHistory, categories: C
     categories: cats, monthly: { labels, forecastNet: [], actualNet: [], actualOneOff: [] },
     surpriseOneOffs: actualCum[H - 1] - actualCoreCum[H - 1], usedDataTo: (start - 1) as Day, ms: 0,
   };
+}
+
+/**
+ * The rest of a signed-off forecast's period seen from today: a fresh forecast of everyday cash
+ * from the day after the latest statement to the signed-off end, made with `sc` from the whole
+ * history. Change since that day, with its likely range. Null once the period is over.
+ */
+export function reforecastSigned(rec: SignedForecast, h: CashHistory, sc: Scenario, categories: Category[], buffer: number, fyStartMonth: number): (SignedForecast['everyday'] & { start: Day }) | null {
+  const span = historySpan(h);
+  const end = dayFromISO(rec.end);
+  if (!span || span.to >= end || span.to < dayFromISO(rec.start)) return null;
+  const basis = basisFromHistory(h, categories.map((c) => c.id));
+  if (!basis) return null;
+  const start = span.to + 1;
+  // the opening doesn't move everyday cash's change, so any will do
+  const fc = runForecast({
+    basis, categories, settings: { ...sc.settings, start: isoFromDay(start), end: rec.end, openingPosition: null },
+    assumptions: sc.assumptions, oneOffs: sc.oneOffs, pastedSchedules: sc.pastedSchedules, treasurySchedule: sc.treasurySchedule,
+    fyStartMonth, liquidityBuffer: buffer, defaultOpening: 0, register: null, overrides: sc.overrides ?? [],
+  });
+  return { start, ...everydayPath(fc) };
 }
 
 /** The complete months the category comparison covers, e.g. "Apr to Sep 2025". */
