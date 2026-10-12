@@ -11,6 +11,7 @@ import type { ForecastBasis } from '../analysis/aggregates';
 import type { ForecastResult } from './engine';
 import type { OneOff } from '../model';
 import { type Day, isoFromDay, dayFromISO } from '../dates';
+import { K_ONEOFF, type CashHistory } from '../history/cashHistory';
 
 /** A confirmed answer: this money arrived on `day` for the payment due on `due`. */
 export interface Arrival {
@@ -112,3 +113,34 @@ export function answerEarly(c: EarlyCandidate, answer: Arrival['answer'], by: st
 
 /** A regular payment's projected date this early arrival stands in for (within this many days of the due date it was given). */
 export const DUE_MATCH_DAYS = 10;
+
+/**
+ * Timing, when judging a signed-off forecast at `at`: money confirmed as early that arrived between
+ * the forecast's start and `at`, for a payment it expected after `at` (and by its `end`). It's in
+ * the actuals already and should even out once the due date passes. The same arrival confirmed on
+ * several forecasts (a duplicated scenario) counts once. Signed: + means the actuals are ahead.
+ */
+export function timingAt(arrivals: Arrival[], from: Day, at: Day, end: Day): { items: Arrival[]; total: number } {
+  const seen = new Set<string>();
+  const items = arrivals.filter((a) => {
+    if (a.answer !== 'early' || seen.has(a.key)) return false;
+    const d = dayFromISO(a.day), due = dayFromISO(a.due);
+    if (d < from || d > at || due <= at || due > end) return false;
+    seen.add(a.key);
+    return true;
+  }).sort((x, z) => Math.abs(z.amount) - Math.abs(x.amount));
+  return { items, total: items.reduce((t, a) => t + a.amount, 0) };
+}
+
+/**
+ * How much of an early arrival the history holds as a one-off (an outlier in its category that day:
+ * a second payment in one month often is). Signed like the arrival, and no bigger than it. Lets
+ * Monitor set one-offs and timing aside together without taking the same money off twice.
+ */
+export function heldAsOneOff(h: CashHistory, a: Arrival): number {
+  const d = dayFromISO(a.day), c = h.cats.indexOf(a.categoryId);
+  if (c < 0) return 0;
+  let v = 0;
+  for (const cells of h.cells) for (let k = 0; k < cells.length; k += 4) if (cells[k] === d && cells[k + 1] === c && cells[k + 2] === K_ONEOFF) v += cells[k + 3] / 100;
+  return Math.sign(v) === Math.sign(a.amount) ? Math.sign(a.amount) * Math.min(Math.abs(v), Math.abs(a.amount)) : 0;
+}

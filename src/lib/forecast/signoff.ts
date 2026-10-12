@@ -5,6 +5,7 @@
 // move as is into a shared database later: one row per sign-off, scoped to the council, with the
 // figures as a JSON payload. Today the records live in the team file (`TeamFile.signedOff`).
 import { runForecast, type ForecastResult } from './engine';
+import { timingAt, type Arrival } from './early';
 import type { BacktestResult } from './backtest';
 import type { Scenario } from '../model';
 import type { Category } from '../categories';
@@ -259,14 +260,15 @@ export function completeTo(end: Day): Day {
 
 export type Tracking =
   // `asOf` is the latest month end compared (or the latest day, `soFar`, before the first one)
-  | { rec: SignedForecast; r: BacktestResult; gap: number; asOf: number; soFar: boolean }
+  // `timing`: how much of `gap` is money confirmed as early, expected after `asOf` (see lib/forecast/early)
+  | { rec: SignedForecast; r: BacktestResult; gap: number; asOf: number; soFar: boolean; timing: number }
   | { rec: SignedForecast; r: null };
 
 /**
  * The sign-off to report on: the one the team chose (`chosen`), else the newest with a month or
  * more of actuals; read at the latest month end. Before it has a month of actuals, it's waiting.
  */
-export function trackSignOffs(signed: SignedForecast[], history: CashHistory | null | undefined, categories: Category[], chosen?: string): Tracking | null {
+export function trackSignOffs(signed: SignedForecast[], history: CashHistory | null | undefined, categories: Category[], chosen?: string, arrivals: Arrival[] = []): Tracking | null {
   const list = [...signed].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
   if (!list.length || !history) return null;
   const own = list.find((x) => x.id === chosen);
@@ -274,5 +276,6 @@ export function trackSignOffs(signed: SignedForecast[], history: CashHistory | n
   const pick = compared.find((x) => x.r && x.r.H >= MIN_COMPARE_DAYS);
   if (!pick) return { rec: own ?? list[0], r: null };
   const r = pick.r!, me = monthEndIndex(r), d = me ?? r.H - 1;
-  return { rec: pick.rec, r, gap: r.actualCum[d] - r.forecastCum[d], asOf: r.cutoff + d, soFar: me === null };
+  const timing = timingAt(arrivals, r.cutoff, r.cutoff + d, dayFromISO(pick.rec.end)).total;
+  return { rec: pick.rec, r, gap: r.actualCum[d] - r.forecastCum[d], asOf: r.cutoff + d, soFar: me === null, timing };
 }

@@ -7,10 +7,11 @@ import { ingest } from '../src/lib/ingest/ingest';
 import { categorise } from '../src/lib/categorise/engine';
 import { DEFAULT_CATEGORIES } from '../src/lib/categories';
 import { runForecast } from '../src/lib/forecast/engine';
-import { fromSession, basisFromHistory, historyBefore, K_OP, type CashHistory } from '../src/lib/history/cashHistory';
+import { fromSession, basisFromHistory, historyBefore, K_OP, K_ONEOFF, type CashHistory } from '../src/lib/history/cashHistory';
 import type { ForecastBasis } from '../src/lib/analysis/aggregates';
 import { isoFromDay, addMonths } from '../src/lib/dates';
-import { findEarly, answerEarly } from '../src/lib/forecast/early';
+import { findEarly, answerEarly, timingAt, heldAsOneOff } from '../src/lib/forecast/early';
+import { dayFromISO } from '../src/lib/dates';
 import type { OneOff } from '../src/lib/model';
 import type { Arrival } from '../src/lib/forecast/early';
 
@@ -94,5 +95,43 @@ describe('money that arrives early', async () => {
     expect(total(fc) - total(after)).toBeCloseTo(o.amount, -3);
     // not raised for an item with no money like it
     expect(findEarly(basis, fc, { oneOffs: [{ ...o, amount: o.amount * 3 }] }, E - 6, E).filter((x) => x.kind === 'oneoff')).toHaveLength(0);
+  });
+
+  it('on Monitor, money that came early is timing until its due date passes', () => {
+    const a = (key: string, day: string, due: string, amount: number, answer: 'early' | 'extra' = 'early'): Arrival =>
+      ({ key, kind: 'series', categoryId: 'grants_general', signature: 'GRANT', day, due, amount, answer, at: '', by: '' });
+    const arrivals = [
+      a('k1', '2024-11-21', '2024-12-09', 3.4e6),
+      a('k1', '2024-11-21', '2024-12-09', 3.4e6), // the same arrival confirmed on a duplicated forecast
+      a('k2', '2024-11-25', '2024-12-02', -1e6),
+      a('k3', '2024-11-22', '2024-12-15', 2e6, 'extra'), // not early: it was something else
+      a('k4', '2024-09-20', '2024-10-07', 5e6), // due date already passed: evened out
+    ];
+    const from = dayFromISO('2024-10-01'), end = dayFromISO('2026-09-30');
+    const t = timingAt(arrivals, from, dayFromISO('2024-11-30'), end);
+    expect(t.items.map((x) => x.key)).toEqual(['k1', 'k2']);
+    expect(t.total).toBeCloseTo(2.4e6, 0);
+    // read before it arrived, or after its due date: no timing
+    expect(timingAt(arrivals, from, dayFromISO('2024-11-20'), end).total).toBe(0);
+    expect(timingAt(arrivals, from, dayFromISO('2024-12-31'), end).total).toBe(0);
+    // due after the signed-off forecast ends: it never expected it, so not timing
+    expect(timingAt(arrivals, from, dayFromISO('2024-11-30'), dayFromISO('2024-12-05')).total).toBeCloseTo(-1e6, 0);
+    // arrived before the forecast started: not part of what it's judged on
+    expect(timingAt(arrivals, dayFromISO('2024-11-22'), dayFromISO('2024-11-30'), end).items.map((x) => x.key)).toEqual(['k2']);
+  });
+
+  it('an early payment held as a one-off is counted once on Monitor', () => {
+    const h = withEarly();
+    const basis = basisFromHistory(h, catIds)!;
+    const c = findEarly(basis, forecast(basis), { oneOffs: [] }, E - 6, E).find((x) => x.signature === grant.signature)!;
+    const a = answerEarly(c, 'early', 'Test');
+    // as built here it's everyday cash, not a one-off
+    expect(heldAsOneOff(h, a)).toBe(0);
+    // the same day held as a one-off instead
+    const asOneOff: CashHistory = { ...h, cells: h.cells.map((cells) => { const out = [...cells]; for (let k = 0; k < out.length; k += 4) if (out[k] === E && h.cats[out[k + 1]] === a.categoryId && out[k + 2] === K_OP) out[k + 2] = K_ONEOFF; return out; }) };
+    const held = heldAsOneOff(asOneOff, a);
+    expect(Math.sign(held)).toBe(Math.sign(a.amount));
+    expect(Math.abs(held)).toBeLessThanOrEqual(Math.abs(a.amount));
+    expect(Math.abs(held)).toBeGreaterThan(0.5 * Math.abs(a.amount));
   });
 });

@@ -5,11 +5,12 @@ import { useStore } from '../../state/store';
 import { Kpi, Panel, Seg } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, pct, day } from '../../lib/format';
-import { addMonths, dayFromYMD, dayFromISO, ymdFromDay, MONTH_NAMES } from '../../lib/dates';
+import { addMonths, dayFromYMD, dayFromISO, ymdFromDay, firstDayOfMonthIndex, monthIndex, MONTH_NAMES } from '../../lib/dates';
 import { compareSigned, reforecastSigned, withdrawals, type SignedForecast, fullMonthsLabel, monthEndIndex, firstFairMonthEnd, MIN_COMPARE_DAYS } from '../../lib/forecast/signoff';
 
 const monthName = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
-import { useTracking, useActiveSignOffs } from './useTracking';
+import { useTracking, useActiveSignOffs, useArrivals } from './useTracking';
+import { timingAt, heldAsOneOff, type Arrival } from '../../lib/forecast/early';
 import { backtestFromHistory, type BacktestResult } from '../../lib/forecast/backtest';
 import { historySpan, type CashHistory } from '../../lib/history/cashHistory';
 import type { Category } from '../../lib/categories';
@@ -123,6 +124,7 @@ function SignedView({ sc }: { sc: Scenario }) {
   const { team, historyBase, monitorPick } = useStore();
   const h = team.cashHistory ?? historyBase;
   const list = [...useActiveSignOffs()].sort((a, b) => b.signedAt.localeCompare(a.signedAt));
+  const arrivals = useArrivals();
   // open on the one you came here from, else the one Home and Today's statement report on
   const tracked = useTracking();
   const [id, setId] = useState(monitorPick ?? tracked?.rec.id ?? list[0]?.id);
@@ -168,7 +170,7 @@ function SignedView({ sc }: { sc: Scenario }) {
         <WithdrawButton rec={rec} />
       </div>
       </div>
-      {r && r.H >= MIN_COMPARE_DAYS ? <PastResult r={r} outlook={outlook} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
+      {r && r.H >= MIN_COMPARE_DAYS ? <PastResult r={r} outlook={outlook} timingFrom={{ arrivals, end: dayFromISO(rec.end), history: h! }} intro={<>It said</>} handAdded={rec.knownItems.length > 0}
         chartNote="Exactly as signed off, including anything added by hand. Everyday cash only: loans, investments and transfers between your own accounts are left out."
         catsLabel={fullMonthsLabel(r) ? `over the complete months so far, ${fullMonthsLabel(r)}` : ''} />
         : <>
@@ -276,7 +278,10 @@ interface Outlook {
   sameScenario: boolean;
 }
 
-function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook }: { r: BacktestResult; intro: ReactNode; chartNote: string; catsLabel?: string; handAdded?: boolean; outlook?: Outlook }) {
+function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook, timingFrom }: { r: BacktestResult; intro: ReactNode; chartNote: string; catsLabel?: string; handAdded?: boolean; outlook?: Outlook;
+  /** money confirmed as early, and the signed-off forecast's last day: for the timing part of the gap */
+  timingFrom?: { arrivals: Arrival[]; end: number; history: CashHistory } }) {
+  const categories = useStore((s) => s.team.categories);
   // read at the latest month end, so payment timing doesn't swing the figures (the chart shows every day)
   const me = monthEndIndex(r);
   const end = me ?? r.H - 1;
@@ -291,9 +296,18 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook }: { r:
   // judged on what it could have known: one-offs (a land sale, an unexpected grant) are set aside
   // when that's closer, and the sentence says so
   const coreGap = r.actualCoreCum[end] - fc;
-  const judged = Math.min(Math.abs(gap), Math.abs(coreGap));
+  // timing: money confirmed as early that the forecast expected after this date (it should even out)
+  const timing = timingFrom ? timingAt(timingFrom.arrivals, r.cutoff, at, timingFrom.end) : { items: [], total: 0 };
+  const t = Math.abs(timing.total) >= 0.1e6 ? timing.total : 0;
+  // an early payment the history holds as a one-off is timing, not a one-off: counted once
+  const tOO = t && timingFrom ? timing.items.reduce((s, a) => s + heldAsOneOff(timingFrom.history, a), 0) : 0;
+  const realOneOffs = oneOffs - tOO;
+  // with timing and one-offs both set aside
+  const bothAside = gap - t - realOneOffs;
+  const judged = Math.min(Math.abs(gap), Math.abs(coreGap), Math.abs(gap - t), Math.abs(bothAside));
   const judgedShare = gross ? judged / gross : 0;
   const verdict = judgedShare < 0.015 ? { word: 'Very close', cls: 'green' } : judgedShare < 0.035 ? { word: 'Close', cls: 'green' } : { word: 'Some way out', cls: 'soft' };
+  const vsWords = (v: number) => (Math.abs(v) < 0.05e6 ? 'in line with' : `${money(Math.abs(v))} ${v > 0 ? 'ahead of' : 'behind'}`);
   const move = (v: number, past = false) => (v < 0 ? `${past ? 'fell' : 'fall'} by ${money(-v)}` : `${past ? 'rose' : 'rise'} by ${money(v)}`);
   const months = Math.max(1, Math.round((end + 1) / 30.44));
 
@@ -311,22 +325,36 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook }: { r:
   }), [r, outlook, fresh]);
 
   const rows = r.categories.filter((c) => !c.excluded && Math.abs(c.error) >= 0.5e6).slice(0, 6);
+  // timing within the complete months the table covers, by category
+  const catTiming = new Map<string, number>();
+  if (timingFrom && r.monthly.labels.length) {
+    const fullEnd = firstDayOfMonthIndex(monthIndex(r.cutoff) + r.monthly.labels.length) - 1;
+    for (const a of timingAt(timingFrom.arrivals, r.cutoff, fullEnd, timingFrom.end).items) catTiming.set(a.categoryId, (catTiming.get(a.categoryId) ?? 0) + a.amount);
+  }
   return (
     <>
       <div className="past-top">
       <div className="summary-box">
         <div className="eyebrow">In a sentence <span className={`badge ${verdict.cls}`} style={{ marginLeft: 8 }}>{verdict.word}</span></div>
         {intro} everyday cash would <strong>{move(fc)}</strong> by {day(at)}{atWords}. It actually <strong>{move(act, true)}</strong>{Math.abs(gap) < 0.05e6 ? ', almost exactly as forecast' : ''}.
-        {Math.abs(oneOffs) >= 1e6 && (handAdded
-          ? <> One-off items account for {money(oneOffs, { sign: true })} of what happened; only those added by hand were in the forecast.</>
-          : <> One-off items, which no forecast from history can see, account for {money(oneOffs, { sign: true })} of what happened.</>)}
-        {Math.abs(oneOffs) >= 1e6 && Math.abs(coreGap) < Math.abs(gap) && <> Leaving those aside, it was out by <strong>{money(Math.abs(coreGap))}</strong>.</>}
+        {t !== 0 && (() => {
+          const name = (a: Arrival) => a.signature?.replace(/\S*#\S*/g, '').trim() || (categories.find((c) => c.id === a.categoryId)?.name ?? a.categoryId);
+          const shown = timing.items.slice(0, 2);
+          return <> <strong>{money(Math.abs(t))}</strong> of the difference is timing: {shown.map((a, i) => <span key={a.key}>{i ? '; ' : ''}{name(a)} {a.amount < 0 ? 'went out' : 'came in'} on {day(dayFromISO(a.day))}, due {day(dayFromISO(a.due))}</span>)}{timing.items.length > 2 ? ` and ${timing.items.length - 2} more` : ''}. It should even out as {timing.items.length > 1 ? 'those dates pass' : 'that date passes'}; leaving it aside, everyday cash was <strong>{vsWords(gap - t)}</strong> the forecast.</>;
+        })()}
+        {Math.abs(realOneOffs) >= 1e6 && (handAdded
+          ? <> One-off items account for {money(realOneOffs, { sign: true })} of what happened; only those added by hand were in the forecast.</>
+          : <> One-off items, which no forecast from history can see, account for {money(realOneOffs, { sign: true })} of what happened.</>)}
+        {Math.abs(realOneOffs) >= 1e6 && (t
+          // with timing set aside too, say which way the rest went, even when it's further out
+          ? <> Leaving those aside too, everyday cash was <strong>{vsWords(bothAside)}</strong> the forecast.</>
+          : Math.abs(bothAside) < Math.abs(gap) && <> Leaving those aside, it was out by <strong>{money(Math.abs(bothAside))}</strong>.</>)}
         {fresh && endFresh !== null && endSigned !== null && <> With what’s happened so far and a fresh forecast for the rest, everyday cash is now expected to <strong>{move(endFresh)}</strong> by {day(r.cutoff + N - 1)}, against {move(endSigned)} as signed off{Math.abs(endFresh - endSigned) >= 0.5e6 ? <>: <strong>{money(Math.abs(endFresh - endSigned))} {endFresh > endSigned ? 'better' : 'worse'}</strong></> : ', much the same'}.</>}
       </div>
 
         <Kpi label="Forecast made then" value={money(fc, { sign: true })} sub={`change in everyday cash to ${day(at)}`} />
         <Kpi light label="What actually happened" value={money(act, { sign: true })} sub={`over the same ${months === 1 ? 'month' : `${months} months`}`} />
-        <Kpi light label="Difference" value={money(gap, { sign: true })} sub={`${pct(share)} of the cash that flowed`} />
+        <Kpi light label="Difference" value={money(gap, { sign: true })} sub={`${pct(share)} of the cash that flowed${t ? `; ${money(t, { sign: true })} of it timing` : ''}`} />
       </div>
 
       <Panel title={fresh ? 'What happened, then a fresh forecast, against the signed-off forecast' : 'Forecast made then, against what happened'} sub={`change in everyday cash since ${day(r.cutoff)}`}>
@@ -342,13 +370,14 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook }: { r:
             <thead><tr><th>Category</th><th className="num">Forecast</th><th className="num">Actual</th><th className="num">Difference</th><th /></tr></thead>
             <tbody>{rows.map((c) => {
               const oo = c.actual - c.actualCore;
+              const ct = catTiming.get(c.id) ?? 0;
               return (
                 <tr key={c.id}>
                   <td>{c.name}</td>
                   <td className="num">{money(c.forecast)}</td>
                   <td className="num">{money(c.actual)}</td>
                   <td className="num"><strong>{money(c.actual - c.forecast, { sign: true })}</strong></td>
-                  <td className="xs muted">{Math.abs(oo) >= 0.5e6 ? `includes ${money(oo, { sign: true })} of one-offs` : ''}</td>
+                  <td className="xs muted">{[Math.abs(oo) >= 0.5e6 ? `includes ${money(oo, { sign: true })} of one-offs` : '', Math.abs(ct) >= 0.1e6 ? `${money(ct, { sign: true })} came early (timing)` : ''].filter(Boolean).join('; ')}</td>
                 </tr>
               );
             })}</tbody>

@@ -3,7 +3,7 @@
 import { useStore, expectedStatementDay, type StepId } from '../../state/store';
 import { historySpan, MIN_HISTORY_DAYS } from '../../lib/history/cashHistory';
 import { day, money } from '../../lib/format';
-import { useTracking, useActiveSignOffs, aheadWords, asOfWords } from '../forecast/useTracking';
+import { useTracking, useActiveSignOffs, aheadWords, asOfWords, timingWords } from '../forecast/useTracking';
 import { usePractice } from '../components/PracticeBar';
 import { ymdFromDay, dayFromISO, MONTH_NAMES } from '../../lib/dates';
 
@@ -46,7 +46,7 @@ export function JobsPage() {
     : behind > CATCH_UP_DAYS ? { id: 'history', title: `Catch up from ${day(span!.to + 1)}`, why: `Your history stops ${behind} days ago. Add the statements since then under History, so the forecast starts from where you are.`, cta: 'Add statements' }
     : !latest ? { id: 'forecast', title: 'Build your forecast and sign it off', why: 'Check each line we propose, add anything you know is coming, then sign it off. Signed-off forecasts are what you monitor against.', cta: 'Build the forecast' }
     : !upToDate ? { id: 'today', title: 'Add today’s statement', why: `Your history runs to ${day(span!.to)}. Drop in the latest statement: it’s sorted in seconds and checked against your signed-off forecast.`, cta: 'Add today’s statement' }
-    : { id: 'monitor', title: 'You’re up to date', why: tr?.r ? `Everyday cash was ${aheadWords(tr.gap, money)} the signed-off “${tr.rec.scenarioName}” ${asOfWords(tr)}.` : `“${latest.scenarioName}” is signed off. It’s compared with what happens as statements come in.`, cta: 'See forecast vs actual' });
+    : { id: 'monitor', title: 'You’re up to date', why: tr?.r ? `Everyday cash was ${aheadWords(tr.gap, money)} the signed-off “${tr.rec.scenarioName}” ${asOfWords(tr)}${timingWords(tr.timing, money)}.` : `“${latest.scenarioName}” is signed off. It’s compared with what happens as statements come in.`, cta: 'See forecast vs actual' });
 
   // ---- the four jobs, in order
   // the example: a job is done when its practice steps are
@@ -64,7 +64,7 @@ export function JobsPage() {
       note: upToDate ? `Up to date: ${day(span!.to)}` : span ? `Last statement ${day(span.to)}` : 'Once your history is loaded' },
     { id: 'monitor', n: 4, icon: 'bi-activity', title: 'Monitor', what: 'Signed-off forecasts against what happened.',
       status: status('monitor', !!tr?.r, !latest),
-      note: tr?.r ? `${aheadWords(tr.gap, money).replace(/^./, (c) => c.toUpperCase())} “${tr.rec.scenarioName}” ${asOfWords(tr)}` : latest ? 'Waiting for statements after it' : 'After your first sign-off' },
+      note: tr?.r ? `${aheadWords(tr.gap, money).replace(/^./, (c) => c.toUpperCase())} “${tr.rec.scenarioName}” ${asOfWords(tr)}${Math.abs(tr.timing) >= 0.1e6 ? ` (${money(Math.abs(tr.timing))} of it timing)` : ''}` : latest ? 'Waiting for statements after it' : 'After your first sign-off' },
   ];
 
   return (
