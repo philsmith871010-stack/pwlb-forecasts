@@ -39,7 +39,7 @@ export function computeForecast(basis: ForecastBasis, sc: Scenario, categories: 
     assumptions: sc.assumptions, oneOffs: sc.oneOffs, pastedSchedules: sc.pastedSchedules, treasurySchedule: sc.treasurySchedule,
     fyStartMonth, liquidityBuffer: buffer, defaultOpening,
     register: register ? { liquid: register.liquid.total, events: register.events } : null,
-    overrides: sc.overrides ?? [],
+    overrides: sc.overrides ?? [], arrivals: sc.arrivals ?? [],
   };
   const fc = runForecast(req);
   const shift = fc.opening - operationalEnd;

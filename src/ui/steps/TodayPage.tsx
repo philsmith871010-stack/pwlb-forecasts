@@ -4,6 +4,7 @@ import { useStore } from '../../state/store';
 import { PageHead, Progress, Seg } from '../components/common';
 import { DayCard } from '../history/HistoryCards';
 import { PastDayCard } from '../history/PastDay';
+import { EarlyCheck } from '../forecast/EarlyCheck';
 import { SortCard, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
 import { historySpan } from '../../lib/history/cashHistory';
@@ -67,6 +68,7 @@ export function TodayPage() {
       {!past && !busy && short && (
         <>
           <DayCard onSort={() => sortRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          <div className="mt"><EarlyCheck from={ingest!.minDay} to={ingest!.maxDay} /></div>
           <div ref={sortRef}><TodaySorting /></div>
           {space === 'mine' && !historyBase && (
             <div className="callout navy mt small"><strong>Next:</strong> to see patterns and forecast, load a few years of past statements under{' '}

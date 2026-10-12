@@ -867,6 +867,10 @@ details.more-detail > summary { cursor: pointer; font-size: 12.5px; font-weight:
 }
 @media (max-width: 640px) { .g3 { grid-template-columns: 1fr; } }
 /* signed-off forecasts */
+.early-check { border-left: 4px solid var(--pt-orange); }
+.early-check h3 { margin: 0 0 4px; } .early-check h3 i { color: var(--pt-orange); margin-right: 6px; }
+.early-check p { margin: 0 0 10px; }
+.early-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--pt-line); }
 .signoff-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px dashed var(--pt-line); border-radius: 12px; background: #fff; font-size: 14px; }
 .signoff-row > span { flex: 1; min-width: 200px; }
 .signoff-row.on { border-style: solid; border-color: #b7e4c7; background: #f1faf4; }

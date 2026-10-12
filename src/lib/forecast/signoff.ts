@@ -194,7 +194,7 @@ export function reforecastSigned(rec: SignedForecast, h: CashHistory, sc: Scenar
   const fc = runForecast({
     basis, categories, settings: { ...sc.settings, start: isoFromDay(start), end: rec.end, openingPosition: null },
     assumptions: sc.assumptions, oneOffs: sc.oneOffs, pastedSchedules: sc.pastedSchedules, treasurySchedule: sc.treasurySchedule,
-    fyStartMonth, liquidityBuffer: buffer, defaultOpening: 0, register: null, overrides: sc.overrides ?? [],
+    fyStartMonth, liquidityBuffer: buffer, defaultOpening: 0, register: null, overrides: sc.overrides ?? [], arrivals: sc.arrivals ?? [],
   });
   return { start, ...everydayPath(fc) };
 }

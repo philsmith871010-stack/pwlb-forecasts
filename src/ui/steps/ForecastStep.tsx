@@ -10,6 +10,7 @@ import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTa
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast, type ForecastBundle } from '../forecast/useForecast';
 import { useActiveSignOffs } from '../forecast/useTracking';
+import { EarlyCheck } from '../forecast/EarlyCheck';
 import { isoFromDay, dayFromISO } from '../../lib/dates';
 import { ForecastChart } from '../forecast/ForecastChart';
 import { SetupSection, MethodsSection, AssumptionsSection, OneOffsSection, PasteSection } from '../forecast/Controls';
@@ -142,6 +143,7 @@ export function ForecastStep() {
       {!locked && !RESULT_TABS.includes(tab) && <ResultsStrip b={b} onOpen={() => setTab('result')} />}
       {!(locked && RESULT_TABS.includes(tab)) && <Explain compact what={help.what} why={help.why} todo={help.todo} />}
 
+      {(tab === 'result' || tab === 'before' || tab === 's-items' || tab === 'oneoffs') && !locked && <div className="mb"><EarlyCheck from={b.req.basis.dataEnd - 31} to={b.req.basis.dataEnd} /></div>}
       {tab === 'result' && !locked && (
         <div className="stack">
           <div className="result-top">

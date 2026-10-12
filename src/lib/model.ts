@@ -1,4 +1,5 @@
 import type { SignedForecast, SignOffChange } from './forecast/signoff';
+import type { Arrival } from './forecast/early';
 // Shared types: rules, bank profiles, forecasts and the team file.
 import type { Category, ForecastMethod } from './categories';
 import type { ColumnMapping } from './ingest/detect';
@@ -162,6 +163,8 @@ export interface Scenario {
   reviewDone?: boolean;
   /** the data end date (ISO) the checks were made against: new data means checking again */
   reviewFor?: string;
+  /** money that arrived before its due date, as confirmed by the user (see lib/forecast/early) */
+  arrivals?: Arrival[];
 }
 
 export interface HistorySummary {

@@ -64,12 +64,21 @@ export function SimpleItems({ sc, upd }: { sc: Scenario; upd: Upd }) {
   const opCats = categories.filter((c) => c.group === 'receipts_operational' || c.group === 'payments_operational');
   const [kind, setKind] = useState<ItemKind | null>(null);
   const name = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
-  const items: { id: string; date: string; text: string; amount?: number; kind: string; remove: () => void }[] = [
-    ...sc.oneOffs.map((o) => ({ id: o.id, date: o.date, kind: 'One-off', amount: o.amount, text: `${o.description || name(o.categoryId)}${o.confidence !== 'firm' ? ` (${o.confidence === 'likely' ? 'likely' : `possible, counted at ${Math.round((o.probability ?? 0.5) * 100)}%`})` : ''}`, remove: () => upd((s) => ({ ...s, oneOffs: s.oneOffs.filter((x) => x.id !== o.id) })) })),
+  const early = (sc.arrivals ?? []).filter((a) => a.answer === 'early');
+  const arrivedOn = (id: string) => early.find((a) => a.kind === 'oneoff' && a.oneOffId === id)?.day;
+  const undo = (key: string) => upd((s) => ({ ...s, arrivals: (s.arrivals ?? []).filter((x) => x.key !== key) }));
+  const items: { id: string; date: string; text: string; amount?: number; kind: string; remove: () => void; removeLabel?: string }[] = [
+    ...sc.oneOffs.map((o) => ({ id: o.id, date: o.date, kind: 'One-off', amount: o.amount, text: `${o.description || name(o.categoryId)}${o.confidence !== 'firm' ? ` (${o.confidence === 'likely' ? 'likely' : `possible, counted at ${Math.round((o.probability ?? 0.5) * 100)}%`})` : ''}${arrivedOn(o.id) ? ` — arrived on ${day(dayFromISO(arrivedOn(o.id)!))}, so not counted again` : ''}`, remove: () => upd((s) => ({ ...s, oneOffs: s.oneOffs.filter((x) => x.id !== o.id) })) })),
     ...sc.assumptions.filter((a) => a.kind === 'stop' || a.kind === 'step').map((a) => ({
       id: a.id, date: a.kind === 'stop' ? a.from : (a as Extract<Assumption, { kind: 'step' }>).effective, kind: a.kind === 'stop' ? 'Stops' : 'Change',
       text: a.kind === 'stop' ? `${name(a.categoryId)}${a.signature ? `: ${a.signature.replace(/\S*#\S*/g, '').trim()} removed` : ' stops'}${a.note ? ` — ${a.note}` : ''}` : `${name(a.categoryId)} ${(a as Extract<Assumption, { kind: 'step' }>).pct >= 0 ? '+' : ''}${(a as Extract<Assumption, { kind: 'step' }>).pct}%${a.note ? ` — ${a.note}` : ''}`,
       remove: () => upd((s) => ({ ...s, assumptions: s.assumptions.filter((x) => x.id !== a.id) })),
+    })),
+    // regular payments that came early: not forecast again on their due date
+    ...early.filter((a) => a.kind === 'series' || sc.oneOffs.some((o) => o.id === a.oneOffId)).map((a) => ({
+      id: a.key, date: a.due, kind: 'Came early', amount: a.kind === 'series' ? -a.amount : undefined,
+      text: `${a.kind === 'series' ? a.signature?.replace(/\S*#\S*/g, '').trim() ?? name(a.categoryId) : sc.oneOffs.find((o) => o.id === a.oneOffId)?.description || 'Your one-off'}: arrived on ${day(dayFromISO(a.day))}, so not forecast again on its due date`,
+      remove: () => undo(a.key), removeLabel: 'Undo: forecast it on its due date again',
     })),
   ].sort((x, y) => x.date.localeCompare(y.date));
   return (
@@ -80,7 +89,7 @@ export function SimpleItems({ sc, upd }: { sc: Scenario; upd: Upd }) {
             <tbody>{items.map((it) => (
               <tr key={it.id}><td style={{ width: 110 }}>{day(dayFromISO(it.date))}</td><td><span className="badge navy" style={{ marginRight: 8 }}>{it.kind}</span>{it.text}</td>
                 <td className="num">{it.amount !== undefined ? <Money v={it.amount} sign /> : ''}</td>
-                <td style={{ width: 40 }}><button className="icon-btn" aria-label="Remove" title="Remove" onClick={it.remove}><i className="bi bi-trash" /></button></td></tr>
+                <td style={{ width: 40 }}><button className="icon-btn" aria-label={it.removeLabel ?? 'Remove'} title={it.removeLabel ?? 'Remove'} onClick={it.remove}><i className={`bi ${it.removeLabel ? 'bi-arrow-counterclockwise' : 'bi-trash'}`} /></button></td></tr>
             ))}</tbody>
           </table>
         </Panel>

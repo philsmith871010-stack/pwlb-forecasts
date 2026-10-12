@@ -2,6 +2,7 @@
 // recompute on every keystroke. Every number traces back to: historic data (profile, series),
 // an assumption, a pasted schedule or a one-off the user entered.
 
+import { type Arrival, DUE_MATCH_DAYS } from './early';
 import type { Category, ForecastMethod } from '../categories';
 import type { Assumption, ForecastSettings, OneOff, PastedSchedule, TreasuryItem, GrowthMode, GridOverride } from '../model';
 import type { ForecastBasis, SeriesBasis } from '../analysis/aggregates';
@@ -27,6 +28,8 @@ export interface ForecastRequest {
   register?: { liquid: number; events: { day: Day; amount: number; label: string; kind: string }[] } | null;
   /** month-by-month figures from the grid: final, applied after everything else in the model */
   overrides?: GridOverride[];
+  /** money that already arrived early: its due payment isn't forecast again */
+  arrivals?: Arrival[];
 }
 
 /** One row of a category's month-by-month grid. */
@@ -461,7 +464,11 @@ export function runForecast(req: ForecastRequest): ForecastResult {
           const stopDay = stopS ? dayFromISO(stopS.from) : Infinity;
           let rowArr = seriesRows.get(c)?.get(s.signature);
           if (!rowArr) { rowArr = new Float64Array(H); if (!seriesRows.has(c)) seriesRows.set(c, new Map()); seriesRows.get(c)!.set(s.signature, rowArr); }
+          // payments that already arrived early, for a due date near one of these
+          const early = (req.arrivals ?? []).filter((a) => a.answer === 'early' && a.kind === 'series' && a.signature === s.signature && a.categoryId === id).map((a) => dayFromISO(a.due));
           for (const due of dates) {
+            const ei = early.findIndex((d) => Math.abs(d - due) <= DUE_MATCH_DAYS);
+            if (ei >= 0) { early.splice(ei, 1); continue; }
             // due in the last few days before the forecast starts but not in the statements yet:
             // it's late, not skipped (a payday on a weekend, say), so it's counted on the first day
             const day = due < start && start - due <= 5 ? start : due;
@@ -635,7 +642,10 @@ export function runForecast(req: ForecastRequest): ForecastResult {
   const oneOffByCat = new Float64Array((C + 1) * H);
 
   // ---------- one-offs ----------
+  const arrivedIds = new Set((req.arrivals ?? []).filter((a) => a.answer === 'early' && a.kind === 'oneoff').map((a) => a.oneOffId));
   for (const o of req.oneOffs) {
+    // already in the statements
+    if (arrivedIds.has(o.id)) continue;
     const day = dayFromISO(o.date);
     const p = o.confidence === 'possible' ? (settings.includePossible ? (o.probability ?? 0.5) : 0) : 1;
     const c = ci(o.categoryId) >= 0 ? ci(o.categoryId) : C;
