@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RegisterCard } from '../register/RegisterCard';
 import { useStore, useEyebrow } from '../../state/store';
-import { PageHead, StepFooter, Money } from '../components/common';
+import { PageHead, StepFooter, Money, ToMenu } from '../components/common';
 import { engine } from '../../worker/client';
 import type { ReviewGroup, DealQueue, TxnRow } from '../../worker/types';
 import { money, pctDone, day, int } from '../../lib/format';
@@ -50,7 +50,7 @@ function confirmWithUndo(text: string) {
 }
 
 export function SimpleReview() {
-  const { cat, catBusy, goto, register } = useStore();
+  const { cat, catBusy, register } = useStore();
   const eyebrow = useEyebrow('review');
   const unsorted = useQueue(() => engine().uncategorisedQueue(200));
   const deals = useQueue(() => engine().dealQueue(200));
@@ -76,7 +76,7 @@ export function SimpleReview() {
         <div style={{ flex: 1 }}>
           <div className="meter" style={{ height: 12 }}><div style={{ width: `${cat.valueCategorisedPct * 100}%`, background: 'linear-gradient(90deg,#2dd4a8,#28a745)' }} /></div>
           <div className="small muted" style={{ marginTop: 8 }}>
-            {allDone ? 'Nothing left to check. Well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to check</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. Small amounts make little difference. <button className="link-btn" onClick={() => goto('history')}>Done for now: look back</button></>}
+            {allDone ? 'Nothing left to check. Well done.' : <>{groups.length > 0 && <><strong className="navy">{groups.length}</strong> item{groups.length > 1 ? 's' : ''} to check</>}{groups.length > 0 && questions.length > 0 && ' · '}{questions.length > 0 && <><strong className="navy">{questions.length}</strong> possible loan{questions.length > 1 ? 's' : ''} to confirm</>}. Small amounts make little difference.</>}
           </div>
         </div>
         {catBusy && <span className="spinner" title="Updating" />}
@@ -90,7 +90,7 @@ export function SimpleReview() {
       {allDone ? (
         <div className="card done-card fade">
           <div className="done-head"><i className="bi bi-check-circle-fill" /><div><h2>All checked</h2><p>Every transaction is sorted, and loans and investments are set aside. Your decisions are remembered for next time.</p></div></div>
-          <div className="done-next"><span className="muted">Next, see how your cash has behaved over the years.</span><button className="btn primary lg" onClick={() => goto('history')}>Next: look back <i className="bi bi-arrow-right" /></button></div>
+          <div className="done-next"><span className="muted">Set up is done. From the main menu you can look back over your history, build a forecast or add the day’s statement.</span><ToMenu label="Done: back to main menu" primary lg /></div>
         </div>
       ) : (
         <>
@@ -109,7 +109,7 @@ export function SimpleReview() {
               <div className="stack" style={{ gap: 12 }}>{questions.slice(0, 12).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</div>
             </section>
           )}
-          <StepFooter nextLabel={allDone ? 'Next: look back' : 'Done for now: look back'} />
+          <StepFooter />
         </>
       )}
     </div>

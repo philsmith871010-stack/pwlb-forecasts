@@ -6,7 +6,7 @@ import { StrategyView } from '../forecast/StrategyView';
 import { RegisterCard } from '../register/RegisterCard';
 import { RegisterOverview } from '../register/RegisterOverview';
 import { SaveStep } from './SaveStep';
-import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef, PracticeNote } from '../components/common';
+import { PageHead, Panel, Kpi, StepFooter, Seg, Modal, Explain, StepTabs, NextTab, useStepTab, TabDef, PracticeNote, ToMenu } from '../components/common';
 import { exportChart, EChart } from '../components/EChart';
 import { useForecast, type ForecastBundle } from '../forecast/useForecast';
 import { useActiveSignOffs } from '../forecast/useTracking';
@@ -312,9 +312,9 @@ function ScenarioBar() {
   );
 }
 
-/** The forecast needs a history first: the saved one, or statements loaded under History. */
+/** The forecast needs a history first: the saved one, or statements loaded under Set up and train. */
 function ForecastStart() {
-  const { historyBase, basis, useSavedHistory, goto, space, switchWorkspace, register, exampleBusy } = useStore();
+  const { historyBase, basis, useSavedHistory, space, switchWorkspace, register, exampleBusy } = useStore();
   const days = basis ? basis.agg.D : historyDays(historyBase);
   const short = days > 0 && days < MIN_HISTORY_DAYS;
   if (exampleBusy) return <div className="page narrow"><div className="jobs-busy light"><span className="spinner" /> Setting up the example council: five years of statements, sorted…</div></div>;
@@ -323,7 +323,7 @@ function ForecastStart() {
       <PageHead title="Forecast">{short ? <>Your bank history covers {days === 1 ? 'one day' : `${days} days`}. A forecast needs at least six months to see a pattern; three to five years is ideal.</> : historyBase ? 'Built from your saved history.' : 'A forecast learns from your bank history, so load that first.'}</PageHead>
       <div className="start-choices">
         {historyBase && !short && <button className="start-choice primary" onClick={() => useSavedHistory()}><i className="bi bi-clock-history" /><strong>Use your saved history</strong><span>Pick up where you left off.</span></button>}
-        <button className={`start-choice ${historyBase && !short ? '' : 'primary'}`} onClick={() => goto('load')}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Three to five years is ideal.</span></button>
+        <div className={`start-choice ${historyBase && !short ? '' : 'primary'}`}><i className="bi bi-file-earmark-arrow-up" /><strong>Load bank statements</strong><span>Under <strong>Set up and train</strong>, from the main menu. Three to five years is ideal.</span></div>
         {space === 'mine' && <button className="start-choice" onClick={() => void switchWorkspace('example')}><i className="bi bi-stars" /><strong>Practise on the example council</strong><span>Every step, with the files provided.</span></button>}
       </div>
       <section className="register-start">
@@ -337,7 +337,7 @@ function ForecastStart() {
 
 /** Sign off the forecast as it stands, or show that this version already has been. */
 function SignOffRow({ b, sc }: { b: ForecastBundle; sc: Scenario }) {
-  const { user, setUser, askConfirm, signOff, toast, space, goto } = useStore();
+  const { user, setUser, askConfirm, signOff, toast, space } = useStore();
   const fc = b.fc;
   const mine = useActiveSignOffs().filter((x) => x.scenarioId === sc.id).sort((a, z) => a.signedAt.localeCompare(z.signedAt));
   const latest = mine[mine.length - 1];
@@ -346,7 +346,6 @@ function SignOffRow({ b, sc }: { b: ForecastBundle; sc: Scenario }) {
   const current = latest && latest.start === start && latest.end === isoFromDay(fc.start + fc.H - 1) && latest.borrowingNeed === Math.round(fc.borrowingRequirement) && latest.low === Math.round(fc.low.amount);
   // new statements have moved the forecast on since it was signed off (rather than someone changing it)
   const movedOn = latest && !current && latest.start < start;
-  const see = (id: string) => { useStore.setState({ monitorPick: id }); goto('monitor'); };
   const sign = async () => {
     let name = user, note = '';
     const yes = await askConfirm({
@@ -361,19 +360,20 @@ function SignOffRow({ b, sc }: { b: ForecastBundle; sc: Scenario }) {
     if (name !== user && space !== 'example') setUser(name);
     const rec = signOff(fc, sc, note, name);
     useStore.setState({ monitorPick: rec.id });
-    toast(`Signed off. See it against what happens under Monitor.`);
+    toast(`Signed off. Monitor (from the main menu) compares it with what happens.`);
   };
   const when = (iso: string) => day(dayFromISO(iso.slice(0, 10)));
   return current ? (
     <div className="signoff-row on">
       <i className="bi bi-patch-check-fill" /> <span>Signed off on <strong>{when(latest.signedAt)}</strong> by <strong>{latest.signedBy}</strong>{latest.note ? <span className="muted"> · “{latest.note}”</span> : null}.</span>
-      <button className="link-btn" onClick={() => see(latest.id)}>See it against what happens</button>
+      <span className="muted small">Monitor compares it with what happens.</span>
+      <ToMenu />
     </div>
   ) : (
     <div className="signoff-row">
       <span className="muted">{movedOn
-        ? <>Signed off on {when(latest.signedAt)}, from {day(dayFromISO(latest.start))}. New statements have since moved this forecast on to start {day(fc.start)}. That sign-off is still monitored; sign off again to monitor this one too. <button className="link-btn" onClick={() => see(latest.id)}>See the earlier one</button></>
-        : latest ? <>Changed since it was signed off on {when(latest.signedAt)}. <button className="link-btn" onClick={() => see(latest.id)}>See the signed-off one</button></>
+        ? <>Signed off on {when(latest.signedAt)}, from {day(dayFromISO(latest.start))}. New statements have since moved this forecast on to start {day(fc.start)}. That sign-off is still monitored; sign off again to monitor this one too.</>
+        : latest ? <>Changed since it was signed off on {when(latest.signedAt)}. The signed-off version is still monitored as it was.</>
         : <>Happy with it? Sign it off to track it against what happens.</>}</span>
       <button className="btn sm navy" onClick={() => void sign()}><i className="bi bi-patch-check" /> Sign off this forecast</button>
     </div>

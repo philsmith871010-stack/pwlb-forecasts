@@ -1,7 +1,6 @@
 // The deal register on its own, before any bank history is loaded: what's owed and invested,
 // and the cash it brings in and takes out over the next two years.
 import { useMemo } from 'react';
-import { useStore } from '../../state/store';
 import { Kpi, Panel } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, day } from '../../lib/format';
@@ -12,7 +11,6 @@ type Ev = RegisterInfo['events'][number];
 const isLoan = (e: Ev) => e.kind.startsWith('loan');
 
 export function RegisterOverview({ r }: { r: RegisterInfo }) {
-  const goto = useStore((s) => s.goto);
   const from = (r.asAt ?? Math.floor(Date.now() / 864e5)) + 1;
   const to = addMonths(from, 24) - 1;
   const coming = useMemo(() => r.events.filter((e) => e.day >= from && e.day <= to), [r, from, to]);
@@ -80,8 +78,7 @@ export function RegisterOverview({ r }: { r: RegisterInfo }) {
 
 
       <div className="callout navy small">
-        <strong>This is the register on its own.</strong> To see when your cash would run short, and how much to borrow, load your bank statements: the forecast then combines your everyday cash with everything above.{' '}
-        <button className="link-btn" onClick={() => goto('load')}>Load bank statements</button>
+        <strong>This is the register on its own.</strong> To see when your cash would run short, and how much to borrow, load your bank statements under <strong>Set up and train</strong> (from the main menu): the forecast then combines your everyday cash with everything above.
       </div>
     </div>
   );

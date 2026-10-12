@@ -37,7 +37,7 @@ export function HistoryAddedNote({ gapsOnly }: { gapsOnly?: boolean } = {}) {
 
 /** For a day (or a few) of bank data: the sorted day, by category, with every line a click away. */
 export function DayCard({ onSort }: { onSort?: () => void } = {}) {
-  const { ingest, cat, team, goto, setStepTab, historyBase, activeScenarioId } = useStore();
+  const { ingest, cat, team, historyBase, activeScenarioId } = useStore();
   const tr = useTracking();
   const [rows, setRows] = useState<TxnRow[] | null>(null);
   const [open, setOpen] = useState<number | null>(null);
@@ -97,7 +97,7 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
       </div>
       {unsorted > 0 && (
         <div className="callout small mb"><strong>{unsorted} line{unsorted > 1 ? 's' : ''} we couldn’t sort.</strong> Sorting {unsorted > 1 ? 'them' : 'it'} once teaches the tool for next time.{' '}
-          <button className="link-btn" onClick={() => { if (onSort) onSort(); else { setStepTab('review-simple', 'unsorted'); goto('review'); } }}>Sort {unsorted > 1 ? 'them' : 'it'} now</button></div>
+          {onSort && <button className="link-btn" onClick={onSort}>Sort {unsorted > 1 ? 'them' : 'it'} now</button>}</div>
       )}
       <div className={wide ? 'day-split' : ''}>
       <table className="tbl day-tbl">
@@ -136,7 +136,7 @@ export function DayCard({ onSort }: { onSort?: () => void } = {}) {
         <span>Everyday cash {one ? 'on the day' : 'over these days'}: <strong>{money(everyday, { sign: true })}</strong>{expected !== null && <span className="muted"> · your forecast expected about {money(expected, { sign: true })}</span>}.</span>
         {tr?.r && (
           <span className="day-track"><i className="bi bi-patch-check-fill" /> Against the signed-off “{tr.rec.scenarioName}” (from {day(dayFromISO(tr.rec.start))}), everyday cash was <strong>{aheadWords(tr.gap, money)}</strong> it {asOfWords(tr)}{timingWords(tr.timing, money)}.{' '}
-            <button className="link-btn" onClick={() => goto('monitor')}>See how</button></span>
+            <span className="muted">More under Monitor.</span></span>
         )}
       </div>
       <div className="done-next">

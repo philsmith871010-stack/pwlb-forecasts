@@ -65,13 +65,17 @@ Reference numbers on a 2024-era laptop, from the bench:
 
 A forecast recomputes in 10–30 ms; changing an assumption updates the chart and summary in under 100 ms.
 
-## How it works — one menu, three jobs
+## How it works: a main menu and five areas
 
-- **Today's statement:** drop in a day's bank statement. It's sorted with the team's rules; sort anything new on the same screen; the day joins the saved history. Or pick **A past day**: any date the saved history holds, as totals by category (and the regular payments that day).
-- **History:** load statements (years the first time, the latest period after that), check the sorting, look back at how cash behaves.
-- **Forecast:** start from the saved history, statements or the example. Then: check each line, known future items, cash and investments (including the deal register), your forecast, what you could do, report and Excel.
+The main menu lists five areas in the order a team uses them. Each card says whether it's open yet and, if not, what it's waiting for. It also shows the area's state ("Up to date", "Checked, not signed off", "£7.4m ahead of Budget 2024/25") and highlights the one to do next.
 
-The team file opens and saves from the header from anywhere. Settings (the gear) holds explanations on every page and the advanced tools: column mapping, sorting results, all transactions, backtesting, scenarios.
+- **Set up and train:** load statements (years the first time, the latest period after that), then check the sorting so the tool learns your categories.
+- **Review history:** look back at how cash has behaved, or look up any past day as totals by category.
+- **Daily:** drop in the day's statement. It's sorted with the team's rules, you sort anything new on the same screen, and the day joins the saved history.
+- **Forecast:** check each line, add known future items, cash and investments (including the deal register), see your forecast and sign it off, then options, report and Excel.
+- **Monitor:** signed-off forecasts against what has happened since.
+
+Areas are entered from the main menu and left by going back to it (the browser's back button does the same). Inside an area you see only its own steps, and pages don't link across to other areas. An area that can't be used yet is locked with the reason, and so is a step inside an area. The gear holds explanations, exact amounts, the team file and the advanced tools switch; the advanced steps then appear inside their areas.
 
 ## Day to day, or a periodic review
 

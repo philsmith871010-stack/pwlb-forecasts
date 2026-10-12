@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel } from '../components/common';
+import { PageHead, Panel, ToMenu } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, ago } from '../../lib/format';
 import { MONTH_NAMES } from '../../lib/dates';
@@ -9,7 +9,6 @@ import { UNCATEGORISED_COLOUR } from '../../lib/categories';
 /** History from the team file's category × month summary — works without any CSV loaded. */
 export function HistorySnapshotView() {
   const team = useStore((s) => s.team);
-  const goto = useStore((s) => s.goto);
   const hs = team.historySummary!;
   const d = useMemo(() => {
     const labels = hs.months.map((m) => { const [y, mo] = m.split('-').map(Number); return `${MONTH_NAMES[mo - 1]} ${String(y).slice(2)}`; });
@@ -22,8 +21,8 @@ export function HistorySnapshotView() {
   const cat = (id: string) => team.categories.find((c) => c.id === id);
   return (
     <>
-      <PageHead eyebrow="From the team file" title="Historic summary" actions={<button className="btn primary" onClick={() => goto('load')}><i className="bi bi-upload" /> Load CSVs for the full analysis</button>}>
-        This view uses the category × month totals saved in the team file {ago(hs.generatedAt)} — no transaction data. Load the bank CSVs to unlock seasonality, drill-down and backtesting.
+      <PageHead eyebrow="From the team file" title="Historic summary" actions={<ToMenu />}>
+        This view uses the category × month totals saved in the team file {ago(hs.generatedAt)} — no transaction data. Load the bank CSVs under Set up and train to unlock seasonality, drill-down and backtesting.
       </PageHead>
       <div className="stack">
         <Panel title="Cumulative operational position (monthly)">

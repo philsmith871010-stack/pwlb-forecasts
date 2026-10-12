@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
-import { useStore, stepsFor } from '../../state/store';
+import { useStore, streamOf, streamSteps } from '../../state/store';
 import type { Category } from '../../lib/categories';
 import { GROUP_LABELS, UNCATEGORISED_COLOUR } from '../../lib/categories';
 import { money } from '../../lib/format';
@@ -138,16 +138,28 @@ export function InfoTip({ text }: { text: string }) {
   return <i className="bi bi-info-circle muted" title={text} aria-label={text} style={{ cursor: 'help', fontSize: 13 }} />;
 }
 
+/** The way out of an area: areas are only left through the main menu. */
+export function ToMenu({ label = 'Back to main menu', primary, lg }: { label?: string; primary?: boolean; lg?: boolean }) {
+  const goto = useStore((s) => s.goto);
+  return <button className={`btn ${primary ? 'primary' : ''} ${lg ? 'lg' : 'sm'}`} onClick={() => goto('home')}><i className="bi bi-grid-3x3-gap" /> {label}</button>;
+}
+
+/** The next step in this area; after its last step, back to the main menu. */
 export function StepFooter({ nextLabel, onNext, nextDisabled, extra }: { backLabel?: string; nextLabel?: string; onNext?: () => void; nextDisabled?: boolean; extra?: ReactNode }) {
   const step = useStore((s) => s.step);
   const next = useStore((s) => s.next);
-  const STEPS = stepsFor(useStore((s) => s.advanced));
-  const i = STEPS.findIndex((s) => s.id === step);
+  const advanced = useStore((s) => s.advanced);
+  const st = streamOf(step);
+  const steps = st ? streamSteps(st, advanced) : [];
+  const i = steps.findIndex((s) => s.id === step);
   if (i < 0) return null;
+  const last = i === steps.length - 1;
   return (
     <div className="step-footer no-print">
       <div />
-      <div className="row">{extra}{i < STEPS.length - 1 && <button className="btn primary lg" disabled={nextDisabled} onClick={onNext ?? next}>{nextLabel ?? `Continue to ${STEPS[i + 1].label.toLowerCase()}`} <i className="bi bi-arrow-right" /></button>}</div>
+      <div className="row">{extra}{last
+        ? <ToMenu label="Done: back to main menu" primary lg />
+        : <button className="btn primary lg" disabled={nextDisabled} onClick={onNext ?? next}>{nextLabel ?? `Next: ${steps[i + 1].label.toLowerCase()}`} <i className="bi bi-arrow-right" /></button>}</div>
     </div>
   );
 }

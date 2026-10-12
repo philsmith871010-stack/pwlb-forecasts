@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
-import { PageHead, Panel, Kpi } from '../components/common';
+import { PageHead, Panel, Kpi, ToMenu } from '../components/common';
 import { EChart, axisMoney } from '../components/EChart';
 import { money, day, ago } from '../../lib/format';
 import { UNCATEGORISED_COLOUR } from '../../lib/categories';
 
 /** Saved forecasts from the team file, viewable without any CSV loaded. */
 export function SnapshotForecastView() {
-  const { team, goto } = useStore();
+  const { team } = useStore();
   const snaps = team.forecasts.filter((f) => f.resultsSnapshot);
   const [id, setId] = useState(snaps[0]?.id);
   const sc = snaps.find((s) => s.id === id) ?? snaps[0];
@@ -19,8 +19,8 @@ export function SnapshotForecastView() {
     <>
       <PageHead eyebrow="Saved in the team file" title={`Forecast: ${sc.name}`} actions={<>
         <select className="select" value={sc.id} onChange={(e) => setId(e.target.value)}>{snaps.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-        <button className="btn primary" onClick={() => goto('load')}><i className="bi bi-upload" /> Load CSVs to re-run</button></>}>
-        Saved {ago(sc.updatedAt)}{sc.createdBy ? ` by ${sc.createdBy}` : ''}. This is the stored result — monthly totals only. Load the bank data to change assumptions and re-run.
+        <ToMenu /></>}>
+        Saved {ago(sc.updatedAt)}{sc.createdBy ? ` by ${sc.createdBy}` : ''}. This is the stored result — monthly totals only. To change assumptions and re-run, load the bank data under Set up and train.
       </PageHead>
       <div className="stack">
         <div className="grid g3">

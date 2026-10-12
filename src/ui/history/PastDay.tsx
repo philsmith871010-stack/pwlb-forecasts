@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { historySpan, daysWithFlows, pastDaySummary, K_INTERNAL, K_ONEOFF, K_TREASURY, type CashHistory } from '../../lib/history/cashHistory';
 import { money, day, int } from '../../lib/format';
-import { Money, CatBadge } from '../components/common';
+import { Money, CatBadge, PageHead } from '../components/common';
 import { dayFromISO, isoFromDay, weekday } from '../../lib/dates';
 import type { Category } from '../../lib/categories';
 
@@ -18,6 +18,17 @@ function sectionOf(r: { cat: string; kind: number }, cats: Category[]): number {
   const g = cats.find((c) => c.id === r.cat)?.group;
   if (!g || r.cat === 'uncategorised') return 0;
   return g === 'receipts_operational' ? 1 : g === 'payments_operational' ? 2 : g === 'treasury' ? 3 : 4;
+}
+
+/** Review history → A past day. */
+export function PastDayPage() {
+  const h = useStore((s) => s.team.cashHistory ?? s.historyBase);
+  return (
+    <div className="page narrow">
+      <PageHead title="A past day">Choose any day in your saved history to see what its statement came to, by category.</PageHead>
+      {h && <PastDayCard h={h} />}
+    </div>
+  );
 }
 
 /** Pick any day the saved history holds and see what it came to, by category. */
@@ -55,7 +66,7 @@ export function PastDayCard({ h }: { h: CashHistory }) {
         <button className="link-btn small" onClick={() => setSel(null)}>Latest</button>
       </div>
 
-      {!sum ? <div className="callout navy small">No statement for {day(d)} is in your saved history. Load it under History to add it.</div>
+      {!sum ? <div className="callout navy small">No statement for {day(d)} is in your saved history. Load it under Set up and train to add it.</div>
         : !rows.length ? <div className="callout navy small">No money moved on {day(d)}{sum.closing !== null ? <>. Balance at the end of the day: <strong>{money(sum.closing)}</strong></> : ''}.</div>
         : (
           <>
@@ -85,7 +96,7 @@ export function PastDayCard({ h }: { h: CashHistory }) {
             )}
             <div className="day-foot small">
               <span>Everyday cash on the day: <strong>{money(everyday, { sign: true })}</strong>{sum.closing !== null && <> · balance at the end of the day: <strong>{money(sum.closing)}</strong></>}{sum.accounts < h.accounts.length && <span className="muted"> · only {sum.accounts} of your {h.accounts.length} accounts have a statement for this day</span>}.</span>
-              <span className="muted">Each figure is the day’s net for that category. To see the lines, load that day’s statement under History.</span>
+              <span className="muted">Each figure is the day’s net for that category. To see the lines, load that day’s statement under Set up and train.</span>
             </div>
           </>
         )}

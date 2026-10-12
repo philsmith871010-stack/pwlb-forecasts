@@ -16,7 +16,7 @@ import { isoFromDay, addMonths, dayFromYMD, isBusinessDay, type Day } from '../l
 import { setExactAmounts as setExactAmountsFormat } from '../lib/format';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
-export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today' | 'monitor';
+export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'pastday' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today' | 'monitor';
 /** Full step list (advanced tools on). */
 export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] = [
   { id: 'load', label: 'Add your data', sub: 'Bank statement files', icon: 'bi-cloud-arrow-up' },
@@ -36,31 +36,35 @@ export function stepsFor(advanced: boolean) {
   return advanced ? STEPS : SIMPLE_STEPS;
 }
 
-// ---------------------------------------------------------------- the four jobs
+// ---------------------------------------------------------------- the five areas
 
-export type StreamId = 'history' | 'forecast' | 'today' | 'monitor';
-export interface Stream { id: StreamId; label: string; short: string; icon: string; steps: { id: StepId; label: string; advanced?: boolean }[] }
+export type StreamId = 'setup' | 'review' | 'today' | 'forecast' | 'monitor';
+export interface Stream { id: StreamId; label: string; short: string; icon: string; what: string; steps: { id: StepId; label: string; advanced?: boolean }[] }
 /**
- * Everything the tool does, as four distinct jobs in the order they depend on each other:
- * learn from the history, build and sign off a forecast, add each day's statement, and check the
- * signed-off forecasts against what happens.
+ * Everything the tool does, as five separate areas in the order they depend on each other. Each
+ * is entered from the main menu (Home) and left by going back to it: no page links across areas,
+ * so you're always in one job with its own steps.
  */
 export const STREAMS: Stream[] = [
-  { id: 'history', label: 'History', short: 'History', icon: 'bi-bar-chart-line', steps: [
+  { id: 'setup', label: 'Set up and train', short: 'Set up', icon: 'bi-mortarboard', what: 'Load bank statements and teach the tool your categories.', steps: [
     { id: 'load', label: 'Load statements' },
     { id: 'map', label: 'Check the files', advanced: true },
     { id: 'categorise', label: 'Sorting results', advanced: true },
     { id: 'review', label: 'Check the sorting' },
+    { id: 'settings', label: 'Rules and settings', advanced: true },
+  ] },
+  { id: 'review', label: 'Review history', short: 'History', icon: 'bi-bar-chart-line', what: 'How your cash has behaved, and any past day.', steps: [
     { id: 'history', label: 'Look back' },
+    { id: 'pastday', label: 'A past day' },
     { id: 'data', label: 'All transactions', advanced: true },
   ] },
-  { id: 'forecast', label: 'Forecast', short: 'Forecast', icon: 'bi-graph-up-arrow', steps: [
+  { id: 'today', label: 'Daily', short: 'Daily', icon: 'bi-calendar-day', what: 'Add each day’s statement and sort anything new.', steps: [{ id: 'today', label: 'Today’s statement' }] },
+  { id: 'forecast', label: 'Forecast', short: 'Forecast', icon: 'bi-graph-up-arrow', what: 'Build it, check it, sign it off.', steps: [
     { id: 'forecast', label: 'Build the forecast' },
     { id: 'backtest', label: 'Test it', advanced: true },
     { id: 'save', label: 'Save & share', advanced: true },
   ] },
-  { id: 'today', label: 'Today’s statement', short: 'Today', icon: 'bi-calendar-day', steps: [{ id: 'today', label: 'Today’s statement' }] },
-  { id: 'monitor', label: 'Monitor', short: 'Monitor', icon: 'bi-activity', steps: [{ id: 'monitor', label: 'Forecast vs actual' }] },
+  { id: 'monitor', label: 'Monitor', short: 'Monitor', icon: 'bi-activity', what: 'Signed-off forecasts against what happened.', steps: [{ id: 'monitor', label: 'Forecast vs actual' }] },
 ];
 
 /** The day a statement is expected up to: the example council's last day, or the last working day before today. */
@@ -306,17 +310,21 @@ export const useStore = create<State & Actions>((set, get) => ({
   goto: (step) => {
     // with a saved history there's nothing to choose: look back and forecast work from it straight away
     if ((step === 'history' || step === 'forecast') && !get().basis && historyDays(get().historyBase) >= MIN_HISTORY_DAYS) get().useSavedHistory();
-    if (step === 'history' && !get().basis) step = 'load';
     const list = stepsFor(get().advanced);
     const i = list.findIndex((s) => s.id === step);
+    // leaving an area (back to the main menu) is what finishes a practice step there
+    const from = streamOf(get().step);
+    if (step === 'home' && from) get().markSeen(`left:${from.id}`);
     set((s) => ({ step, reached: Math.max(s.reached, i) }));
     get().markSeen(step);
     document.querySelector('.main')?.scrollTo({ top: 0 });
   },
+  // the next step in this area; after its last, back to the main menu (areas are only left that way)
   next: () => {
-    const list = stepsFor(get().advanced);
+    const st = streamOf(get().step);
+    const list = st ? streamSteps(st, get().advanced) : [];
     const i = list.findIndex((s) => s.id === get().step);
-    if (i < list.length - 1) get().goto(list[i + 1].id);
+    get().goto(i >= 0 && i < list.length - 1 ? list[i + 1].id : 'home');
   },
   enterWorkspace: () => set({ workspace: true }),
 

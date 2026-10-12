@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useStore, StepId, STREAMS, streamOf, streamSteps, type StreamId } from '../state/store';
+import { useStore, StepId, streamOf, streamSteps } from '../state/store';
+import { useAreas } from './areas';
+import { historyDays, MIN_HISTORY_DAYS } from '../lib/history/cashHistory';
+import { PastDayPage } from './history/PastDay';
 import { Toasts, Modal } from './components/common';
 import { LoadStep } from './steps/LoadStep';
 import { MonitorPage } from './steps/MonitorPage';
@@ -15,7 +18,7 @@ import { DataWorkspace } from './steps/DataWorkspace';
 import { SettingsView } from './steps/SettingsView';
 import { HomePage } from './steps/HomePage';
 import { TodayPage } from './steps/TodayPage';
-import { SpaceSwitch, SettingsMenu } from './components/HeaderMenus';
+import { SettingsMenu } from './components/HeaderMenus';
 import { JobsPage } from './steps/JobsPage';
 
 function Logo() {
@@ -33,60 +36,75 @@ function Logo() {
 export function App() {
   const s = useStore();
   const { step, team, cat, goto, advanced, space } = s;
+  const { areas } = useAreas();
+  const current = streamOf(step);
+  const area = current ? areas.find((a) => a.id === current.id) : undefined;
+
+  // the browser's back button goes back to the main menu from inside an area
+  useEffect(() => {
+    if (!s.entered || step === 'home') return;
+    if (!window.history.state?.area) window.history.pushState({ area: true }, '');
+    const back = () => { if (useStore.getState().step !== 'home') useStore.getState().goto('home'); };
+    window.addEventListener('popstate', back);
+    return () => window.removeEventListener('popstate', back);
+  }, [s.entered, step]);
+  useEffect(() => { if (step === 'home' && window.history.state?.area) window.history.back(); }, [step]);
 
   // the landing page comes first, on its own; one click enters the app
   if (!s.entered) return <div className="landing-shell"><HomePage /><Toasts /></div>;
 
+  const h = team.cashHistory ?? s.historyBase;
   const enabled = (id: StepId) => {
-    if (id === 'load' || id === 'save' || id === 'today' || id === 'home' || id === 'settings') return true;
+    if (id === 'load' || id === 'save' || id === 'today' || id === 'home' || id === 'settings' || id === 'pastday') return true;
     if (id === 'map') return s.sources.length > 0;
-    if (id === 'history' || id === 'forecast') return !!cat || !!s.basis || team.forecasts.some((f) => f.resultsSnapshot) || !!team.historySummary || id === 'forecast';
+    if (id === 'history') return !!cat || !!s.basis || historyDays(h) >= MIN_HISTORY_DAYS || !!team.historySummary;
+    if (id === 'forecast') return true;
     if (id === 'backtest' || id === 'categorise' || id === 'review' || id === 'data') return !!cat;
     return true;
   };
-  const current = streamOf(step);
-  // where each job opens: wherever it makes sense given what's loaded
-  const openStream = (id: StreamId) => {
-    if (id === 'today') return goto('today');
-    if (id === 'history') return goto('history');
-    if (id === 'monitor') return goto('monitor');
-    return goto('forecast');
+
+  // why a step in this area can't be opened yet
+  const why = (id: StepId): string => {
+    if (id === 'map') return 'Opens when you’ve chosen statement files on Load statements.';
+    if (id === 'history') return 'Needs at least six months of bank history.';
+    return 'Needs bank statement files read in this session: your saved history keeps daily totals, not the lines. Load them under Load statements.';
   };
 
   return (
     <div className="shell top">
       <header className="shell-header">
-        <a className="brand" href="#" onClick={(e) => { e.preventDefault(); goto('home'); }} aria-label="Cash Flow Insight home">
+        <a className="brand" href="#" onClick={(e) => { e.preventDefault(); goto('home'); }} aria-label="Cash Flow Insight: main menu">
           <Logo /><span className="brand-word">Cash Flow <span>Insight</span></span>
         </a>
-        <nav className="topnav" aria-label="Main menu">
-          <button className={step === 'home' ? 'on' : ''} onClick={() => goto('home')}><i className="bi bi-house" /> <span>Home</span></button>
-          {STREAMS.map((st) => (
-            <button key={st.id} className={current?.id === st.id ? 'on' : ''} onClick={() => openStream(st.id)} aria-current={current?.id === st.id ? 'page' : undefined}>
-              <i className={`bi ${st.icon}`} /> <span>{st.label}</span>
-            </button>
-          ))}
-        </nav>
+        {current && (
+          <div className="area-head">
+            <button className="menu-back" onClick={() => goto('home')}><i className="bi bi-grid-3x3-gap" /> Main menu</button>
+            <span className="area-name"><i className={`bi ${current.icon}`} /> {current.label}</span>
+            {area && !area.locked && <span className={`area-status ${area.tone}`} title={area.detail}>{area.status}</span>}
+          </div>
+        )}
         <div className="header-spacer" />
         <span className="privacy-dot" title="Everything happens in this browser tab. Nothing is uploaded."><i className="bi bi-shield-lock-fill" /></span>
-        {step !== 'home' && <SpaceSwitch />}
         {step !== 'home' && space === 'example' && <span className="example-tag" title="You’re in the example council">Example</span>}
         <SettingsMenu />
       </header>
 
       <main className="main" id="main">
         <PracticeBar />
+        {area?.locked ? <LockedArea label={current!.label} reason={area.locked} /> : <>
         {current && streamSteps(current, advanced).length > 1 && (
           <div className="streambar">
             {streamSteps(current, advanced).map((x, i) => (
-              <button key={x.id} className={x.id === step ? 'on' : ''} disabled={!enabled(x.id)} onClick={() => goto(x.id)} aria-current={x.id === step ? 'step' : undefined}>
-                <span className="sb-num">{i + 1}</span>{x.label}
+              <button key={x.id} className={x.id === step ? 'on' : ''} disabled={!enabled(x.id)} onClick={() => goto(x.id)} aria-current={x.id === step ? 'step' : undefined}
+                title={enabled(x.id) ? undefined : why(x.id)} aria-label={enabled(x.id) ? undefined : `${x.label}: locked. ${why(x.id)}`}>
+                <span className="sb-num">{enabled(x.id) ? i + 1 : <i className="bi bi-lock-fill" />}</span>{x.label}
               </button>
             ))}
           </div>
         )}
         {step === 'home' && <JobsPage />}
         {step === 'today' && <TodayPage />}
+        {step === 'pastday' && <PastDayPage />}
         {step === 'monitor' && <MonitorPage />}
         {step === 'load' && <LoadStep />}
         {step === 'map' && <MappingStep />}
@@ -98,10 +116,26 @@ export function App() {
         {step === 'save' && <SaveStep />}
         {step === 'data' && <DataWorkspace />}
         {step === 'settings' && <SettingsView />}
+        </>}
       </main>
       <Toasts />
       <MergeDialog />
       <ConfirmDialog />
+    </div>
+  );
+}
+
+/** An area that isn't open yet: what it's waiting for, and the way back. */
+function LockedArea({ label, reason }: { label: string; reason: string }) {
+  const goto = useStore((s) => s.goto);
+  return (
+    <div className="page narrow">
+      <div className="locked-panel">
+        <i className="bi bi-lock" />
+        <h3>{label} isn’t open yet</h3>
+        <p>{reason}</p>
+        <button className="btn primary lg" onClick={() => goto('home')}><i className="bi bi-grid-3x3-gap" /> Back to main menu</button>
+      </div>
     </div>
   );
 }

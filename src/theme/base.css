@@ -1057,3 +1057,37 @@ details.more-detail { margin-top: 2px; }
 .report-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .field.inline { flex-direction: row; align-items: center; gap: 8px; margin: 0; }
 .field.inline label { white-space: nowrap; margin: 0; }
+/* areas: the header inside an area (the way back, where you are, its state) */
+.area-head { display: flex; align-items: center; gap: 12px; min-width: 0; margin-left: 18px; }
+.menu-back { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--pt-line); background: #fff; color: var(--pt-navy); font: inherit; font-size: 13.5px; font-weight: 600; padding: 6px 12px; border-radius: var(--radius-pill); cursor: pointer; white-space: nowrap; }
+.menu-back:hover { border-color: var(--pt-navy); }
+.area-name { font-weight: 700; color: var(--pt-navy); font-size: 15.5px; white-space: nowrap; display: inline-flex; gap: 7px; align-items: center; }
+.area-name i { color: var(--pt-orange); }
+.area-status { font-size: 12.5px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--pt-line-soft); color: var(--pt-muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.area-status.done { background: #e7f6ec; color: #1e7b34; }
+.area-status.action { background: var(--pt-orange-soft); color: #a8520a; }
+.area-status.waiting { background: #eef2f7; color: var(--pt-muted-2); }
+@media (max-width: 900px) { .area-status { display: none; } }
+@media (max-width: 640px) { .area-head { margin-left: 8px; gap: 8px; } .area-name { display: none; } }
+/* the main menu's five areas */
+.jobs.five { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+@media (max-width: 1200px) { .jobs.five { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .jobs.five { grid-template-columns: 1fr; } }
+.job .job-state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #fff; margin-top: 6px; }
+.job .job-state.done i { color: var(--pt-mint); }
+.job .job-state.action i { color: var(--pt-orange); }
+.job .job-state.waiting i, .job .job-state.ready i { color: rgba(255,255,255,.7); }
+.job em { margin-top: 2px; color: rgba(255,255,255,.72); }
+.job.done .job-n { background: var(--pt-mint); color: var(--pt-navy) !important; }
+.job:disabled { cursor: not-allowed; opacity: .55; background: rgba(255,255,255,.03); border-style: dashed; }
+.job:disabled:hover { transform: none; }
+.job.locked .job-state i { color: rgba(255,255,255,.75); }
+.job.locked em { color: rgba(255,255,255,.75); }
+.practice-list { list-style: none; padding: 0; margin: 18px 0 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: rgba(255,255,255,.75); }
+.practice-list li i { margin-right: 4px; }
+.practice-list li.done i { color: var(--pt-mint); }
+.practice-list li.next { color: #fff; font-weight: 700; }
+.practice-list li.next i { color: var(--pt-orange); }
+.practice-list .muted { color: rgba(255,255,255,.5); font-weight: 400; }
+.jobs.five .job.waiting { opacity: 1; }
+.jobs.five .job:disabled:hover { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.18); }

@@ -279,3 +279,15 @@ export function trackSignOffs(signed: SignedForecast[], history: CashHistory | n
   const timing = timingAt(arrivals, r.cutoff, r.cutoff + d, dayFromISO(pick.rec.end)).total;
   return { rec: pick.rec, r, gap: r.actualCum[d] - r.forecastCum[d], asOf: r.cutoff + d, soFar: me === null, timing };
 }
+
+/** "£11.2m ahead of" / "£3.0m behind" / "in line with": everyday cash against the signed-off forecast. */
+export function aheadWords(gap: number, money: (x: number) => string): string {
+  return Math.abs(gap) < 0.5e6 ? 'in line with' : gap > 0 ? `${money(gap)} ahead of` : `${money(-gap)} behind`;
+}
+
+/** "at the end of Mar 2026", or "so far (to 12 Oct 2025)" before the first month end. */
+export function asOfWords(t: { asOf: number; soFar: boolean }): string {
+  const { y, m, d } = ymdFromDay(t.asOf);
+  return t.soFar ? `so far (to ${d} ${MONTH_NAMES[m - 1]} ${y})` : `at the end of ${MONTH_NAMES[m - 1]} ${y}`;
+}
+

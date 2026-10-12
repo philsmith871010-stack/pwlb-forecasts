@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, Progress, Counter, Explain } from '../components/common';
 import { downloadBlob } from '../../lib/teamfile';
@@ -16,8 +16,6 @@ export function LoadStep() {
   const saved = s.historyBase;
   // a day or two of bank data added to a saved history: show the day itself
   const daily = done && !!saved && !s.demo && s.ingest!.maxDay - s.ingest!.minDay <= 3;
-  // a day or two belongs on Today's statement
-  useEffect(() => { if (daily) s.goto('today'); }, [daily]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="page narrow">
       <PageHead eyebrow={eyebrow} title={saved ? 'Add to your history' : 'Load your bank history'}>

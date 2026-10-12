@@ -90,8 +90,8 @@ function SimpleSave({ embedded }: { embedded?: boolean }) {
         Take your forecast away as a report or spreadsheet, and save your work so you can pick it up next time.
       </PageHead>
       {!b && b0 && (
-        <div className="callout mb"><strong>Your forecast isn’t ready to share yet.</strong> Check each line on the Look ahead step first. The report and Excel file become available once you’ve seen your forecast.
-          {' '}<button className="link-btn" onClick={() => { s.setStepTab('forecast-simple', 'lines'); s.setStepTab('forecast', 'lines'); s.goto('forecast'); }}>Go to Look ahead</button></div>
+        <div className="callout mb"><strong>Your forecast isn’t ready to share yet.</strong> Check each line on the Build the forecast step first. The report and Excel file become available once you’ve seen your forecast.
+          {' '}<button className="link-btn" onClick={() => { s.setStepTab('forecast-simple', 'lines'); s.setStepTab('forecast', 'lines'); s.goto('forecast'); }}>Go to Build the forecast</button></div>
       )}
       {b && <div className="summary-box mb"><div className="eyebrow">Your forecast in one line</div>
         Lowest point <strong>{money(b.fc.low.amount)}</strong> on <strong>{day(b.fc.low.day)}</strong>{b.fc.borrowingRequirement > 0 ? <> — you may need to borrow about <strong>{money(b.fc.borrowingRequirement)}</strong> to keep {money(b.fc.buffer)} in the bank.</> : <> — no borrowing needed to keep {money(b.fc.buffer)} in the bank.</>}

@@ -496,3 +496,27 @@ Improvements to choosing what's monitored:
   - **The sentence** names each early payment with its date and due date, then gives the difference with timing set aside, as "ahead of" or "behind". Where one-offs are set aside too, it says which way everyday cash really went, even when that's further out than the headline (in the test run, £7.4m ahead overall was £6.6m behind underneath).
   - **No double counting:** an early payment the history also holds as a one-off (a second payment in a month can be flagged as an outlier) is counted as timing only (`heldAsOneOff`).
   - **Elsewhere:** the Difference figure, the "Where it was out" rows, Home and Today's statement say how much is timing.
+
+## A main menu and five areas
+
+Users could get lost: the header listed every job, and 31 links on pages jumped between them. Now:
+
+- **The main menu is the only way between areas.** The five areas are Set up and train, Review history, Daily, Forecast and Monitor. Each is entered from its card and left with "Main menu" in the header (or the browser's back button). Inside an area the header shows only "Main menu", the area's name, its state and its own steps. There's no list of other areas.
+- **Every link across areas was replaced**, by one of three things:
+  - the action done in place;
+  - "Back to main menu" at the end of a job: after the last step in an area the footer reads "Done: back to main menu";
+  - a sentence naming the area to go to.
+  "A past day" moved from Today's statement to Review history. All transactions and Rules and settings moved from the gear menu into Review history and Set up and train as advanced steps. Loading a day's statement under Set up no longer jumps to Daily.
+- **Locks say why** (`lib/areas.ts`, `computeAreas`):
+  - Review history needs any history, and opens on A past day until there are six months.
+  - Daily, Forecast and Monitor need six months.
+  - Monitor also needs a signed-off forecast.
+  A locked card is greyed with its reason. Opening a locked area shows the reason and the way back. A step that can't be used yet inside an area shows a lock and its reason, such as All transactions needing statement files read in this session.
+- **Each card's state** is one of done, to do, waiting, ready or locked, with a short status and a detail line:
+  - Set up: years of history, or how far behind.
+  - Review: what's there.
+  - Daily: up to date, or from which day statements are needed.
+  - Forecast: not built, checked but not signed off, signed off, or lines to check again.
+  - Monitor: ahead of or behind the sign-off with any timing, or when it's first judged.
+  The same answer shows in the area's header. "Next" is the first of Set up, Forecast and Daily that has something to do, otherwise Monitor.
+- **The practice run goes through the menu.** Each step knows its area. Inside an area, the bar says when the next step is elsewhere and offers "Back to main menu". Leaving an area finishes the steps that are only a look (Check the sorting, Look back, What you could do), so the run can't loop. The menu lists all eight steps with ticks.

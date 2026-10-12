@@ -92,8 +92,8 @@ export function HistoryStep() {
       {h && tab === 'category' && <CategoryDeepDive h={h} />}
       {h && tab === 'recurring' && <RecurringView h={h} />}
       {h && tab === 'quality' && <DataQuality />}
-      {idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} text={<button className="link-btn" onClick={() => useStore.getState().goto('forecast')}>or skip to building the forecast</button>} />
-        : !workspace && <StepFooter nextLabel="Next: build the forecast" />}
+      {idx < TABS.length - 1 ? <NextTab label={`Next: ${TABS[idx + 1].label.toLowerCase()}`} onClick={() => setTab(TABS[idx + 1].id)} />
+        : !workspace && <StepFooter />}
     </div>
   );
 }

@@ -96,7 +96,7 @@ export function TeamFileMenu() {
 }
 
 export function SettingsMenu() {
-  const { showTips, setShowTips, advanced, setAdvanced, goto, cat, step, space, forgetWorkspace, exactAmounts, setExactAmounts } = useStore();
+  const { showTips, setShowTips, advanced, setAdvanced, goto, step, space, forgetWorkspace, exactAmounts, setExactAmounts } = useStore();
   const { open, el } = useOpenTeamFile();
   const save = useSaveTeamFile();
   // the file input lives outside the menu: the menu closes as the file chooser opens, and an input
@@ -111,13 +111,10 @@ export function SettingsMenu() {
         <div className="menu">
           <label className="menu-item check"><input type="checkbox" checked={showTips} onChange={(e) => setShowTips(e.target.checked)} /> Show explanations on every page</label>
           <label className="menu-item check" title="Every figure in pounds and pence, instead of £m and £k"><input type="checkbox" checked={exactAmounts} onChange={(e) => setExactAmounts(e.target.checked)} /> Show exact amounts (£ and pence)</label>
-          <label className="menu-item check" title="Column mapping, sorting rules, all transactions, backtesting, scenarios">
+          <label className="menu-item check" title="Extra steps inside each area: column mapping, sorting rules, all transactions, backtesting, scenarios">
             <input type="checkbox" checked={advanced} onChange={(e) => { setAdvanced(e.target.checked); if (!e.target.checked && ['map', 'categorise', 'backtest', 'data', 'settings'].includes(step)) goto('home'); }} /> Advanced tools
           </label>
-          {advanced && <>
-            <button className="menu-item" disabled={!cat} onClick={() => { close(); goto('data'); }}><i className="bi bi-list-ul" /> All transactions</button>
-            <button className="menu-item" onClick={() => { close(); goto('settings'); }}><i className="bi bi-sliders" /> Rules and settings</button>
-          </>}
+          {advanced && <div className="menu-note xs muted">Advanced steps appear inside each area: column mapping and rules under Set up and train, all transactions under Review history, testing under Forecast.</div>}
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => { close(); void save('download'); }}><i className="bi bi-download" /> Download a copy of your work</button>
           <button className="menu-item" onClick={() => { close(); void open(); }}><i className="bi bi-upload" /> Load a copy…</button>
