@@ -114,7 +114,7 @@ export function SettingsMenu() {
           <label className="menu-item check" title="Extra steps inside each area: column mapping, sorting rules, all transactions, backtesting, scenarios">
             <input type="checkbox" checked={advanced} onChange={(e) => { setAdvanced(e.target.checked); if (!e.target.checked && ['map', 'categorise', 'backtest', 'data', 'settings'].includes(step)) goto('home'); }} /> Advanced tools
           </label>
-          {advanced && <div className="menu-note xs muted">Advanced steps appear inside each area: column mapping and rules under Set up and train, all transactions under Review history, testing under Forecast.</div>}
+          {advanced && <div className="menu-note xs muted">Advanced steps appear inside each area: column mapping and categories under Set up and train, all transactions under Review history, testing under Forecast.</div>}
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => { close(); void save('download'); }}><i className="bi bi-download" /> Download a copy of your work</button>
           <button className="menu-item" onClick={() => { close(); void open(); }}><i className="bi bi-upload" /> Load a copy…</button>

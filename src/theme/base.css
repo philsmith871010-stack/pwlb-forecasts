@@ -1091,3 +1091,4 @@ details.more-detail { margin-top: 2px; }
 .practice-list .muted { color: rgba(255,255,255,.5); font-weight: 400; }
 .jobs.five .job.waiting { opacity: 1; }
 .jobs.five .job:disabled:hover { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.18); }
+.form-grid.rule-form { margin-top: 0; padding-top: 0; border-top: 0; }

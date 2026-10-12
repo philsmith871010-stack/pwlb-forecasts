@@ -3,6 +3,7 @@ import { useStore, StepId, streamOf, streamSteps } from '../state/store';
 import { useAreas } from './areas';
 import { historyDays, MIN_HISTORY_DAYS } from '../lib/history/cashHistory';
 import { PastDayPage } from './history/PastDay';
+import { RulesPage } from './steps/RulesPage';
 import { Toasts, Modal } from './components/common';
 import { LoadStep } from './steps/LoadStep';
 import { MonitorPage } from './steps/MonitorPage';
@@ -55,7 +56,7 @@ export function App() {
 
   const h = team.cashHistory ?? s.historyBase;
   const enabled = (id: StepId) => {
-    if (id === 'load' || id === 'save' || id === 'today' || id === 'home' || id === 'settings' || id === 'pastday') return true;
+    if (id === 'load' || id === 'save' || id === 'today' || id === 'home' || id === 'settings' || id === 'pastday' || id === 'rules') return true;
     if (id === 'map') return s.sources.length > 0;
     if (id === 'history') return !!cat || !!s.basis || historyDays(h) >= MIN_HISTORY_DAYS || !!team.historySummary;
     if (id === 'forecast') return true;
@@ -116,6 +117,7 @@ export function App() {
         {step === 'save' && <SaveStep />}
         {step === 'data' && <DataWorkspace />}
         {step === 'settings' && <SettingsView />}
+        {step === 'rules' && <RulesPage />}
         </>}
       </main>
       <Toasts />

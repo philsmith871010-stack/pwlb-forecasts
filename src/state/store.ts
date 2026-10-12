@@ -16,7 +16,7 @@ import { isoFromDay, addMonths, dayFromYMD, isBusinessDay, type Day } from '../l
 import { setExactAmounts as setExactAmountsFormat } from '../lib/format';
 import { TEAM_FILE_DEFAULT_NAME } from '../config';
 
-export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'history' | 'pastday' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today' | 'monitor';
+export type StepId = 'load' | 'map' | 'categorise' | 'review' | 'rules' | 'history' | 'pastday' | 'forecast' | 'backtest' | 'save' | 'data' | 'settings' | 'home' | 'today' | 'monitor';
 /** Full step list (advanced tools on). */
 export const STEPS: { id: StepId; label: string; sub: string; icon: string }[] = [
   { id: 'load', label: 'Add your data', sub: 'Bank statement files', icon: 'bi-cloud-arrow-up' },
@@ -51,7 +51,8 @@ export const STREAMS: Stream[] = [
     { id: 'map', label: 'Check the files', advanced: true },
     { id: 'categorise', label: 'Sorting results', advanced: true },
     { id: 'review', label: 'Check the sorting' },
-    { id: 'settings', label: 'Rules and settings', advanced: true },
+    { id: 'rules', label: 'Your sorting rules' },
+    { id: 'settings', label: 'Categories and settings', advanced: true },
   ] },
   { id: 'review', label: 'Review history', short: 'History', icon: 'bi-bar-chart-line', what: 'How your cash has behaved, and any past day.', steps: [
     { id: 'history', label: 'Look back' },

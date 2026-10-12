@@ -27,6 +27,9 @@ export interface Rule {
   createdAt?: string;
   hits?: number;
   note?: string;
+  /** the latest change, when someone edited it */
+  editedBy?: string;
+  editedAt?: string;
   /** starter rules are built in and not saved to the team file */
   source?: 'team' | 'starter' | 'session';
 }

@@ -536,3 +536,13 @@ Now each upload joins the history through `addToHistory`:
   - **Any other difference** (a fuller statement, such as the full day after a part day, or a correction): the file's figures are used, and the user is told so.
 - **The history now keeps a count of bank lines per account per day** (`lines`). That's only a number, with no amounts or narratives. It's what tells a part export from the same statement: a category's net total can rise as easily as fall when lines are dropped. Histories saved before this have no counts, so they compare the money moving that day instead.
 - The notice shows on Load statements (Set up and train) and on Today's statement (Daily).
+
+## Your sorting rules
+
+- **A step of its own,** in Set up and train after Check the sorting, so it's visible without Advanced tools. Before, the rules were only reachable as an advanced step, where a rule's category could be changed or the rule deleted, and that was all.
+- **The team's rules** are listed in plain words ("Description contains 'DWP HB SUBSIDY', money in, at least £1.0m"). Each shows the category it sorts into, who made or last changed it and when, and how many lines it sorted when statements were last loaded. They can be searched and filtered by category.
+- **Add or change a rule** (match type, words, category, money in or out, smallest and largest amount, note). A live preview shows how many lines in the loaded statements it matches, how many will move category, and the largest of them (`testRule` in the worker, `ruleMatcher` in the engine). An unusable rule (no words, an invalid pattern) can't be saved and says why. A new rule goes first, so it wins over older rules and the built-in ones. The lines are sorted again at once.
+- **Delete** asks first, and offers Undo, which puts the rule back where it was.
+- **Built-in rules** are listed read-only, with "Override", which makes a team rule from one.
+- **Bank file layouts** (how each bank's columns are read): each shows its date, description, amount and account columns, and can be renamed or deleted. Changing how a layout reads its columns still needs a file from that bank, on Check the files.
+- The advanced "Rules and settings" step is now "Categories and settings" (general settings, categories and aliases).

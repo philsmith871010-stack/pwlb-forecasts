@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '../../state/store';
 import { PageHead, Panel, Modal, Explain, StepTabs, useStepTab, TabDef } from '../components/common';
-import { RulesPanel } from './CategoriseStep';
 import { GROUP_LABELS, CategoryGroup, ForecastMethod, Category } from '../../lib/categories';
 import { uid } from '../../lib/model';
-import { ago } from '../../lib/format';
 
 const METHODS: ForecastMethod[] = ['seasonal', 'series', 'flat', 'manual', 'exclude'];
 
@@ -17,14 +15,12 @@ export function SettingsView() {
   const tabs: TabDef[] = [
     { id: 'general', label: 'General', icon: 'bi-building' },
     { id: 'categories', label: 'Categories', icon: 'bi-tags', badge: team.categories.length },
-    { id: 'rules', label: 'Rules', icon: 'bi-signpost', badge: team.rules.length || '' },
     { id: 'aliases', label: 'Aliases', icon: 'bi-link-45deg', badge: team.aliases.length || '' },
-    { id: 'banks', label: 'Bank layouts', icon: 'bi-bookmark', badge: team.bankProfiles.length || '' },
   ];
   const [tab, setTab] = useStepTab('settings', tabs);
   return (
     <div className="page">
-      <PageHead eyebrow="Advanced tools" title="Settings">Everything here is saved with your work in this browser.</PageHead>
+      <PageHead eyebrow="Advanced tools" title="Categories and settings">Everything here is saved with your work in this browser. Sorting rules and bank file layouts are under <strong>Your sorting rules</strong>.</PageHead>
       <StepTabs tabs={tabs} value={tab} onChange={setTab} numbered={false} />
       {tab === 'general' && <>
         <Explain compact what="Your council’s name, when its financial year starts, and the minimum cash buffer you want to keep." why="The buffer is the red line on the forecast: falling below it is what creates a borrowing need." />
@@ -63,27 +59,9 @@ export function SettingsView() {
         </div>
       </Panel>
       </>}
-      {tab === 'rules' && <>
-        <Explain compact what="Rules your team created in Review, and the built-in starter rules." why="Rules are how the tool remembers your decisions — each one sorts matching lines automatically next time." todo="Change a rule’s category or delete it if it’s wrong." />
-        <RulesEditor />
-        <div className="mt"><RulesPanel /></div>
-      </>}
       {tab === 'aliases' && <>
         <Explain compact what="Different spellings of the same counterparty, e.g. “P.W.L.B” and “PUBLIC WORKS LOAN” both meaning PWLB." why="Spellings are made the same before rules run, so one rule covers them all." />
         <AliasesPanel />
-      </>}
-      {tab === 'banks' && <>
-        <Explain compact what="Saved bank file layouts. A file whose column headings match is read with no checking needed." todo="Delete a layout if your bank changed its export format." />
-        <div style={{ maxWidth: 760 }}>
-        <Panel title="Saved bank layouts" sub={`${team.bankProfiles.length}`}>
-          {team.bankProfiles.length === 0 ? <p className="small muted">Save one from the Mapping step.</p> : (
-            <ul className="list-plain small">{team.bankProfiles.map((p) => (
-              <li key={p.id} className="row tight"><i className="bi bi-bookmark orange" /><span style={{ flex: 1 }}>{p.name}<div className="xs muted mono ellipsis" style={{ maxWidth: 260 }} title={p.headerSignature}>{p.headerSignature}</div></span>
-                <button className="icon-btn" aria-label={`Delete ${p.name}`} onClick={() => updateTeam((t) => ({ ...t, bankProfiles: t.bankProfiles.filter((x) => x.id !== p.id) }))}><i className="bi bi-trash" /></button></li>
-            ))}</ul>
-          )}
-        </Panel>
-        </div>
       </>}
       {merge && (
         <Modal title={`Merge “${merge.name}” into…`} onClose={() => setMerge(null)} footer={<><button className="btn" onClick={() => setMerge(null)}>Cancel</button>
@@ -96,29 +74,6 @@ export function SettingsView() {
         </Modal>
       )}
     </div>
-  );
-}
-
-function RulesEditor() {
-  const { team, updateTeam } = useStore();
-  if (!team.rules.length) return null;
-  return (
-    <Panel title="Edit team rules" sub="delete or change what a rule does" flush>
-      <div className="tbl-wrap">
-        <table className="tbl">
-          <thead><tr><th>Pattern</th><th>Type</th><th>Category</th><th>Created</th><th className="num">Hits</th><th /></tr></thead>
-          <tbody>{team.rules.map((r) => (
-            <tr key={r.id}>
-              <td className="mono xs">{r.pattern}</td><td className="xs">{r.type}</td>
-              <td><select className="select sm" value={r.categoryId} onChange={(e) => updateTeam((t) => ({ ...t, rules: t.rules.map((x) => (x.id === r.id ? { ...x, categoryId: e.target.value } : x)) }), { recategorise: true })}>{team.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></td>
-              <td className="xs muted">{r.createdBy ?? '—'} · {r.createdAt ? ago(r.createdAt) : ''}</td>
-              <td className="num">{r.hits ?? 0}</td>
-              <td><button className="icon-btn" aria-label="Delete rule" onClick={() => updateTeam((t) => ({ ...t, rules: t.rules.filter((x) => x.id !== r.id) }), { recategorise: true })}><i className="bi bi-trash" /></button></td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-    </Panel>
   );
 }
 

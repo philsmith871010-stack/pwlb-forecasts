@@ -113,4 +113,14 @@ describe('loading what is already loaded', async () => {
     expect(r.overlap.same).toBeGreaterThan(20);
     expect(net(r.history)).toBeCloseTo(net(withOct), 2);
   });
+
+  it('a file overlapping days already held still adds its new days, even when its old days are a part export', async () => {
+    const lines = [...csv(ds, octFrom, octTo, { every: 2 }).trim().split('\n'), ...csv(ds, `${y}-11-01`, `${y}-11-30`).trim().split('\n').slice(1)];
+    const r = addToHistory(withOct, await read('oct-part-nov.csv', lines.join('\n') + '\n', withOct));
+    expect(r.kept).toBeGreaterThan(10);
+    expect(r.overlap.fresh).toBeGreaterThan(20);
+    // October as saved, November added: the same as loading November alone
+    const novOnly = addToHistory(withOct, await read('nov.csv', csv(ds, `${y}-11-01`, `${y}-11-30`), withOct)).history;
+    expect(net(r.history)).toBeCloseTo(net(novOnly), 2);
+  });
 });

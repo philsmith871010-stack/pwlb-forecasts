@@ -8,7 +8,7 @@ import { detectMapping, DetectionReport, ColumnMapping } from '../lib/ingest/det
 import { ingest, Dataset, IngestSource } from '../lib/ingest/ingest';
 import {
   categorise, CatConfig, CatResult, rowKey, SPECIAL_RULE_LABELS, DEAL_NO, DEAL_SUSPECTED, CONF_LOW,
-  F_DEAL_LIKE_OP, F_LOAN_PAIR, F_OUTLIER, F_SINGLE, F_LARGE, FLAG_LABELS,
+  F_DEAL_LIKE_OP, F_LOAN_PAIR, F_OUTLIER, F_SINGLE, F_LARGE, FLAG_LABELS, ruleMatcher,
 } from '../lib/categorise/engine';
 import { computeAccuracy, AccuracyReport } from '../lib/categorise/accuracy';
 import { buildBasis, ForecastBasis, Aggregates } from '../lib/analysis/aggregates';
@@ -20,6 +20,7 @@ import type { IngestSummary, CatSummary, TxnRow, ReviewGroup, DealQueue, TxnFilt
 import { readRegisterWorkbook, registerFromSnapshot, LoadedRegister, REG } from '../lib/register';
 import { registerEvents, registerAccounts, liquidBalances, toDay, CashEvent } from '../lib/register/cashflows';
 import { fromSession, type CashHistory } from '../lib/history/cashHistory';
+import type { Rule } from '../lib/model';
 
 let ds: Dataset | null = null;
 let res: CatResult | null = null;
@@ -398,6 +399,22 @@ const api = {
     const rows: TxnRow[] = [];
     for (let k = offset; k < Math.min(idx.length, offset + limit); k++) rows.push(row(idx[k]));
     return { total: idx.length, rows, sumIn, sumOut };
+  },
+
+  /** The lines in this session a rule would match: how many, how many it would move to another category, and the largest. */
+  testRule(rule: Rule, limit = 8): { matches: number; changes: number; total: number; examples: TxnRow[] } {
+    const d = need(ds, 'Data'), r = need(res, 'Categorisation');
+    const m = ruleMatcher(rule);
+    const ci = r.catIds.indexOf(rule.categoryId);
+    const hit: number[] = [];
+    let changes = 0, total = 0;
+    for (let i = 0; i < d.n; i++) {
+      if (!m(r.signatures[r.sig[i]], d.amount[i])) continue;
+      hit.push(i); total += Math.abs(d.amount[i]);
+      if (r.cat[i] !== ci) changes++;
+    }
+    hit.sort((a, b) => Math.abs(d.amount[b]) - Math.abs(d.amount[a]));
+    return { matches: hit.length, changes, total, examples: hit.slice(0, limit).map(row) };
   },
 
   rowsForSignature(sigIdx: number, limit = 2000): TxnRow[] {

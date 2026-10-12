@@ -158,6 +158,21 @@ function compileRule(r: Rule): (sig: string) => boolean {
   }
 }
 
+/** Whether a rule matches a line: its pattern on the line's signature, and its conditions on the amount. */
+export function ruleMatcher(r: Rule): (signature: string, amount: number) => boolean {
+  const test = compileRule(r);
+  return (s, a) => test(s)
+    && !(r.direction === 'in' && a < 0) && !(r.direction === 'out' && a >= 0)
+    && !(r.minAmount != null && Math.abs(a) < r.minAmount) && !(r.maxAmount != null && Math.abs(a) > r.maxAmount);
+}
+
+/** A rule's pattern that can't be used (an invalid advanced pattern), or null. */
+export function ruleProblem(r: Pick<Rule, 'type' | 'pattern'>): string | null {
+  if (!r.pattern.trim()) return 'Type the words to look for.';
+  if (r.type === 'regex') { try { new RegExp(r.pattern, 'i'); } catch (e) { return `That pattern isn’t valid: ${(e as Error).message}`; } }
+  return null;
+}
+
 function median(a: number[]): number {
   if (!a.length) return 0;
   const s = a.slice().sort((x, y) => x - y);
