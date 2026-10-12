@@ -452,3 +452,9 @@ Walked through as someone deciding in ten minutes whether to buy. Changes:
   - the Known items practice note only asks for the register when it isn't added;
   - the report and Excel descriptions and the Today tip are shorter.
 - The register card no longer says the options cover "for how long" (a benchmark leftover).
+
+## Published on GitHub Pages
+
+- **The site is published on GitHub Pages** from this repo (now public) by `.github/workflows/pages.yml`: on every push to `main` it installs, runs the tests, builds and deploys `dist`. A failing test stops the deploy.
+- **The build uses relative paths** (`base: './'` in `vite.config.ts`), so the same build works at a site's root or under `/pwlb-forecasts/`. It was checked from a sub-path with the production security policy: the worker, the example files, the register template, the forecast and the report all work.
+- **Nothing changes about the data:** the site is static files. Bank data is still read in the visitor's browser and kept there; the page's security policy still only lets it talk to its own origin.

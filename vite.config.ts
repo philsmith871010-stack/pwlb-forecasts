@@ -10,6 +10,8 @@ const strictCsp = (): Plugin => ({
 });
 
 export default defineConfig({
+  // relative paths: the same build works at a site's root or under a path, e.g. GitHub Pages' /pwlb-forecasts/
+  base: './',
   plugins: [react(), strictCsp()],
   worker: { format: 'es' },
   build: { target: 'es2022', chunkSizeWarningLimit: 4000 },
