@@ -76,6 +76,10 @@ describe('main menu', () => {
     const r = run({ history: h, forecasts: [checked], active: [so], tracking: { rec: so, r: null } });
     expect(r.by.forecast).toMatchObject({ tone: 'done', status: '“Base” signed off' });
     expect(r.by.monitor).toMatchObject({ locked: null, tone: 'waiting', status: 'First judged at the end of Apr 2026' });
+    // a day's statement later, it still counts as signed off: no daily re-sign-off
+    const dayOn = run({ history: history('2021-04-01', '2026-04-01'), expected: D('2026-04-01'), forecasts: [checked], active: [so], tracking: { rec: so, r: null } });
+    expect(dayOn.by.forecast).toMatchObject({ tone: 'done', status: '“Base” signed off' });
+    expect(dayOn.by.forecast.detail).toMatch(/Sign off again within a month/);
     // two months on: the lines' checks no longer hold, and the sign-off is of an earlier start
     const later = run({ history: history('2021-04-01', '2026-05-29'), expected: D('2026-05-29'), forecasts: [checked], active: [so], tracking: { rec: so, r: null } });
     expect(later.by.forecast).toMatchObject({ tone: 'action', status: 'Lines to check again' });

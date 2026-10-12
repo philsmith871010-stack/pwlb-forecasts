@@ -1,7 +1,7 @@
 // Payment conventions: learned from a payment's past dates, then used for its future ones, with
 // weekends and bank holidays where real councils' payments fall.
 import { describe, it, expect } from 'vitest';
-import { dateFor, detectConvention, conventionWords, parseConvention, conventionToken, type Convention } from '../src/lib/forecast/conventions';
+import { dateFor, detectConvention, conventionWords, parseConvention, conventionToken, timingRuleWords, type Convention } from '../src/lib/forecast/conventions';
 import { dayFromYMD, isoFromDay, isBusinessDay } from '../src/lib/dates';
 import { projectDates } from '../src/lib/forecast/engine';
 
@@ -84,5 +84,15 @@ describe('payment conventions', () => {
     // the old rule (no convention) rolled money out back into the month before
     const old = projectDates({ ...s, convention: null }, days[days.length - 1], dayFromYMD(2025, 12, 31));
     expect(old.filter((d, k) => d !== next[k]).length).toBeGreaterThan(2);
+  });
+});
+
+describe('timing changes in words', () => {
+  it('describes each rule, the payment conventions included', () => {
+    expect(timingRuleWords({ rule: 'last_working_day' })).toBe('on the last working day');
+    expect(timingRuleWords({ rule: 'weekday', weekday: 5 })).toBe('on Fridays');
+    expect(timingRuleWords({ rule: 'day_of_month', dayOfMonth: 15 })).toBe('on day 15');
+    expect(timingRuleWords({ rule: 'convention', convention: 'dom:15:next' })).toBe('on the 15th, or the next working day if that isn’t one');
+    expect(timingRuleWords({ rule: 'convention', convention: 'weekday:2:2' })).toBe('on the second Tuesday');
   });
 });

@@ -171,9 +171,9 @@ export function ForecastStep() {
               <button className="btn sm on-dark" title="Download chart as SVG" onClick={() => chartRef.current && void exportChart(chartRef.current, `forecast-${sc.name}`, 'svg')}>SVG</button>
             </> : <button className="btn sm on-dark" title="Download this chart as a picture" onClick={() => chartRef.current && void exportChart(chartRef.current, `forecast-${sc.name}`, 'png')}><i className="bi bi-image" /> Save picture</button>}>
             <ForecastChart b={b} granularity={gran} historyMonths={histMonths} height={460} onReady={(c) => { chartRef.current = c; }} />
-            {advanced && <div className="row xs muted">
+            {(advanced || fc.breaches.length > 0) && <div className="row xs muted">
               <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(253,126,20,.3)' }} />shaded: the likely range — it widens because the further ahead, the less certain</span>
-              <span className="legend-dot"><span style={{ color: 'var(--pt-orange)' }}>◆</span> a change or one-off you added</span>
+              {fc.markers.some((m) => m.kind !== 'treasury') && <span className="legend-dot"><span style={{ color: 'var(--pt-orange)' }}>◆</span> a change or one-off you added</span>}
               {fc.breaches.length > 0 && <span className="legend-dot"><span className="swatch" style={{ background: 'rgba(176,70,50,.25)' }} />below your minimum cash</span>}
             </div>}
           </Panel>

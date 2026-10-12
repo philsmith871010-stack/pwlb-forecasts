@@ -153,7 +153,18 @@ const api = {
     const q = (v: string) => (/[",]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const iso = isoFromDay(day);
     const lines = ['Date,Account Number,Description,Amount'];
-    for (let i = 0; i < tmp.n; i++) if (tmp.day[i] === day) lines.push([`${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`, tmp.accounts[tmp.account[i]], q(tmp.narratives[tmp.narr[i]]), tmp.amount[i].toFixed(2)].join(','));
+    const row = (acct: string, narr: string, amt: number) => [`${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`, acct, q(narr), amt.toFixed(2)].join(',');
+    let dup = -1;
+    for (let i = 0; i < tmp.n; i++) {
+      if (tmp.day[i] !== day) continue;
+      lines.push(row(tmp.accounts[tmp.account[i]], tmp.narratives[tmp.narr[i]], tmp.amount[i]));
+      // a supplier payment to show as paid twice
+      const a = -tmp.amount[i];
+      if (a >= 5_000 && a <= 400_000 && !/SAL|PAY|HMRC|PENSION|LOAN|PWLB|DMO|MMF|FUND|TRF|TRANSFER/i.test(tmp.narratives[tmp.narr[i]]) && (dup < 0 || a > -tmp.amount[dup])) dup = i;
+    }
+    // so the practice run has exceptions to look at: that payment twice, and a payee never paid before
+    if (dup >= 0) lines.push(row(tmp.accounts[tmp.account[dup]], tmp.narratives[tmp.narr[dup]], tmp.amount[dup]));
+    lines.push(row(tmp.accounts[0], 'BACS ZENITH INTERIM CONSULTING LTD', -64_500));
     const name = `northbridge_statement_${iso}.csv`;
     const text = lines.join('\n') + '\n';
     demoFiles.set(name, text);

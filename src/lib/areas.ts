@@ -88,14 +88,19 @@ export function computeAreas({ history: h, expected, forecasts, rules: allRules,
   // ---- Forecast
   const fcs = forecasts;
   const start = span ? isoFromDay(span.to + 1) : '';
-  // a sign-off of the forecast as it now starts (the day after the latest statement)
-  const signedNow = active.filter((x) => x.start === start).sort((a, z) => z.signedAt.localeCompare(a.signedAt))[0];
+  // a recent sign-off: of the forecast as it now starts (the day after the latest statement), or
+  // from no more than a month of statements ago. A day's statement shouldn't ask for a new sign-off;
+  // a month's worth should, as the lines' checks lapse then too.
+  const signedNow = span ? active.filter((x) => !x.id.startsWith('so_example_') && x.start <= start && span.to + 1 - dayFromISO(x.start) <= CHECKS_HOLD_DAYS)
+    .sort((a, z) => z.start.localeCompare(a.start) || z.signedAt.localeCompare(a.signedAt))[0] : undefined;
   const lastSigned = [...active].filter((x) => !x.id.startsWith('so_example_')).sort((a, z) => z.signedAt.localeCompare(a.signedAt))[0];
   const checked = fcs.filter((f) => f.reviewDone && f.reviewFor && span && span.to - dayFromISO(f.reviewFor) <= CHECKS_HOLD_DAYS && span.to >= dayFromISO(f.reviewFor));
   const forecast: AreaState = !enough
     ? { id: 'forecast', locked: NEED_HISTORY, tone: 'locked', status: 'Locked', detail: '', entry: 'forecast' }
     : signedNow
-      ? { id: 'forecast', locked: null, tone: 'done', status: `“${signedNow.scenarioName}” signed off`, detail: `${day(dayFromISO(signedNow.signedAt.slice(0, 10)))} by ${signedNow.signedBy}: may need to borrow ${money(signedNow.borrowingNeed)}`, entry: 'forecast' }
+      ? { id: 'forecast', locked: null, tone: 'done', status: `“${signedNow.scenarioName}” signed off`, detail: signedNow.start === start
+        ? `${day(dayFromISO(signedNow.signedAt.slice(0, 10)))} by ${signedNow.signedBy}: may need to borrow ${money(signedNow.borrowingNeed)}`
+        : `From ${day(dayFromISO(signedNow.start))}, by ${signedNow.signedBy}. Sign off again within a month of new statements.`, entry: 'forecast' }
       : checked.length
         ? { id: 'forecast', locked: null, tone: 'action', status: 'Checked, not signed off', detail: lastSigned ? `New statements since “${lastSigned.scenarioName}” was signed off: sign off again to monitor the latest.` : `“${checked[0].name}” is ready: see it and sign it off.`, entry: 'forecast' }
         : fcs.some((f) => f.reviewDone)

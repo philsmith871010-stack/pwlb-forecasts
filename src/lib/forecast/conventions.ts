@@ -115,3 +115,11 @@ export function detectConvention(days: ArrayLike<number>, sign = -1): { conventi
   }
   return best && best.share >= MIN_SHARE ? { convention: best.convention, share: best.share } : null;
 }
+
+/** A timing change's rule in words, e.g. "on the last working day", "on Fridays", "on the 2nd Tuesday". */
+export function timingRuleWords(a: { rule: 'last_working_day' | 'day_of_month' | 'weekday' | 'convention'; dayOfMonth?: number; weekday?: number; convention?: string }): string {
+  if (a.rule === 'last_working_day') return 'on the last working day';
+  if (a.rule === 'weekday') return `on ${WEEKDAYS[a.weekday ?? 5]}s`;
+  if (a.rule === 'convention') { const c = parseConvention(a.convention); return c ? conventionWords(c) : 'on its usual days'; }
+  return `on day ${a.dayOfMonth}`;
+}

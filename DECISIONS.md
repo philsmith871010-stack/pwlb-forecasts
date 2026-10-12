@@ -587,3 +587,11 @@ Now each upload joins the history through `addToHistory`:
 - **Each exception is marked Checked** (with an optional note) **or Query raised** (with a reason), with who and when. A name is required first, so the record is an audit trail. Reviews are kept in the team file under a hash of the line, with no bank details. The latest for each counts, and copies merge like sign-offs. The log, with each exception's line and status, downloads as CSV.
 - **Daily's card and header** say "N exceptions to check", and Daily opens on them. Today's statement points to them after a day is read.
 - **This is a detective control on bank statements,** alongside purchase-to-pay controls (invoices, approvals), not instead of them. The page says so.
+
+## Audit fixes (intuitive, accurate, polished)
+
+- **A sign-off stays "done" on the main menu for a month of new statements.** Before, adding one day's statement turned Forecast back into "sign off again". That would have asked for a fresh sign-off every day. Now a sign-off counts while it starts no more than 31 days before the latest statement, the same window as the lines' checks. Past that, the menu asks again.
+- **The practice run shows Exceptions.** The example's daily statement now includes a supplier payment made twice and a payment to a new payee, so step 7 has two exceptions to look at. The practice checks them as "You (practice)", as it signs off, without keeping that as your name.
+- **"Home" wording replaced by "main menu"** on Monitor, which picks the sign-off the menu and Daily report on.
+- **The board report describes payment-convention timing changes** ("on the 15th, or the next working day if that isn't one"). It used to print "day undefined". The forecast's list of changes uses the same words (`timingRuleWords`).
+- **Polish:** the active area or step pill no longer turns blank on hover. The red shading below minimum cash is explained under the forecast chart. The "minimum cash" label moved off the past line. The Exceptions filters are hidden when there's nothing to filter, and the small selects keep room for their arrow. On a phone, the A4 board report shrinks to fit the screen (printing is unchanged), and exception lines drop the account column so the amounts fit.

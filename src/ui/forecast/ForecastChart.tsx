@@ -67,7 +67,7 @@ export function ForecastChart({ b, granularity, historyMonths = 24, height = 420
         },
         {
           name: fcName, type: 'line', data: fcVals, showSymbol: false, lineStyle: { width: 2.6, color: '#fd7e14', type: 'dashed' }, itemStyle: { color: '#fd7e14' }, sampling: 'lttb',
-          markLine: { silent: true, symbol: 'none', data: [{ yAxis: fc.buffer, lineStyle: { color: '#b04632', type: 'dashed', width: 1.5 }, label: { formatter: `minimum cash ${money(fc.buffer)}`, position: 'insideStartTop', color: '#b04632', fontSize: 10.5 } }] },
+          markLine: { silent: true, symbol: 'none', data: [{ yAxis: fc.buffer, lineStyle: { color: '#b04632', type: 'dashed', width: 1.5 }, label: { formatter: `minimum cash ${money(fc.buffer)}`, position: 'insideEndTop', color: '#b04632', fontSize: 10.5 } }] },
           markPoint: {
             symbol: 'circle', symbolSize: 10,
             data: [

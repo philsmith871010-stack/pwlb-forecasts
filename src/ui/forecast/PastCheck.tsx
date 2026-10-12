@@ -55,7 +55,7 @@ export function PastCheck({ sc }: { sc: Scenario }) {
 }
 
 /** Your signed-off forecasts, newest first, each against what has happened since. */
-/** Which sign-off Home and Today's statement report on: this one, or (the default) the newest with a month of statements. */
+/** Which sign-off the main menu and Today's statement report on: this one, or (the default) the newest with a month of statements. */
 function HomeChoice({ id, tracked }: { id: string; tracked: boolean }) {
   const chosen = useStore((s) => s.team.settings.trackedSignOff);
   const updateTeam = useStore((s) => s.updateTeam);
@@ -63,10 +63,10 @@ function HomeChoice({ id, tracked }: { id: string; tracked: boolean }) {
   return (
     <div className="xs">
       {chosen === id
-        ? <><i className="bi bi-house-door-fill" /> Home reports on this one, as your team chose. <button className="link-btn" onClick={() => set(undefined)}>Go back to the newest</button></>
+        ? <><i className="bi bi-grid-3x3-gap-fill" /> The main menu and Daily report on this one, as your team chose. <button className="link-btn" onClick={() => set(undefined)}>Go back to the newest</button></>
         : tracked
-          ? <><i className="bi bi-house-door" /> Home reports on this one: the newest with a month of statements. <button className="link-btn" onClick={() => set(id)}>Keep reporting on it</button></>
-          : <button className="link-btn" onClick={() => set(id)}><i className="bi bi-house-door" /> Report on this one on Home</button>}
+          ? <><i className="bi bi-grid-3x3-gap" /> The main menu and Daily report on this one: the newest with a month of statements. <button className="link-btn" onClick={() => set(id)}>Keep reporting on it</button></>
+          : <button className="link-btn" onClick={() => set(id)}>Report on this one on the main menu</button>}
     </div>
   );
 }
@@ -78,7 +78,7 @@ function WithdrawButton({ rec }: { rec: SignedForecast }) {
     let reason = '';
     const yes = await askConfirm({
       title: `Withdraw “${rec.scenarioName}”, signed off ${day(dayFromISO(rec.signedAt.slice(0, 10)))}?`,
-      body: 'It’s no longer compared with what happens, or reported on Home. Nothing is deleted: it stays in the team file, marked withdrawn by you, and you can restore it under Withdrawn.',
+      body: 'It’s no longer compared with what happens, or reported on the main menu. Nothing is deleted: it stays in the team file, marked withdrawn by you, and you can restore it under Withdrawn.',
       ok: 'Withdraw', danger: true,
       note: { label: 'Why', placeholder: 'e.g. signed off by mistake; replaced by the mid-year review', onValue: (v) => { reason = v; } },
     });
@@ -86,7 +86,7 @@ function WithdrawButton({ rec }: { rec: SignedForecast }) {
     changeSignOff(rec.id, 'withdraw', reason);
     toast('Withdrawn. You can restore it under Withdrawn on this page.');
   };
-  return <div className="xs"><button className="link-btn muted" onClick={() => void go()}><i className="bi bi-x-circle" /> Withdraw this sign-off</button></div>;
+  return <div className="xs"><button className="link-btn muted" onClick={() => void go()}>Withdraw this sign-off</button></div>;
 }
 
 /** Sign-offs withdrawn, with who withdrew them, when and why; each can be restored. */
@@ -154,7 +154,7 @@ function SignedView({ sc }: { sc: Scenario }) {
       <div className="signed-list" role="radiogroup" aria-label="Signed-off forecast">
         {shown.map((x) => (
           <button key={x.id} role="radio" aria-checked={x.id === rec.id} className={x.id === rec.id ? 'on' : ''} onClick={() => setId(x.id)}>
-            <strong>{x.scenarioName}{x.id === tracked?.rec.id && list.length > 1 && <i className="bi bi-house-door xs muted" title="The one Home reports on" style={{ marginLeft: 6 }} />}</strong>
+            <strong>{x.scenarioName}{x.id === tracked?.rec.id && list.length > 1 && <i className="bi bi-grid-3x3-gap xs muted" title="The one the main menu reports on" style={{ marginLeft: 6 }} />}</strong>
             <span>From {day(dayFromISO(x.start))} · borrow {money(x.borrowingNeed)}</span>
             <span>Signed off {signedWhen(x)} · {x.signedBy}</span>
             {x.note && <span className="signed-note" title={x.note}>“{x.note}”</span>}

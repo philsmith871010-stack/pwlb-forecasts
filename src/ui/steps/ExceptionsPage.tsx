@@ -11,7 +11,9 @@ import { downloadText } from '../../lib/teamfile';
 const LABEL = Object.fromEntries(EXCEPTION_KINDS.map((k) => [k.kind, k.label])) as Record<ExceptionKind, string>;
 
 export function ExceptionsPage() {
-  const { exceptions, ingest, team, updateTeam, user, setUser } = useStore();
+  const { exceptions, ingest, team, updateTeam, user, setUser, space } = useStore();
+  // the practice run checks as "You (practice)", as it signs off, without keeping it as your name
+  const who = user.trim() || (space === 'example' ? 'You (practice)' : '');
   const [show, setShow] = useState<'open' | 'all'>('open');
   const [kind, setKind] = useState<ExceptionKind | ''>('');
   const reviews = useMemo(() => latestReviews(team.exceptionReviews), [team.exceptionReviews]);
@@ -19,7 +21,7 @@ export function ExceptionsPage() {
   const open = list.filter((e) => !reviews.get(e.key));
   const shown = (show === 'open' ? open : list).filter((e) => !kind || e.kind === kind);
   const review = (e: ExceptionView, status: ExceptionReview['status'], note?: string) =>
-    updateTeam((t) => ({ ...t, exceptionReviews: [...(t.exceptionReviews ?? []), { key: e.key, status, by: user.trim(), at: new Date().toISOString(), note: note || undefined }] }));
+    updateTeam((t) => ({ ...t, exceptionReviews: [...(t.exceptionReviews ?? []), { key: e.key, status, by: who, at: new Date().toISOString(), note: note || undefined }] }));
   const exportLog = () => {
     const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const rows = [['Type', 'Date', 'Payee', 'Amount', 'Account', 'Why', 'Status', 'By', 'When', 'Note'].join(',')];
@@ -40,7 +42,7 @@ export function ExceptionsPage() {
         <>
           <div className="exc-top">
             <div className="small">From the statements read: <strong>{day(ingest.minDay)}</strong>{ingest.maxDay > ingest.minDay && <> to <strong>{day(ingest.maxDay)}</strong></>}, {int(ingest.rows)} lines. <strong>{int(open.length)}</strong> to check{list.length > open.length && <>, {int(list.length - open.length)} done</>}.</div>
-            <div className="row tight">
+            {list.length > 0 && <div className="row tight">
               <div className="seg" role="radiogroup" aria-label="Show">
                 <button role="radio" aria-checked={show === 'open'} className={show === 'open' ? 'on' : ''} onClick={() => setShow('open')}>To check ({open.length})</button>
                 <button role="radio" aria-checked={show === 'all'} className={show === 'all' ? 'on' : ''} onClick={() => setShow('all')}>All ({list.length})</button>
@@ -50,15 +52,15 @@ export function ExceptionsPage() {
                 {EXCEPTION_KINDS.map((k) => { const n = list.filter((e) => e.kind === k.kind).length; return n ? <option key={k.kind} value={k.kind}>{k.label} ({n})</option> : null; })}
               </select>
               <button className="btn sm ghost" onClick={exportLog} disabled={!list.length}><i className="bi bi-download" /> Download the log</button>
-            </div>
+            </div>}
           </div>
-          {list.length > 0 && !user.trim() && (
+          {list.length > 0 && !who && (
             <div className="callout small mb"><label htmlFor="exc-who"><strong>Your name</strong>, recorded on each check and query:</label>{' '}
               <input id="exc-who" className="input sm" style={{ width: 220 }} value={user} onChange={(e) => setUser(e.target.value)} placeholder="Name or initials" /></div>
           )}
           {!list.length ? <div className="callout green small"><i className="bi bi-check2-circle" /> Nothing unusual in these statements.</div>
             : !shown.length ? <div className="callout green small"><i className="bi bi-check2-circle" /> Every exception {kind ? 'of this type ' : ''}has been looked at.</div>
-            : <div className="stack" style={{ gap: 10 }}>{shown.map((e) => <ExceptionCard key={e.key} e={e} r={reviews.get(e.key)} named={!!user.trim()} onReview={(s, n) => review(e, s, n)} />)}</div>}
+            : <div className="stack" style={{ gap: 10 }}>{shown.map((e) => <ExceptionCard key={e.key} e={e} r={reviews.get(e.key)} named={!!who} onReview={(s, n) => review(e, s, n)} />)}</div>}
           <Thresholds />
         </>
       )}

@@ -1,4 +1,5 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { timingRuleWords } from '../../lib/forecast/conventions';
 import { useStore } from '../../state/store';
 import { STRATEGY_CAVEAT } from '../../lib/forecast/strategy';
 import { EChart, axisMoney } from '../components/EChart';
@@ -89,7 +90,7 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
     switch (a.kind) {
       case 'growth': return `${catName(a.categoryId)}: ${a.pct >= 0 ? '+' : ''}${a.pct}% a year (${a.mode === 'annual_step' ? 'from each April' : 'steady'})`;
       case 'step': return `${catName(a.categoryId)}: ${a.pct >= 0 ? '+' : ''}${a.pct}% from ${day(dayFromISO(a.effective))}${a.backdateFrom ? `, backdated to ${day(dayFromISO(a.backdateFrom))}` : ''}`;
-      case 'timing': return `${catName(a.categoryId)}${a.signature ? ` (${a.signature.replace(/\S*#\S*/g, '').trim()})` : ''}: paid on ${a.rule === 'last_working_day' ? 'the last working day' : a.rule === 'weekday' ? `${['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'][a.weekday ?? 5]}` : `day ${a.dayOfMonth}`} from ${day(dayFromISO(a.from))}`;
+      case 'timing': return `${catName(a.categoryId)}${a.signature ? ` (${a.signature.replace(/\S*#\S*/g, '').trim()})` : ''}: paid ${timingRuleWords(a)} from ${day(dayFromISO(a.from))}`;
       case 'stop': return `${catName(a.categoryId)}${a.signature ? `: ${a.signature.replace(/\S*#\S*/g, '').trim()} removed` : ' stops'} from ${day(dayFromISO(a.from))}`;
       case 'start': return `New ${a.cadence.replace('_', '-')} ${money(a.amount)} in ${catName(a.categoryId)} from ${day(dayFromISO(a.from))}`;
       case 'inflation': return `Inflation +${a.pct}% a year on ${a.categoryIds.length} categories`;
@@ -107,9 +108,10 @@ export function ReportView({ b, backtest }: { b: ForecastBundle; backtest: () =>
     fc.drivers.length ? <>The biggest reasons for the fall are {fc.drivers.map((d) => d.name.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' and $1')}.</> : null,
     fc.treasuryDaily.some((v) => v) ? <>After known treasury commitments the position at {fmtDay(horizonEnd)} is <strong>{money(fc.cumulativeAfterTreasury[fc.H - 1])}</strong>.</> : null,
   ].filter(Boolean);
+  const fitRef = useFitPages();
   const common = { total: 7, head: s.advanced ? `${team.authorityName} · ${sc.name} scenario` : team.authorityName, foot: `Prepared ${prepared}${s.user ? ` by ${s.user}` : ''}` };
   return (
-    <div className="r-doc">
+    <div className="r-doc" ref={fitRef}>
       {/* 1 ---------------------------------------------------------------- cover */}
       <RPage {...common} n={1} cover>
         <div className="r-cover-band">
@@ -362,4 +364,17 @@ function ReportChart({ b, height, showHistory }: { b: ForecastBundle; height: nu
     };
   }, [b, showHistory]);
   return <EChart option={option} height={height} />;
+}
+
+/** On a narrow screen, shrink the A4 pages to fit the width (printing is unaffected). */
+function useFitPages() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const fit = () => { const w = el.clientWidth - 16, page = 794; el.style.setProperty('--r-zoom', String(w > 0 && w < page ? Math.max(0.3, w / page) : 1)); };
+    const ro = new ResizeObserver(fit); ro.observe(el); fit();
+    return () => ro.disconnect();
+  }, []);
+  return ref;
 }
