@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import { PageHead, Progress } from '../components/common';
-import { DayCard } from '../history/HistoryCards';
+import { DayCard, AlreadyLoaded } from '../history/HistoryCards';
 import { EarlyCheck } from '../forecast/EarlyCheck';
 import { SortCard, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
@@ -40,6 +40,8 @@ export function TodayPage() {
       )}
 
       {!busy && !short && <TodayDrop onFiles={read} onPick={space === 'example' ? () => void useExampleStatement() : undefined} />}
+
+      {!busy && (short || readHere) && <div className="mb"><AlreadyLoaded /></div>}
 
       {!busy && long && readHere && (
         <div className="callout mt small">That covers <strong>{day(ingest!.minDay)}</strong> to <strong>{day(ingest!.maxDay)}</strong>, more than a few days, so it has gone straight into your history. To check how it was sorted, use <strong>Set up and train</strong> from the main menu.</div>

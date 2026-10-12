@@ -45,6 +45,11 @@ export interface CashHistory {
   accounts: HistoryAccount[];
   /** per account (same order as `accounts`): flat [day, cat index, kind, pence, …] */
   cells: number[][];
+  /**
+   * per account (same order as `accounts`): flat [day, number of bank lines, …]. Just a count, so a
+   * statement loaded again can be told from a part export of it. Missing in histories saved before.
+   */
+  lines?: number[][];
   series: HistorySeries[];
 }
 
@@ -73,6 +78,7 @@ export function fromSession(ds: Dataset, res: CatResult, knownSeries: { sig: str
   const knownOcc = new Map<string, HistorySeries>();
 
   const cellMaps = ds.accounts.map(() => new Map<string, number>()); // `${day}|${cat}|${kind}` → pence
+  const lineMaps = ds.accounts.map(() => new Map<Day, number>());
   const span = ds.accounts.map(() => ({ from: Infinity, to: -Infinity, flow: 0 }));
   for (let i = 0; i < ds.n; i++) {
     const a = ds.account[i], day = ds.day[i], amt = ds.amount[i];
@@ -92,6 +98,7 @@ export function fromSession(ds: Dataset, res: CatResult, knownSeries: { sig: str
     else kind = K_OP;
     const k = `${day}|${c}|${kind}`;
     cellMaps[a].set(k, (cellMaps[a].get(k) ?? 0) + pence(amt));
+    lineMaps[a].set(day, (lineMaps[a].get(day) ?? 0) + 1);
     // occurrences of regular payments
     if (kind === K_OP) {
       const ss = res.series[i] >= 0 ? sessionSeries.get(res.series[i]) : undefined;
@@ -126,7 +133,8 @@ export function fromSession(ds: Dataset, res: CatResult, knownSeries: { sig: str
     const cur = series.get(key);
     if (cur) cur.occ.push(...s.occ); else series.set(key, { ...s, occ: [...s.occ] });
   }
-  return { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, series: [...series.values()].filter((s) => s.occ.length) };
+  const lines = lineMaps.map((m) => [...m].flat());
+  return { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, lines, series: [...series.values()].filter((s) => s.occ.length) };
 }
 
 // ---------------------------------------------------------------- merging
@@ -160,9 +168,10 @@ export function mergeHistory(base: CashHistory | null, add: CashHistory): { hist
   const catIx = (id: string) => { let i = cats.indexOf(id); if (i < 0) { cats.push(id); i = cats.length - 1; } return i; };
   const accounts: HistoryAccount[] = base.accounts.map((a) => ({ ...a, ranges: a.ranges.map((r) => [r[0], r[1]] as [Day, Day]) }));
   const cells: number[][] = base.cells.map((c) => [...c]);
+  const lines: number[][] = base.accounts.map((_, i) => [...(base.lines?.[i] ?? [])]);
   const acctIx = (key: string) => {
     let i = accounts.findIndex((a) => a.key === key);
-    if (i < 0) { accounts.push({ key, ranges: [], opening: null, openingDay: null, closing: null, closingDay: null }); cells.push([]); i = accounts.length - 1; }
+    if (i < 0) { accounts.push({ key, ranges: [], opening: null, openingDay: null, closing: null, closingDay: null }); cells.push([]); lines.push([]); i = accounts.length - 1; }
     return i;
   };
   const addIx = add.accounts.map((a) => acctIx(a.key));
@@ -180,6 +189,9 @@ export function mergeHistory(base: CashHistory | null, add: CashHistory): { hist
     const src = add.cells[j];
     for (let k = 0; k < src.length; k += 4) kept.push(src[k], catIx(add.cats[src[k + 1]]), src[k + 2], src[k + 3]);
     cells[i] = kept;
+    const keptLines: number[] = [];
+    for (let k = 0; k < lines[i].length; k += 2) if (!inRanges(lines[i][k], a.ranges)) keptLines.push(lines[i][k], lines[i][k + 1]);
+    lines[i] = [...keptLines, ...(add.lines?.[j] ?? [])];
     // gaps between what was held and what's added
     const lastHeld = was.ranges.length ? Math.max(...was.ranges.map((r) => r[1])) : null;
     for (const [f, t] of a.ranges) {
@@ -206,7 +218,7 @@ export function mergeHistory(base: CashHistory | null, add: CashHistory): { hist
     if (cur) cur.occ = [...cur.occ, ...occ].sort((a, b) => a[0] - b[0]);
     else series.set(key, { ...s, occ });
   }
-  return { history: { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, series: [...series.values()] }, report };
+  return { history: { v: 1, updatedAt: new Date().toISOString(), cats, accounts, cells, lines, series: [...series.values()] }, report };
 }
 
 // ---------------------------------------------------------------- back to a forecast basis
@@ -332,6 +344,7 @@ export const historyBytes = (h: CashHistory) => JSON.stringify(h).length;
 export function historyBefore(h: CashHistory, day: Day): CashHistory {
   const accounts: HistoryAccount[] = [];
   const cells: number[][] = [];
+  const lines: number[][] = [];
   h.accounts.forEach((a, i) => {
     const keep: number[] = [];
     let removed = 0;
@@ -349,8 +362,177 @@ export function historyBefore(h: CashHistory, day: Day): CashHistory {
       closingDay: a.closingDay !== null ? Math.min(a.closingDay, last) : null,
     });
     cells.push(keep);
+    const l = h.lines?.[i] ?? [];
+    const kl: number[] = [];
+    for (let k = 0; k < l.length; k += 2) if (l[k] < day) kl.push(l[k], l[k + 1]);
+    lines.push(kl);
   });
   const acctMap = new Map(h.accounts.map((a, i) => [i, accounts.findIndex((x) => x.key === a.key)]));
   const series = h.series.map((s) => ({ ...s, occ: s.occ.filter(([d]) => d < day).map(([d, p, a]) => [d, p, acctMap.get(a)!] as [Day, number, number]) })).filter((s) => s.occ.length);
-  return { ...h, updatedAt: new Date().toISOString(), accounts, cells, series };
+  return { ...h, updatedAt: new Date().toISOString(), accounts, cells, lines: h.lines ? lines : undefined, series };
+}
+
+// ---------------------------------------------------------------- loading what's already loaded
+
+/** per account key: day → { net, gross } in pence, from the daily totals */
+function dayTotals(h: CashHistory): Map<string, Map<Day, { net: number; gross: number }>> {
+  const out = new Map<string, Map<Day, { net: number; gross: number }>>();
+  h.accounts.forEach((a, i) => {
+    const m = new Map<Day, { net: number; gross: number }>();
+    const cells = h.cells[i] ?? [];
+    for (let k = 0; k < cells.length; k += 4) {
+      const t = m.get(cells[k]) ?? { net: 0, gross: 0 };
+      t.net += cells[k + 3]; t.gross += Math.abs(cells[k + 3]);
+      m.set(cells[k], t);
+    }
+    out.set(a.key, m);
+  });
+  return out;
+}
+
+/**
+ * The same bank account under another name. A file with no account number is named after the
+ * file, so the same statement saved as "export (2).csv" would otherwise become a second account
+ * and be counted twice. A new account in `add` is the saved account whose days it shares match
+ * figure for figure (most of them, and at least three), or, with no days in common, whose regular
+ * payees are mostly its own. Returns `add` with those accounts renamed.
+ */
+export function matchAccounts(base: CashHistory, add: CashHistory): { add: CashHistory; matched: { from: string; to: string; why: string }[] } {
+  const known = new Set(base.accounts.map((a) => a.key));
+  const bt = dayTotals(base), at = dayTotals(add);
+  const matched: { from: string; to: string; why: string }[] = [];
+  const rename = new Map<string, string>();
+  const taken = new Set(add.accounts.filter((a) => known.has(a.key)).map((a) => a.key));
+  add.accounts.forEach((a, ai) => {
+    if (known.has(a.key)) return;
+    const mine = at.get(a.key)!;
+    let best: { key: string; why: string; score: number } | null = null;
+    for (const b of base.accounts) {
+      if (taken.has(b.key)) continue;
+      const theirs = bt.get(b.key)!;
+      let shared = 0, same = 0;
+      for (const [d, t] of mine) {
+        if (!b.ranges.some(([f, to]) => d >= f && d <= to)) continue;
+        shared++;
+        const s = theirs.get(d);
+        if (s && Math.abs(s.net - t.net) <= 100 && Math.abs(s.gross - t.gross) <= 100) same++;
+      }
+      if (shared >= 3 && same / shared >= 0.8) {
+        const score = 1 + same / shared;
+        if (!best || score > best.score) best = { key: b.key, why: `the same figures on ${same} of the ${shared} days you'd already loaded`, score };
+        continue;
+      }
+      if (shared) continue;
+      // no days in common: the regular payees
+      const bi = base.accounts.indexOf(b);
+      const theirSigs = new Set(base.series.filter((s) => s.occ.some((o) => o[2] === bi)).map((s) => s.sig));
+      const mySigs = new Set(add.series.filter((s) => s.occ.some((o) => o[2] === ai)).map((s) => s.sig));
+      if (mySigs.size < 3) continue;
+      const inter = [...mySigs].filter((s) => theirSigs.has(s)).length / mySigs.size;
+      if (inter >= 0.6 && (!best || inter > best.score)) best = { key: b.key, why: `${Math.round(inter * 100)}% of its regular payments are that account's`, score: inter };
+    }
+    if (best) { rename.set(a.key, best.key); taken.add(best.key); matched.push({ from: a.key, to: best.key, why: best.why }); }
+  });
+  if (!rename.size) return { add, matched };
+  return { add: { ...add, accounts: add.accounts.map((a) => (rename.has(a.key) ? { ...a, key: rename.get(a.key)! } : a)) }, matched };
+}
+
+/** How a new file's days compare with the days the history already held for the same account. */
+export interface OverlapReport {
+  /** days already held with the same figures: nothing changes */
+  same: number;
+  /** days already held with different figures; `less`: the file has fewer bank lines that day than were saved (or, without counts, less money moving) */
+  changed: { account: string; day: Day; saved: number; file: number; savedLines?: number; fileLines?: number; less: boolean }[];
+  /** days not held before */
+  fresh: number;
+}
+
+export function compareOverlap(base: CashHistory | null, add: CashHistory): OverlapReport {
+  const r: OverlapReport = { same: 0, changed: [], fresh: 0 };
+  const bt = base ? dayTotals(base) : new Map<string, Map<Day, { net: number; gross: number }>>();
+  const at = dayTotals(add);
+  const counts = (h: CashHistory | null, key: string) => {
+    const i = h ? h.accounts.findIndex((x) => x.key === key) : -1;
+    const l = i >= 0 ? h!.lines?.[i] : undefined;
+    if (!l) return null;
+    const m = new Map<Day, number>();
+    for (let k = 0; k < l.length; k += 2) m.set(l[k], l[k + 1]);
+    return m;
+  };
+  add.accounts.forEach((a) => {
+    const savedLines = counts(base, a.key), fileLines = counts(add, a.key);
+    const held = base?.accounts.find((b) => b.key === a.key);
+    const theirs = bt.get(a.key), mine = at.get(a.key)!;
+    for (const [f, t] of a.ranges) for (let d = f; d <= t; d++) {
+      if (!held || !held.ranges.some(([x, y]) => d >= x && d <= y)) { if (mine.has(d)) r.fresh++; continue; }
+      const s = theirs?.get(d) ?? { net: 0, gross: 0 }, n = mine.get(d) ?? { net: 0, gross: 0 };
+      if (!s.gross && !n.gross) continue;
+      // fewer bank lines than were saved (or, for histories saved before lines were counted, less money moving)
+      const sl = savedLines?.get(d), fl = fileLines?.get(d) ?? 0;
+      const sameFigures = Math.abs(s.net - n.net) <= 100 && Math.abs(s.gross - n.gross) <= 100;
+      if (sameFigures && (sl === undefined || sl === fl)) r.same++;
+      else r.changed.push({ account: a.key, day: d, saved: s.gross / 100, file: n.gross / 100, savedLines: sl, fileLines: sl !== undefined ? fl : undefined, less: sl !== undefined ? fl < sl : n.gross < s.gross - 100 });
+    }
+  });
+  return r;
+}
+
+/** `add` without some days of some accounts (by key), so a merge keeps what was saved for them. */
+export function withoutDays(add: CashHistory, drop: Map<string, Set<Day>>): CashHistory {
+  if (!drop.size) return add;
+  const accounts = add.accounts.map((a) => {
+    const d = drop.get(a.key);
+    if (!d?.size) return a;
+    const ranges: [Day, Day][] = [];
+    for (const [f, t] of a.ranges) {
+      let s: Day | null = null;
+      for (let x = f; x <= t + 1; x++) {
+        const keep = x <= t && !d.has(x);
+        if (keep && s === null) s = x;
+        if (!keep && s !== null) { ranges.push([s, x - 1]); s = null; }
+      }
+    }
+    return { ...a, ranges };
+  });
+  const cells = add.cells.map((c, i) => {
+    const d = drop.get(add.accounts[i].key);
+    if (!d?.size) return c;
+    const out: number[] = [];
+    for (let k = 0; k < c.length; k += 4) if (!d.has(c[k])) out.push(c[k], c[k + 1], c[k + 2], c[k + 3]);
+    return out;
+  });
+  const lines = add.lines?.map((l, i) => {
+    const d = drop.get(add.accounts[i].key);
+    if (!d?.size) return l;
+    const out: number[] = [];
+    for (let k = 0; k < l.length; k += 2) if (!d.has(l[k])) out.push(l[k], l[k + 1]);
+    return out;
+  });
+  const series = add.series.map((s) => ({ ...s, occ: s.occ.filter(([day, , ai]) => !drop.get(add.accounts[ai].key)?.has(day)) })).filter((s) => s.occ.length);
+  return { ...add, accounts: accounts.filter((a) => a.ranges.length), cells: cells.filter((_, i) => accounts[i].ranges.length), lines: lines?.filter((_, i) => accounts[i].ranges.length), series: reindexSeries(series, accounts) };
+}
+
+/** series' account indexes after accounts with nothing left were dropped */
+function reindexSeries(series: HistorySeries[], accounts: HistoryAccount[]): HistorySeries[] {
+  const map: number[] = [];
+  let j = 0;
+  accounts.forEach((a, i) => { map[i] = a.ranges.length ? j++ : -1; });
+  return series.map((s) => ({ ...s, occ: s.occ.filter(([, , ai]) => map[ai] >= 0).map(([d, p, ai]) => [d, p, map[ai]] as [Day, number, number]) })).filter((s) => s.occ.length);
+}
+
+/**
+ * A session's history joined to the saved one without counting anything twice: accounts matched
+ * to the saved ones they are, and days already held compared. Identical days change nothing;
+ * days where this file has less money moving than was saved (a part export, say) keep what was
+ * saved unless `useFileFor` says otherwise; other differences (a fuller or corrected statement)
+ * take the file's figures.
+ */
+export function addToHistory(base: CashHistory | null, session: CashHistory, useFile = false): { history: CashHistory; report: MergeReport; overlap: OverlapReport; matched: { from: string; to: string; why: string }[]; kept: number } {
+  const { add, matched } = base ? matchAccounts(base, session) : { add: session, matched: [] };
+  const overlap = compareOverlap(base, add);
+  const keep = new Map<string, Set<Day>>();
+  if (!useFile) for (const c of overlap.changed) if (c.less) { if (!keep.has(c.account)) keep.set(c.account, new Set()); keep.get(c.account)!.add(c.day); }
+  const kept = [...keep.values()].reduce((t, s) => t + s.size, 0);
+  const { history, report } = mergeHistory(base, withoutDays(add, keep));
+  return { history, report, overlap, matched, kept };
 }

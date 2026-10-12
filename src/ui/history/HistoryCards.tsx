@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { engine } from '../../worker/client';
 import type { TxnRow } from '../../worker/types';
-import { historySpan, historyBytes, type CashHistory } from '../../lib/history/cashHistory';
+import { historySpan, historyBytes, type CashHistory, type OverlapReport } from '../../lib/history/cashHistory';
 import { money, day, int } from '../../lib/format';
 import { Money, CatBadge } from '../components/common';
 import { isBusinessDay, dayFromISO } from '../../lib/dates';
@@ -22,12 +22,10 @@ export function HistoryAddedNote({ gapsOnly }: { gapsOnly?: boolean } = {}) {
   if (!r || !h || !historyBase) return null;
   const span = historySpan(h);
   const from = Math.min(...r.added.map((x) => x.from)), to = Math.max(...r.added.map((x) => x.to));
-  const replaced = r.added.reduce((t, x) => t + x.replacedDays, 0);
   const n = workingDays(from, to);
   return (
     <>
-      {!gapsOnly && <li><i className="bi bi-clock-history" /> Added {n <= 1 ? <strong>{day(from)}</strong> : <><strong>{day(from)}</strong> to <strong>{day(to)}</strong> ({int(n)} working days)</>} to your saved history{span ? <>, which now runs {day(span.from)} to {day(span.to)}</> : ''}.
-        {replaced > 0 && <span className="muted"> {int(replaced)} day{replaced > 1 ? 's' : ''} you’d loaded before {replaced > 1 ? 'were' : 'was'} replaced by these files, so nothing is counted twice.</span>}</li>}
+      {!gapsOnly && <li><i className="bi bi-clock-history" /> Added {n <= 1 ? <strong>{day(from)}</strong> : <><strong>{day(from)}</strong> to <strong>{day(to)}</strong> ({int(n)} working days)</>} to your saved history{span ? <>, which now runs {day(span.from)} to {day(span.to)}</> : ''}.</li>}
       {r.gaps.map((g, i) => (
         <li key={i} className="warn"><i className="bi bi-exclamation-triangle" /> Nothing has been loaded for account <strong>{g.account}</strong> between {day(g.from)} and {day(g.to)} ({int(workingDays(g.from, g.to))} working days). If money moved then, add that statement too.</li>
       ))}
@@ -160,4 +158,37 @@ function useWide(px: number): boolean {
     return () => m.removeEventListener('change', on);
   }, [q]);
   return wide;
+}
+
+/** What happened to days that were already in the history: nothing counted twice, and why. */
+export function AlreadyLoaded() {
+  const a = useStore((s) => s.historyAdd);
+  const useFileFigures = useStore((s) => s.useFileFigures);
+  const ingest = useStore((s) => s.ingest);
+  if (!a || !ingest) return null;
+  const { overlap: o, matched, kept } = a;
+  const held = o.same + o.changed.length;
+  if (!held && !matched.length) return null;
+  const span = <><strong>{day(ingest.minDay)}</strong>{ingest.maxDay > ingest.minDay ? <> to <strong>{day(ingest.maxDay)}</strong></> : null}</>;
+  const less = o.changed.filter((c) => c.less), more = o.changed.filter((c) => !c.less);
+  const eg = (c: OverlapReport['changed'][number]) => c.savedLines !== undefined && c.savedLines !== c.fileLines
+    ? `${day(c.day)}, account ${c.account}: ${int(c.savedLines)} line${c.savedLines === 1 ? '' : 's'} saved, ${int(c.fileLines ?? 0)} in this file`
+    : `${day(c.day)}, account ${c.account}: ${money(c.saved)} moved in your saved history, ${money(c.file)} in this file`;
+  const days = (n: number) => `${int(n)} day${n === 1 ? '' : 's'}`;
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      {matched.map((m) => (
+        <div key={m.from} className="callout navy small"><i className="bi bi-link-45deg" /> This file had no account number we knew, but it’s account <strong>{m.to}</strong> ({m.why}), so it’s been counted as that account, not a new one.</div>
+      ))}
+      {held > 0 && !o.fresh && !o.changed.length
+        ? <div className="callout green small"><i className="bi bi-check2-circle" /> <strong>Already loaded.</strong> Every day in this file ({span}) was already in your history with the same figures. Nothing was added or counted twice.</div>
+        : o.same > 0 && <div className="callout navy small"><i className="bi bi-check2-circle" /> {days(o.same)} in this file {o.same === 1 ? 'was' : 'were'} already in your history with the same figures, so {o.same === 1 ? 'it was' : 'they were'} left as {o.same === 1 ? 'it was' : 'they were'}{o.fresh ? <>; {days(o.fresh)} {o.fresh === 1 ? 'was' : 'were'} new and added</> : ''}. Nothing is counted twice.</div>}
+      {kept > 0 && (
+        <div className="callout small"><i className="bi bi-exclamation-triangle" /> <strong>{days(kept)} already loaded {kept === 1 ? 'has' : 'have'} fewer bank lines in this file than you loaded before</strong> (e.g. {eg(less[0])}). It looks like a part export, so your saved figures were kept for {kept === 1 ? 'that day' : 'those days'}.{' '}
+          <button className="link-btn" onClick={useFileFigures}>Use this file’s figures instead</button></div>
+      )}
+      {!kept && less.length > 0 && <div className="callout small"><i className="bi bi-info-circle" /> This file’s figures were used for {days(less.length)} that had more in your saved history (e.g. {eg(less[0])}), as you chose.</div>}
+      {more.length > 0 && <div className="callout small"><i className="bi bi-info-circle" /> {days(more.length)} you’d loaded before {more.length === 1 ? 'has' : 'have'} different figures in this file, so this file’s were used (e.g. {eg(more[0])}). Nothing is counted twice.</div>}
+    </div>
+  );
 }

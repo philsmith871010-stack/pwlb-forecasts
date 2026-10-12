@@ -520,3 +520,19 @@ Users could get lost: the header listed every job, and 31 links on pages jumped 
   - Monitor: ahead of or behind the sign-off with any timing, or when it's first judged.
   The same answer shows in the area's header. "Next" is the first of Set up, Forecast and Daily that has something to do, otherwise Monitor.
 - **The practice run goes through the menu.** Each step knows its area. Inside an area, the bar says when the next step is elsewhere and offers "Back to main menu". Leaving an area finishes the steps that are only a look (Check the sorting, Look back, What you could do), so the run can't loop. The menu lists all eight steps with ticks.
+
+## Loading statements that are already loaded
+
+Tested with real files, before this change:
+- **The same statement again, under any name:** already safe. The days it covers replaced the same days, rather than being added.
+- **A part export of days already loaded** (half October's lines): it **replaced the full days**, losing money (net £7.56m became £2.40m), with only a "days replaced" note.
+- **A file with no account number column:** the account was named after the file, so the same statement under another name became **a second account and was counted twice**.
+
+Now each upload joins the history through `addToHistory`:
+- **The same account is recognised** (`matchAccounts`) when a new account's days match a saved account's figure for figure: most of the days they share, and at least three. With no days in common, it's recognised when most of its regular payments are that account's. It's then counted as that account, and the user is told which and why.
+- **Days already held are compared** (`compareOverlap`):
+  - **Identical** (same figures and same number of bank lines): nothing changes, and it says "Already loaded".
+  - **Fewer bank lines than were saved** (a part export): the saved days are kept, and the user is warned with an example day and "Use this file's figures instead".
+  - **Any other difference** (a fuller statement, such as the full day after a part day, or a correction): the file's figures are used, and the user is told so.
+- **The history now keeps a count of bank lines per account per day** (`lines`). That's only a number, with no amounts or narratives. It's what tells a part export from the same statement: a category's net total can rise as easily as fall when lines are dropped. Histories saved before this have no counts, so they compare the money moving that day instead.
+- The notice shows on Load statements (Set up and train) and on Today's statement (Daily).

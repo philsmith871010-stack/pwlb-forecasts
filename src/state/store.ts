@@ -8,7 +8,7 @@ import type { IngestSummary, CatSummary, RegisterInfo } from '../worker/types';
 import { signForecast, knownItemsOf, rollForward, type SignedForecast } from '../lib/forecast/signoff';
 import { exampleSignOffs } from '../lib/forecast/exampleSignoffs';
 import type { ForecastResult } from '../lib/forecast/engine';
-import { mergeHistory, basisFromHistory, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport } from '../lib/history/cashHistory';
+import { addToHistory, basisFromHistory, historyDays, MIN_HISTORY_DAYS, type CashHistory, type MergeReport, type OverlapReport } from '../lib/history/cashHistory';
 import type { Aggregates, ForecastBasis } from '../lib/analysis/aggregates';
 import { engine, proxy } from '../worker/client';
 import type { GeneratorOptions } from '../generator';
@@ -140,6 +140,8 @@ interface State {
   historyBase: CashHistory | null;
   /** what adding this session's files to the history did */
   historyReport: MergeReport | null;
+  /** how the latest files joined the saved history (for "already loaded" and the part-export choice) */
+  historyAdd: { base: CashHistory; session: CashHistory; overlap: OverlapReport; matched: { from: string; to: string; why: string }[]; kept: number } | null;
   /** looking at the saved history alone, without loading bank files */
   historyOnly: boolean;
   registerBusy: boolean;
@@ -197,6 +199,7 @@ interface Actions {
   runIngest: () => Promise<boolean>;
   runCategorise: () => Promise<void>;
   useSavedHistory: () => void;
+  useFileFigures: () => void;
   forgetHistory: () => void;
   saveTeam: (mode?: 'save' | 'saveAs' | 'download') => Promise<void>;
   resolveMerge: (apply: boolean) => Promise<void>;
@@ -281,6 +284,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   register: null,
   historyBase: null,
   historyReport: null,
+  historyAdd: null,
   historyOnly: false,
   registerBusy: false,
   registerError: null,
@@ -334,7 +338,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     // example data doesn't belong to a real team file, and a team file with its own cash history
     // starts afresh: show what it holds and where to add new statements
     const fresh = !!get().demo || get().sources.some((x) => x.demo) || !!r.team.cashHistory;
-    set({ team: r.team, teamName: name, teamHandle: handle, teamLoadedHash: teamHash(text), teamLoadedSavedAt: r.team.savedAt, dirty: false, sessionChanges: [], activeScenarioId: r.team.forecasts[0]?.id ?? null, historyBase: r.team.cashHistory ?? null, historyReport: null, historyOnly: false });
+    set({ team: r.team, teamName: name, teamHandle: handle, teamLoadedHash: teamHash(text), teamLoadedSavedAt: r.team.savedAt, dirty: false, sessionChanges: [], activeScenarioId: r.team.forecasts[0]?.id ?? null, historyBase: r.team.cashHistory ?? null, historyReport: null, historyAdd: null, historyOnly: false });
     if (fresh) set((s) => ({ sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, ingestError: null, register: s.register?.example ? null : s.register }));
     persistTeam(text);
     // re-match bank profiles for sources already added
@@ -344,7 +348,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
   startFresh: (authority) => {
     const t = emptyTeamFile(authority);
-    set({ team: t, teamName: null, teamHandle: null, teamLoadedHash: null, teamLoadedSavedAt: null, dirty: true, sessionChanges: [], activeScenarioId: null, historyBase: null, historyReport: null, historyOnly: false });
+    set({ team: t, teamName: null, teamHandle: null, teamLoadedHash: null, teamLoadedSavedAt: null, dirty: true, sessionChanges: [], activeScenarioId: null, historyBase: null, historyReport: null, historyAdd: null, historyOnly: false });
   },
 
   updateTeam: (fn, opts) => {
@@ -461,7 +465,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       const team = cachedTeam(ws);
       set({
         space: ws, team, teamName: null, teamHandle: null, dirty: false, sessionChanges: [], activeScenarioId: team.forecasts[0]?.id ?? null,
-        historyBase: team.cashHistory ?? null, historyReport: null, historyOnly: false,
+        historyBase: team.cashHistory ?? null, historyReport: null, historyAdd: null, historyOnly: false,
         sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, ingestError: null,
       });
     }
@@ -501,7 +505,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     const team = emptyTeamFile(ws === 'example' ? 'Northbridge Council (example)' : undefined);
     if (ws === 'example') { lsSet('cfi.practice', '[]'); set({ practiceSeen: [] }); }
     keepRegister(ws, null);
-    set({ team, historyBase: null, historyReport: null, historyOnly: false, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, activeScenarioId: null, sessionChanges: [] });
+    set({ team, historyBase: null, historyReport: null, historyAdd: null, historyOnly: false, sources: [], ingest: null, cat: null, agg: null, basis: null, demo: null, register: null, activeScenarioId: null, sessionChanges: [] });
   },
 
   loadRegisterFile: async (f) => {
@@ -591,7 +595,11 @@ export const useStore = create<State & Actions>((set, get) => ({
       const base = hb && (hb.example ? accts.length > 0 && accts.every((a) => hb.accounts.some((x) => x.key === a)) : !isDemo) ? hb : null;
       const session = await engine().sessionHistory(base?.series.map(({ sig, cat, dir }) => ({ sig, cat, dir })) ?? []);
       const example = isDemo || !!base?.example;
-      const { history, report } = mergeHistory(base, { ...session, example: example || undefined });
+      // nothing counted twice: the same account under another name is matched, days already held
+      // with the same figures change nothing, and a file with less on a day than was saved (a part
+      // export) doesn't replace it unless the user says so
+      const added = addToHistory(base, { ...session, example: example || undefined });
+      const { history, report } = added;
       history.example = example || undefined;
       if (base) basis = basisFromHistory(history, summary.catIds) ?? basis;
       // a saved history these files can't join is left exactly as it was
@@ -600,6 +608,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       const hits = new Map(summary.ruleHits.map((h) => [h.id, h.hits]));
       set((s) => ({
         cat: summary, basis, agg: basis.agg, catBusy: null, catVersion: s.catVersion + 1, historyReport: keepSaved ? null : report, historyOnly: false,
+        historyAdd: keepSaved || !base ? null : { base, session: { ...session, example: example || undefined }, overlap: added.overlap, matched: added.matched, kept: added.kept },
         team: { ...s.team, cashHistory: keepSaved ? hb! : history, forecasts: rolled(s.team.forecasts, basis.dataEnd), rules: s.team.rules.map((r) => (hits.has(r.id) ? { ...r, hits: hits.get(r.id) } : r)) },
       }));
       // the example: its treasury team signed off two forecasts in the past year
@@ -619,6 +628,17 @@ export const useStore = create<State & Actions>((set, get) => ({
     }
   },
 
+  // the user prefers this file's figures for the days it has less on than was saved
+  useFileFigures: () => {
+    const a = get().historyAdd;
+    if (!a) return;
+    const { history, report, overlap, matched } = addToHistory(a.base, a.session, true);
+    history.example = a.session.example;
+    const basis = basisFromHistory(history, get().cat?.catIds ?? get().team.categories.map((c) => c.id));
+    set((s) => ({ team: { ...s.team, cashHistory: history }, historyReport: report, historyAdd: { ...a, overlap, matched, kept: 0 }, ...(basis ? { basis, agg: basis.agg } : {}), catVersion: s.catVersion + 1, dirty: true }));
+    persistTeam(JSON.stringify(get().team));
+  },
+
   useSavedHistory: () => {
     const h = get().historyBase;
     if (!h) return;
@@ -630,7 +650,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
 
   forgetHistory: () => {
-    set((s) => ({ historyBase: null, historyReport: null, historyOnly: false, team: { ...s.team, cashHistory: undefined }, dirty: true }));
+    set((s) => ({ historyBase: null, historyReport: null, historyAdd: null, historyOnly: false, team: { ...s.team, cashHistory: undefined }, dirty: true }));
     persistTeam(JSON.stringify(get().team));
   },
 

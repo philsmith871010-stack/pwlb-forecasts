@@ -5,7 +5,7 @@ import { downloadBlob } from '../../lib/teamfile';
 import { bytes, day, int, pctDone } from '../../lib/format';
 import { VOLUME_PRESETS, VolumePreset, DEFAULT_GENERATOR_OPTIONS, GeneratorOptions } from '../../generator';
 import { engine } from '../../worker/client';
-import { HistoryAddedNote } from '../history/HistoryCards';
+import { HistoryAddedNote, AlreadyLoaded } from '../history/HistoryCards';
 import { AddMoreFiles } from '../components/AddMoreFiles';
 
 export function LoadStep() {
@@ -146,6 +146,7 @@ function DoneCard() {
         {advanced && ingest.rejectsTotal > 0 && <li className="muted"><i className="bi bi-info-circle" /> {int(ingest.rejectsTotal)} lines were skipped, such as totals rows or lines without a date. <button className="link-btn" onClick={async () => downloadBlob(await engine().rejectLogBlob(), 'skipped-lines.csv')}>See which</button></li>}
         {needCheck.length > 0 && <li className="warn"><i className="bi bi-exclamation-triangle" /> {needCheck.length} file{needCheck.length > 1 ? 's have' : ' has'} an unusual layout. <button className="link-btn" onClick={() => goto('map')}>Check {needCheck.length > 1 ? 'them' : 'it'}</button></li>}
       </ul>
+      <AlreadyLoaded />
       <div className="done-next">
         <span className="muted">{toCheck > 0 ? '' : 'Everything was sorted confidently.'}</span>
         <button className="btn primary lg" onClick={() => { setStepTab('review', 'overview'); goto('review'); }}>Next: check the sorting <i className="bi bi-arrow-right" /></button>
