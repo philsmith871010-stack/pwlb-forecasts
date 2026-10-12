@@ -2,7 +2,20 @@
 // recompute on every keystroke. Every number traces back to: historic data (profile, series),
 // an assumption, a pasted schedule or a one-off the user entered.
 
-import { type Arrival, DUE_MATCH_DAYS } from './early';
+import type { Arrival } from './early';
+
+/** A regular payment's projected date an early arrival stands in for: within this many days of the due date it was given. */
+export const DUE_MATCH_DAYS = 10;
+
+/**
+ * When a payment confirmed as late came in: the first time it shows after its due date (within an
+ * interval and a half of it), from the days it shows in the statements. Null while it hasn't.
+ */
+export function lateArrivedOn(days: ArrayLike<number>, a: Pick<Arrival, 'due'>, cadence?: string): Day | null {
+  const due = dayFromISO(a.due), I = ({ monthly: 30.44, quarterly: 91.3, half_yearly: 182.6, annual: 365.25 } as Record<string, number>)[cadence ?? 'monthly'] ?? 30.44;
+  for (let k = 0; k < days.length; k++) if (days[k] > due - 2 && days[k] <= due + 1.5 * I) return days[k];
+  return null;
+}
 import type { Category, ForecastMethod } from '../categories';
 import type { Assumption, ForecastSettings, OneOff, PastedSchedule, TreasuryItem, GrowthMode, GridOverride } from '../model';
 import type { ForecastBasis, SeriesBasis } from '../analysis/aggregates';
@@ -449,7 +462,9 @@ export function runForecast(req: ForecastRequest): ForecastResult {
         let projected = 0, next: Day | null = null;
         // the user may have said when this payment is made
         const tm = [...req.assumptions].reverse().find((a) => a.kind === 'timing' && a.signature === s.signature && a.categoryId === id) as Extract<Assumption, { kind: 'timing' }> | undefined;
-        if (s.active && last >= dataEnd - 400) {
+        // a payment confirmed as late is still a regular payment, however long since it last came
+        const stillComing = (req.arrivals ?? []).some((a) => a.answer === 'late' && a.kind === 'series' && a.signature === s.signature && a.categoryId === id);
+        if ((s.active || stillComing) && last >= dataEnd - 400) {
           let anchor = last;
           if (tm?.rule === 'weekday' && tm.weekday !== undefined) {
             // weekly-type payments: re-anchor on the nearest chosen weekday, keeping the rhythm
@@ -458,6 +473,15 @@ export function runForecast(req: ForecastRequest): ForecastResult {
             anchor = last + delta;
           }
           const sched = tm && tm.rule !== 'weekday' ? { ...s, lastWorkingDay: tm.rule === 'last_working_day', dayOfMonth: tm.rule === 'day_of_month' ? tm.dayOfMonth ?? s.dayOfMonth : s.dayOfMonth } : s;
+          // payments confirmed as late (still coming): once one has come, the ones after follow on
+          // from the date it was due, so a late payment doesn't push the next one out
+          const lates = (req.arrivals ?? []).filter((a) => a.answer === 'late' && a.kind === 'series' && a.signature === s.signature && a.categoryId === id);
+          const pending: Day[] = [];
+          for (const a of lates) {
+            const came = lateArrivedOn(s.days, a, s.cadence), due = dayFromISO(a.due);
+            if (came === null) pending.push(Math.max(start, dayFromISO(a.day)));
+            else if (came === last && due < anchor) anchor = due;
+          }
           const dates = projectDates(sched, anchor, end).filter((d) => d > last);
           // the user may have removed this payment from a date
           const stopS = [...req.assumptions].reverse().find((a) => a.kind === 'stop' && a.signature === s.signature && a.categoryId === id) as Extract<Assumption, { kind: 'stop' }> | undefined;
@@ -466,6 +490,14 @@ export function runForecast(req: ForecastRequest): ForecastResult {
           if (!rowArr) { rowArr = new Float64Array(H); if (!seriesRows.has(c)) seriesRows.set(c, new Map()); seriesRows.get(c)!.set(s.signature, rowArr); }
           // payments that already arrived early, for a due date near one of these
           const early = (req.arrivals ?? []).filter((a) => a.answer === 'early' && a.kind === 'series' && a.signature === s.signature && a.categoryId === id).map((a) => dayFromISO(a.due));
+          // late ones not in yet: on the day now expected (or the first day, if that's passed)
+          for (const day of pending) {
+            if (day > end || day >= stopDay) continue;
+            const amt = level * G(last, day);
+            put(c, day, amt);
+            if (day - start < H) rowArr[day - start] += amt;
+            projected += amt;
+          }
           for (const due of dates) {
             const ei = early.findIndex((d) => Math.abs(d - due) <= DUE_MATCH_DAYS);
             if (ei >= 0) { early.splice(ei, 1); continue; }
@@ -480,8 +512,14 @@ export function runForecast(req: ForecastRequest): ForecastResult {
             if (next === null) next = day;
           }
         }
+        if (s.active || stillComing) for (const a of req.arrivals ?? []) {
+          // the next payment is the late one, when it's still to come
+          if (a.answer !== 'late' || a.signature !== s.signature || a.categoryId !== id || lateArrivedOn(s.days, a, s.cadence) !== null) continue;
+          const d = Math.max(start, dayFromISO(a.day));
+          if (d <= end && (next === null || d < next)) next = d;
+        }
         forecastTotal += projected;
-        seriesExplain.push({ signature: s.signature, cadence: s.cadence, level, next, projected, active: s.active, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, regularity: s.regularity, lastDay: last, timing: tm ? 'user' : 'history' });
+        seriesExplain.push({ signature: s.signature, cadence: s.cadence, level, next, projected, active: s.active || stillComing, dayOfMonth: s.dayOfMonth, lastWorkingDay: s.lastWorkingDay, regularity: s.regularity, lastDay: last, timing: tm ? 'user' : 'history' });
       }
       for (const x of renamed) notes.push(`${x.signature} stopped under that name, but the same payment carries on from ${fmtDay(x.from)} (probably a new name), so it is still projected.`);
       const stopped = catSeries.filter((s) => !s.active);

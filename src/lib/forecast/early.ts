@@ -7,13 +7,20 @@
 //  - an item added by hand, still dated ahead, whose amount has already arrived in its category.
 // The user confirms each: "early" takes the due payment out of the forecast, "extra" leaves it in.
 // Either answer is kept on the scenario (`arrivals`), so it's asked once.
+//
+// And the mirror image: a regular payment whose due date has passed with nothing in the statements.
+// Left alone, the forecast stops expecting it. The user says whether it's late (still coming: the
+// forecast keeps it, from the date they expect it) or not coming (it's left out).
 import type { ForecastBasis } from '../analysis/aggregates';
-import type { ForecastResult } from './engine';
+import { projectDates, lateArrivedOn, type ForecastResult } from './engine';
 import type { OneOff } from '../model';
-import { type Day, isoFromDay, dayFromISO } from '../dates';
+import { type Day, isoFromDay, dayFromISO, nextBusinessDay } from '../dates';
 import { K_ONEOFF, type CashHistory } from '../history/cashHistory';
 
-/** A confirmed answer: this money arrived on `day` for the payment due on `due`. */
+/**
+ * A confirmed answer. Early: this money arrived on `day` for the payment due on `due`. Late: the
+ * payment due on `due` hasn't come and is now expected on `day`. Missed: it isn't coming.
+ */
 export interface Arrival {
   /** what was asked about (see `EarlyCandidate.key`) */
   key: string;
@@ -25,8 +32,9 @@ export interface Arrival {
   day: string;
   due: string;
   amount: number;
-  /** early: take the due payment out of the forecast; extra: it was something else, leave it in */
-  answer: 'early' | 'extra';
+  /** early: take the due payment out of the forecast; extra: it was something else, leave it in;
+   *  late: still coming, expected on `day`; missed: not coming */
+  answer: 'early' | 'extra' | 'late' | 'missed';
   at: string;
   by: string;
 }
@@ -111,25 +119,35 @@ export function answerEarly(c: EarlyCandidate, answer: Arrival['answer'], by: st
   };
 }
 
-/** A regular payment's projected date this early arrival stands in for (within this many days of the due date it was given). */
-export const DUE_MATCH_DAYS = 10;
+export { DUE_MATCH_DAYS } from './engine';
 
 /**
- * Timing, when judging a signed-off forecast at `at`: money confirmed as early that arrived between
- * the forecast's start and `at`, for a payment it expected after `at` (and by its `end`). It's in
- * the actuals already and should even out once the due date passes. The same arrival confirmed on
- * several forecasts (a duplicated scenario) counts once. Signed: + means the actuals are ahead.
+ * Timing, when judging a signed-off forecast at `at`:
+ *  - money confirmed as early that arrived between the forecast's start and `at`, for a payment it
+ *    expected after `at` (and by its `end`): in the actuals already, evening out at the due date;
+ *  - a payment confirmed as late, due between the start and `at`, not in by `at` (from `h`): missing
+ *    from the actuals, evening out when it comes.
+ * The same answer on several forecasts (a duplicated scenario) counts once. Signed: + means the
+ * actuals are ahead.
  */
-export function timingAt(arrivals: Arrival[], from: Day, at: Day, end: Day): { items: Arrival[]; total: number } {
+export function timingAt(arrivals: Arrival[], from: Day, at: Day, end: Day, h?: CashHistory | null): { items: Arrival[]; total: number } {
   const seen = new Set<string>();
   const items = arrivals.filter((a) => {
-    if (a.answer !== 'early' || seen.has(a.key)) return false;
+    if (seen.has(a.key)) return false;
     const d = dayFromISO(a.day), due = dayFromISO(a.due);
-    if (d < from || d > at || due <= at || due > end) return false;
+    if (a.answer === 'early') {
+      if (d < from || d > at || due <= at || due > end) return false;
+    } else if (a.answer === 'late') {
+      // due inside the period read, and not in yet by then: the forecast had it, the statements don't
+      if (due < from || due > at) return false;
+      const came = h ? lateArrivedOn(seriesDays(h, a), a) : null;
+      if (came !== null && came <= at) return false;
+    } else return false;
     seen.add(a.key);
     return true;
   }).sort((x, z) => Math.abs(z.amount) - Math.abs(x.amount));
-  return { items, total: items.reduce((t, a) => t + a.amount, 0) };
+  // early money is in the actuals ahead of time (+ for money in); late money is missing from them (− for money in)
+  return { items, total: items.reduce((t, a) => t + (a.answer === 'late' ? -a.amount : a.amount), 0) };
 }
 
 /**
@@ -143,4 +161,61 @@ export function heldAsOneOff(h: CashHistory, a: Arrival): number {
   let v = 0;
   for (const cells of h.cells) for (let k = 0; k < cells.length; k += 4) if (cells[k] === d && cells[k + 1] === c && cells[k + 2] === K_ONEOFF) v += cells[k + 3] / 100;
   return Math.sign(v) === Math.sign(a.amount) ? Math.sign(a.amount) * Math.min(Math.abs(v), Math.abs(a.amount)) : 0;
+}
+
+// ---------------------------------------------------------------- late
+
+/** a due date this many days behind the latest statement, with nothing in, is late (not a payday that fell on a weekend) */
+export const LATE_DAYS = 5;
+
+export interface LateCandidate {
+  key: string;
+  categoryId: string;
+  signature: string;
+  label: string;
+  /** when it was due, and what the forecast would have expected (signed) */
+  due: Day;
+  amount: number;
+  /** a sensible day to expect it now: the next working day after the latest statement */
+  expectOn: Day;
+}
+
+/** Regular payments due between `from` and `to` that haven't come, now more than a few days on. */
+export function findLate(basis: ForecastBasis, fc: ForecastResult, sc: { arrivals?: Arrival[] }, from: Day, to: Day): LateCandidate[] {
+  const asked = new Set((sc.arrivals ?? []).map((a) => a.key));
+  const out: LateCandidate[] = [];
+  const end = basis.dataEnd;
+  for (const e of fc.explain) {
+    for (const s of e.series) {
+      const I = INTERVAL[s.cadence];
+      if (!I) continue;
+      const b = basis.series.find((x) => x.signature === s.signature && x.catIdx === e.catIdx);
+      if (!b || b.days.length < 3) continue;
+      const last = b.days[b.days.length - 1];
+      // a regular payment until lately: a missed one or two can make it look stopped, which is
+      // exactly when to ask (left alone, a stopped payment drops out of the forecast altogether)
+      if (end - last > 2.5 * I) continue;
+      const due = projectDates(b, last, end + 1).find((d) => d > last);
+      if (due === undefined || due > end - LATE_DAYS || due < from || due > to) continue;
+      const key = `late|${e.id}|${s.signature}|${isoFromDay(due)}`;
+      if (asked.has(key)) continue;
+      out.push({ key, categoryId: e.id, signature: s.signature, label: s.signature, due, amount: s.level, expectOn: nextBusinessDay(end) });
+    }
+  }
+  return out.sort((a, z) => Math.abs(z.amount) - Math.abs(a.amount));
+}
+
+/** The answer to keep for a late payment: still coming (expected on `expectOn`), or not coming. */
+export function answerLate(c: LateCandidate, answer: 'late' | 'missed', expectOn: Day, by: string): Arrival {
+  return {
+    key: c.key, kind: 'series', categoryId: c.categoryId, signature: c.signature,
+    day: isoFromDay(expectOn), due: isoFromDay(c.due), amount: Math.round(c.amount), answer, at: new Date().toISOString(), by,
+  };
+}
+
+export { lateArrivedOn };
+
+/** The days a regular payment shows in a saved history (for `lateArrivedOn`). */
+export function seriesDays(h: CashHistory, a: Arrival): number[] {
+  return h.series.filter((s) => s.sig === a.signature && s.cat === a.categoryId).flatMap((s) => s.occ.map((o) => o[0])).sort((x, y) => x - y);
 }

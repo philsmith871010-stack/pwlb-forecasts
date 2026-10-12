@@ -546,3 +546,11 @@ Now each upload joins the history through `addToHistory`:
 - **Built-in rules** are listed read-only, with "Override", which makes a team rule from one.
 - **Bank file layouts** (how each bank's columns are read): each shows its date, description, amount and account columns, and can be renamed or deleted. Changing how a layout reads its columns still needs a file from that bank, on Check the files.
 - The advanced "Rules and settings" step is now "Categories and settings" (general settings, categories and aliases).
+- **Late payments are in the timing split too.** A regular payment whose due date has passed, more than five days before the latest statement, with nothing come through (`findLate`), is asked about under "Running late?", on Daily and on the Forecast page:
+  - **"Still coming", on a date the user can set** (the next working day by default): the forecast keeps it on that date, or on its first day if that has passed. When it does come, the following payments follow on from the date it was due, so a payment landing in the next month doesn't push that month's payment out.
+  - **"Not coming":** it's left out.
+  Either answer is asked once, and is listed under Known items with an undo. Tests showed why this matters:
+  - Left alone, a payment more than five days late simply dropped out of the forecast.
+  - A late one arriving the next month pushed that month's payment out.
+  - Most of a month late, the payment counts as stopped, so **every** later one dropped out too (about £42m over a year for a £3.5m monthly grant). Confirming "still coming" keeps it regular and puts them all back.
+  - On Monitor, a payment confirmed late that was due inside the period read and hadn't come by then is timing (actuals behind by it). Once it comes in, it isn't timing any more. "Not coming" isn't timing, because it's a real difference. The sentence says "due 7 Nov, hadn't come in by then (late: expected …)", and Home and the menu card include it in "of it timing".

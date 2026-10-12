@@ -80,6 +80,12 @@ export function SimpleItems({ sc, upd }: { sc: Scenario; upd: Upd }) {
       text: `${a.kind === 'series' ? a.signature?.replace(/\S*#\S*/g, '').trim() ?? name(a.categoryId) : sc.oneOffs.find((o) => o.id === a.oneOffId)?.description || 'Your one-off'}: arrived on ${day(dayFromISO(a.day))}, so not forecast again on its due date`,
       remove: () => undo(a.key), removeLabel: 'Undo: forecast it on its due date again',
     })),
+    // regular payments due with nothing in: still coming (kept in the forecast), or not coming
+    ...(sc.arrivals ?? []).filter((a) => a.answer === 'late' || a.answer === 'missed').map((a) => ({
+      id: a.key, date: a.answer === 'late' ? a.day : a.due, kind: a.answer === 'late' ? 'Running late' : 'Not coming', amount: a.answer === 'late' ? a.amount : undefined,
+      text: `${a.signature?.replace(/\S*#\S*/g, '').trim() ?? name(a.categoryId)}: due ${day(dayFromISO(a.due))}, ${a.answer === 'late' ? `still expected (on ${day(dayFromISO(a.day))} or when it comes)` : 'not coming, so left out of the forecast'}`,
+      remove: () => undo(a.key), removeLabel: 'Undo: ask again',
+    })),
   ].sort((x, y) => x.date.localeCompare(y.date));
   return (
     <div className="stack">

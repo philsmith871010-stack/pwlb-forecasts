@@ -297,10 +297,10 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook, timing
   // when that's closer, and the sentence says so
   const coreGap = r.actualCoreCum[end] - fc;
   // timing: money confirmed as early that the forecast expected after this date (it should even out)
-  const timing = timingFrom ? timingAt(timingFrom.arrivals, r.cutoff, at, timingFrom.end) : { items: [], total: 0 };
+  const timing = timingFrom ? timingAt(timingFrom.arrivals, r.cutoff, at, timingFrom.end, timingFrom.history) : { items: [], total: 0 };
   const t = Math.abs(timing.total) >= 0.1e6 ? timing.total : 0;
   // an early payment the history holds as a one-off is timing, not a one-off: counted once
-  const tOO = t && timingFrom ? timing.items.reduce((s, a) => s + heldAsOneOff(timingFrom.history, a), 0) : 0;
+  const tOO = t && timingFrom ? timing.items.reduce((s, a) => s + (a.answer === 'early' ? heldAsOneOff(timingFrom.history, a) : 0), 0) : 0;
   const realOneOffs = oneOffs - tOO;
   // with timing and one-offs both set aside
   const bothAside = gap - t - realOneOffs;
@@ -329,7 +329,7 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook, timing
   const catTiming = new Map<string, number>();
   if (timingFrom && r.monthly.labels.length) {
     const fullEnd = firstDayOfMonthIndex(monthIndex(r.cutoff) + r.monthly.labels.length) - 1;
-    for (const a of timingAt(timingFrom.arrivals, r.cutoff, fullEnd, timingFrom.end).items) catTiming.set(a.categoryId, (catTiming.get(a.categoryId) ?? 0) + a.amount);
+    for (const a of timingAt(timingFrom.arrivals, r.cutoff, fullEnd, timingFrom.end, timingFrom.history).items) catTiming.set(a.categoryId, (catTiming.get(a.categoryId) ?? 0) + (a.answer === "late" ? -a.amount : a.amount));
   }
   return (
     <>
@@ -340,7 +340,9 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook, timing
         {t !== 0 && (() => {
           const name = (a: Arrival) => a.signature?.replace(/\S*#\S*/g, '').trim() || (categories.find((c) => c.id === a.categoryId)?.name ?? a.categoryId);
           const shown = timing.items.slice(0, 2);
-          return <> <strong>{money(Math.abs(t))}</strong> of the difference is timing: {shown.map((a, i) => <span key={a.key}>{i ? '; ' : ''}{name(a)} {a.amount < 0 ? 'went out' : 'came in'} on {day(dayFromISO(a.day))}, due {day(dayFromISO(a.due))}</span>)}{timing.items.length > 2 ? ` and ${timing.items.length - 2} more` : ''}. It should even out as {timing.items.length > 1 ? 'those dates pass' : 'that date passes'}; leaving it aside, everyday cash was <strong>{vsWords(gap - t)}</strong> the forecast.</>;
+          return <> <strong>{money(Math.abs(t))}</strong> of the difference is timing: {shown.map((a, i) => <span key={a.key}>{i ? '; ' : ''}{a.answer === 'late'
+            ? <>{name(a)}, due {day(dayFromISO(a.due))}, hadn’t {a.amount < 0 ? 'gone out' : 'come in'} by then (late: expected {day(dayFromISO(a.day))})</>
+            : <>{name(a)} {a.amount < 0 ? 'went out' : 'came in'} early on {day(dayFromISO(a.day))}, due {day(dayFromISO(a.due))}</>}</span>)}{timing.items.length > 2 ? ` and ${timing.items.length - 2} more` : ''}. It should even out {timing.items.every((a) => a.answer === 'late') ? (timing.items.length > 1 ? 'when they come in' : 'when it comes in') : timing.items.every((a) => a.answer === 'early') ? (timing.items.length > 1 ? 'as those dates pass' : 'as that date passes') : 'as these payments land'}; leaving it aside, everyday cash was <strong>{vsWords(gap - t)}</strong> the forecast.</>;
         })()}
         {Math.abs(realOneOffs) >= 1e6 && (handAdded
           ? <> One-off items account for {money(realOneOffs, { sign: true })} of what happened; only those added by hand were in the forecast.</>
@@ -377,7 +379,7 @@ function PastResult({ r, intro, chartNote, catsLabel, handAdded, outlook, timing
                   <td className="num">{money(c.forecast)}</td>
                   <td className="num">{money(c.actual)}</td>
                   <td className="num"><strong>{money(c.actual - c.forecast, { sign: true })}</strong></td>
-                  <td className="xs muted">{[Math.abs(oo) >= 0.5e6 ? `includes ${money(oo, { sign: true })} of one-offs` : '', Math.abs(ct) >= 0.1e6 ? `${money(ct, { sign: true })} came early (timing)` : ''].filter(Boolean).join('; ')}</td>
+                  <td className="xs muted">{[Math.abs(oo) >= 0.5e6 ? `includes ${money(oo, { sign: true })} of one-offs` : '', Math.abs(ct) >= 0.1e6 ? `${money(ct, { sign: true })} timing (early or late payments)` : ''].filter(Boolean).join('; ')}</td>
                 </tr>
               );
             })}</tbody>

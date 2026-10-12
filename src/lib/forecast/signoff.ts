@@ -276,7 +276,7 @@ export function trackSignOffs(signed: SignedForecast[], history: CashHistory | n
   const pick = compared.find((x) => x.r && x.r.H >= MIN_COMPARE_DAYS);
   if (!pick) return { rec: own ?? list[0], r: null };
   const r = pick.r!, me = monthEndIndex(r), d = me ?? r.H - 1;
-  const timing = timingAt(arrivals, r.cutoff, r.cutoff + d, dayFromISO(pick.rec.end)).total;
+  const timing = timingAt(arrivals, r.cutoff, r.cutoff + d, dayFromISO(pick.rec.end), history).total;
   return { rec: pick.rec, r, gap: r.actualCum[d] - r.forecastCum[d], asOf: r.cutoff + d, soFar: me === null, timing };
 }
 

@@ -10,7 +10,7 @@ import { runForecast } from '../src/lib/forecast/engine';
 import { fromSession, basisFromHistory, historyBefore, K_OP, K_ONEOFF, type CashHistory } from '../src/lib/history/cashHistory';
 import type { ForecastBasis } from '../src/lib/analysis/aggregates';
 import { isoFromDay, addMonths } from '../src/lib/dates';
-import { findEarly, answerEarly, timingAt, heldAsOneOff } from '../src/lib/forecast/early';
+import { findEarly, answerEarly, timingAt, heldAsOneOff, findLate, answerLate } from '../src/lib/forecast/early';
 import { dayFromISO } from '../src/lib/dates';
 import type { OneOff } from '../src/lib/model';
 import type { Arrival } from '../src/lib/forecast/early';
@@ -134,4 +134,89 @@ describe('money that arrives early', async () => {
     expect(Math.abs(held)).toBeLessThanOrEqual(Math.abs(a.amount));
     expect(Math.abs(held)).toBeGreaterThan(0.5 * Math.abs(a.amount));
   });
+
+  // ---- late: May's payment hasn't come
+  const nextDue = grant.days[j + 2];
+  const acct = hs.occ.find(([d]) => d === due)![2];
+  /** the history to `to`, without the payment due on `due`, and (optionally) with it arriving on `on` */
+  const withLate = (to: number, on?: number): CashHistory => {
+    const h = historyBefore(full, to + 1);
+    const pence = Math.round(grant.amounts[j + 1] * 100);
+    const ci = h.cats.indexOf(hs.cat);
+    const series = h.series.map((s) => (s.sig === hs.sig && s.cat === hs.cat ? { ...s, occ: [...s.occ.filter(([d]) => d !== due), ...(on ? [[on, pence, acct] as [number, number, number]] : [])] } : s));
+    const cells = h.cells.map((c, i) => {
+      if (i !== acct) return c;
+      const out: number[] = [];
+      for (let k = 0; k < c.length; k += 4) if (!(c[k] === due && c[k + 1] === ci && c[k + 2] === K_OP && Math.abs(c[k + 3] - pence) < 100)) out.push(c[k], c[k + 1], c[k + 2], c[k + 3]);
+      if (on) out.push(on, ci, K_OP, pence);
+      return out;
+    });
+    return { ...h, series, cells };
+  };
+  const forecastFrom = (basis: ForecastBasis, start: number, arrivals: Arrival[] = []) =>
+    runForecast({ basis, categories: DEFAULT_CATEGORIES, settings: { ...settings, start: isoFromDay(start), end: isoFromDay(addMonths(start, 12) - 1) }, assumptions: [], oneOffs: [], pastedSchedules: [], treasurySchedule: [], fyStartMonth: 4, liquidityBuffer: 10e6, defaultOpening: 0, arrivals });
+
+  it('left alone, a late payment drops out of the forecast; confirmed late, it stays in', () => {
+    const to = due + 10;
+    const basis = basisFromHistory(withLate(to), catIds)!;
+    const fc = forecastFrom(basis, to + 1);
+    // the forecast has moved on to the next one: May's is gone
+    expect(Math.abs(projected(fc).next! - nextDue)).toBeLessThanOrEqual(3);
+    const c = findLate(basis, fc, { arrivals: [] }, to - 45, to).find((x) => x.signature === grant.signature)!;
+    expect(c).toBeDefined();
+    expect(Math.abs(c.due - due)).toBeLessThanOrEqual(3);
+    const late = answerLate(c, 'late', to + 3, 'Test');
+    const after = forecastFrom(basis, to + 1, [late]);
+    expect(projected(after).next).toBe(to + 3);
+    const total = (f: ReturnType<typeof runForecast>) => f.net.reduce((t, v) => t + v, 0);
+    expect(total(after) - total(fc)).toBeCloseTo(projected(fc).level, -5);
+    // not coming: left out, as before; either answer is asked once
+    expect(total(forecastFrom(basis, to + 1, [answerLate(c, 'missed', to + 3, 'Test')]))).toBeCloseTo(total(fc), 0);
+    expect(findLate(basis, after, { arrivals: [late] }, to - 45, to)).toHaveLength(0);
+  });
+
+  it('a late payment that comes in the next month doesn’t push that month’s payment out', () => {
+    const on = nextDue - 3;
+    const basis = basisFromHistory(withLate(on, on), catIds)!;
+    // left alone, the next one forecast is a month after the late one: this month's is lost
+    expect(projected(forecastFrom(basis, on + 1)).next! - nextDue).toBeGreaterThan(20);
+    // confirmed late earlier: this month's is still expected
+    const late: Arrival = { key: 'k', kind: 'series', categoryId: catIds[grant.catIdx], signature: grant.signature, day: isoFromDay(due + 12), due: isoFromDay(due), amount: Math.round(grant.amounts[j + 1]), answer: 'late', at: '', by: '' };
+    expect(Math.abs(projected(forecastFrom(basis, on + 1, [late])).next! - nextDue)).toBeLessThanOrEqual(3);
+  });
+
+  it('on Monitor, a late payment is timing until it comes in', () => {
+    const late: Arrival = { key: 'k', kind: 'series', categoryId: catIds[grant.catIdx], signature: grant.signature, day: isoFromDay(due + 12), due: isoFromDay(due), amount: 3.4e6, answer: 'late', at: '', by: '' };
+    const end = due + 365;
+    // not in by the month end read: actuals behind by it
+    const notIn = withLate(due + 20);
+    expect(timingAt([late], due - 30, due + 20, end, notIn).total).toBeCloseTo(-3.4e6, 0);
+    // read before it was due: nothing
+    expect(timingAt([late], due - 30, due - 1, end, notIn).total).toBe(0);
+    // came in by then: evened out
+    const came = withLate(due + 20, due + 15);
+    expect(timingAt([late], due - 30, due + 20, end, came).total).toBe(0);
+    // ...but if read before it came, still timing
+    expect(timingAt([late], due - 30, due + 10, end, came).total).toBeCloseTo(-3.4e6, 0);
+    // not coming isn't timing: it's a real difference
+    expect(timingAt([{ ...late, answer: 'missed' }], due - 30, due + 20, end, notIn).total).toBe(0);
+  });
+
+  it('a payment most of a month late looks stopped, dropping all of it; confirming puts it all back', () => {
+    // nearly two months since the last one came (the previous check only looked back a month and a half)
+    const to = nextDue - 4;
+    expect(to - grant.days[j]).toBeGreaterThan(1.5 * 30.44);
+    const basis = basisFromHistory(withLate(to), catIds)!;
+    const fc = forecastFrom(basis, to + 1);
+    const c = findLate(basis, fc, { arrivals: [] }, to - 45, to).find((x) => x.signature === grant.signature)!;
+    expect(c).toBeDefined();
+    expect(Math.abs(c.due - due)).toBeLessThanOrEqual(3);
+    const total = (f: ReturnType<typeof runForecast>) => f.net.reduce((t, v) => t + v, 0);
+    // left alone, not just this one but every one after it is gone
+    expect(projected(fc).projected).toBe(0);
+    const after = forecastFrom(basis, to + 1, [answerLate(c, 'late', to + 2, 'Test')]);
+    expect(projected(after).next).toBe(to + 2);
+    expect(total(after) - total(fc)).toBeGreaterThan(10 * Math.abs(c.amount));
+  });
+
 });
