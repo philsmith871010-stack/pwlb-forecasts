@@ -290,7 +290,7 @@ function CategoryPicker({ h, value, onChange }: { h: H; value: number; onChange:
 function useSeries() {
   const catVersion = useStore((s) => s.catVersion);
   const [s, setS] = useState<Awaited<ReturnType<ReturnType<typeof engine>['seriesInfo']>> | null>(null);
-  useEffect(() => { void engine().seriesInfo().then(setS); }, [catVersion]);
+  useEffect(() => { void engine().seriesInfo().then(setS, () => setS(null)); }, [catVersion]);
   return s;
 }
 
@@ -379,7 +379,7 @@ function CategoryDeepDive({ h }: { h: H }) {
   const [detail, setDetail] = useState<CategoryDetail | null>(null);
   const [sigFilter, setSigFilter] = useState<number | undefined>();
   const catVersion = useStore((s) => s.catVersion);
-  useEffect(() => { setDetail(null); setSigFilter(undefined); void engine().categoryDetail(c === h.C ? -1 : c).then(setDetail); }, [c, catVersion, h.C]);
+  useEffect(() => { setDetail(null); setSigFilter(undefined); void engine().categoryDetail(c === h.C ? -1 : c).then(setDetail, () => setDetail(null)); }, [c, catVersion, h.C]);
   const data = useMemo(() => {
     const { agg } = h;
     const base = c * agg.D;

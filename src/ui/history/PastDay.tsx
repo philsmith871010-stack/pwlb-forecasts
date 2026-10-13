@@ -3,7 +3,7 @@
 // of the day, not its lines.
 import { useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
-import { historySpan, daysWithFlows, pastDaySummary, K_INTERNAL, K_ONEOFF, K_TREASURY, type CashHistory } from '../../lib/history/cashHistory';
+import { historySpan, daysWithFlows, pastDaySummary, K_INTERNAL, K_ONEOFF, K_TREASURY, type CashHistory, type PastDaySummary } from '../../lib/history/cashHistory';
 import { money, day, int } from '../../lib/format';
 import { Money, CatBadge, PageHead } from '../components/common';
 import { dayFromISO, isoFromDay, weekday } from '../../lib/dates';
@@ -25,7 +25,7 @@ export function PastDayPage() {
   const h = useStore((s) => s.team.cashHistory ?? s.historyBase);
   return (
     <div className="page narrow">
-      <PageHead title="A past day">Choose any day in your saved history to see what its statement came to, by category.</PageHead>
+      <PageHead title="A past day">Choose any day in your saved history to see it like a bank statement: each account’s opening and closing balance, and the day’s money by category.</PageHead>
       {h && <PastDayCard h={h} />}
     </div>
   );
@@ -55,7 +55,7 @@ export function PastDayCard({ h }: { h: CashHistory }) {
         <i className="bi bi-calendar3" />
         <div>
           <h2>A past day: {WEEKDAYS[weekday(d)] ?? ''} {day(d)}</h2>
-          <p>Any day from {day(span.from)} to {day(span.to)}, from your saved history: totals by category for the day, not the individual bank lines.</p>
+          <p>Any day from {day(span.from)} to {day(span.to)}, from your saved history: balances and totals for the day, not the individual bank lines.</p>
         </div>
       </div>
       <div className="row mb">
@@ -66,8 +66,10 @@ export function PastDayCard({ h }: { h: CashHistory }) {
         <button className="link-btn small" onClick={() => setSel(null)}>Latest</button>
       </div>
 
+      {sum && <DayStatement s={sum.statement} />}
+
       {!sum ? <div className="callout navy small">No statement for {day(d)} is in your saved history. Load it under Set up and train to add it.</div>
-        : !rows.length ? <div className="callout navy small">No money moved on {day(d)}{sum.closing !== null ? <>. Balance at the end of the day: <strong>{money(sum.closing)}</strong></> : ''}.</div>
+        : !rows.length ? <div className="callout navy small">No money moved on {day(d)}.</div>
         : (
           <>
             <table className="tbl day-tbl">
@@ -95,11 +97,35 @@ export function PastDayCard({ h }: { h: CashHistory }) {
               </details>
             )}
             <div className="day-foot small">
-              <span>Everyday cash on the day: <strong>{money(everyday, { sign: true })}</strong>{sum.closing !== null && <> · balance at the end of the day: <strong>{money(sum.closing)}</strong></>}{sum.accounts < h.accounts.length && <span className="muted"> · only {sum.accounts} of your {h.accounts.length} accounts have a statement for this day</span>}.</span>
+              <span>Everyday cash on the day: <strong>{money(everyday, { sign: true })}</strong>{sum.accounts < h.accounts.length && <span className="muted"> · only {sum.accounts} of your {h.accounts.length} accounts have a statement for this day</span>}.</span>
               <span className="muted">Each figure is the day’s net for that category. To see the lines, load that day’s statement under Set up and train.</span>
             </div>
           </>
         )}
+    </div>
+  );
+}
+
+/** The day as a bank statement: each account's balance at the start and end of the day, and money in and out. */
+function DayStatement({ s }: { s: PastDaySummary['statement'] }) {
+  if (!s.length) return null;
+  const known = s.every((a) => a.opening !== null && a.closing !== null);
+  const tot = s.reduce((t, a) => ({ opening: t.opening + (a.opening ?? 0), closing: t.closing + (a.closing ?? 0), in: t.in + a.in, out: t.out + a.out }), { opening: 0, closing: 0, in: 0, out: 0 });
+  const bal = (v: number | null) => (v === null ? <span className="muted">not shown</span> : <Money v={v} full />);
+  return (
+    <div className="day-statement mb">
+      <table className="tbl">
+        <thead><tr><th>Account</th><th className="num">Opening balance</th><th className="num">Money in</th><th className="num">Money out</th><th className="num">Closing balance</th></tr></thead>
+        <tbody>
+          {s.map((a) => (
+            <tr key={a.key}><td className="mono">{a.key}</td><td className="num">{bal(a.opening)}</td><td className="num">{a.in ? <Money v={a.in} full /> : '–'}</td><td className="num">{a.out ? <Money v={a.out} full /> : '–'}</td><td className="num strong">{bal(a.closing)}</td></tr>
+          ))}
+          {s.length > 1 && (
+            <tr className="tot"><td>All {s.length} accounts</td><td className="num">{known ? <Money v={tot.opening} full /> : ''}</td><td className="num"><Money v={tot.in} full /></td><td className="num"><Money v={tot.out} full /></td><td className="num">{known ? <Money v={tot.closing} full /> : ''}</td></tr>
+          )}
+        </tbody>
+      </table>
+      <div className="xs muted mt">{known ? 'Balances worked out from the balances in your statement files and the money moving each day.' : 'A balance shows when the statement files for that account included one.'}</div>
     </div>
   );
 }

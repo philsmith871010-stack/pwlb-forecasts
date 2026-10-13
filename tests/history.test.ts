@@ -106,6 +106,23 @@ describe('cash history', async () => {
     expect(pastDaySummary(h, ds.minDay - 1)).toBeNull();
   });
 
+  it('reads a past day like a bank statement: each account’s balances add up and run on day to day', () => {
+    const h = fromSession(ds, res);
+    const a = h.accounts.findIndex((x) => x.opening !== null && x.closing !== null);
+    expect(a).toBeGreaterThanOrEqual(0);
+    const acct = h.accounts[a];
+    let last: number | null = null;
+    for (let d = acct.ranges[0][0]; d <= acct.closingDay!; d++) {
+      const row = pastDaySummary(h, d)?.statement.find((x) => x.key === acct.key);
+      if (!row) continue;
+      expect(row.opening! + row.in + row.out).toBeCloseTo(row.closing!, 2);
+      if (last !== null) expect(row.opening!).toBeCloseTo(last, 2);
+      last = row.closing!;
+    }
+    // the last day's closing balance is the one the statement files ended on
+    expect(last!).toBeCloseTo(acct.closing!, 2);
+  });
+
   it('keeps everyone’s sign-offs when team files are saved and merged', () => {
     const h = fromSession(ds, res);
     const recs = exampleSignOffs(h, DEFAULT_CATEGORIES, 10e6);

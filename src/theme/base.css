@@ -1140,3 +1140,11 @@ details.more-detail { margin-top: 2px; }
   .st-desc .sc-meta { white-space: normal; }
   .st-why { display: none; }
 }
+
+/* A past day, as a bank statement */
+.day-statement { border: 1px solid var(--pt-line); border-radius: 10px; overflow-x: auto; padding: 0 0 8px; }
+.day-statement .tbl { margin: 0; min-width: 560px; }
+.day-statement .tbl td.mono { font-family: var(--font-mono); font-size: 12.5px; }
+.day-statement .tbl td.strong { font-weight: 700; color: var(--pt-navy); }
+.day-statement .tbl tr.tot td { font-weight: 700; border-top: 2px solid var(--pt-line); background: var(--pt-line-soft); }
+.day-statement > .xs { padding: 0 12px; }

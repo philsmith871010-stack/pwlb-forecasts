@@ -308,6 +308,11 @@ export interface PastDaySummary {
   regular: { sig: string; cat: string; amount: number }[];
   /** total balance at the end of the day, when every account's opening balance is known */
   closing: number | null;
+  /**
+   * The day as a bank statement, one row per account with a statement that day: the balance at the
+   * start and end of the day (null when the files didn't show a balance), and money in and out.
+   */
+  statement: { key: string; opening: number | null; closing: number | null; in: number; out: number }[];
 }
 
 /** Days the history holds any money moving on, ascending. */
@@ -322,15 +327,18 @@ export function pastDaySummary(h: CashHistory, d: number): PastDaySummary | null
   const held = h.accounts.map((a) => a.ranges.some(([f, t]) => d >= f && d <= t));
   if (!held.some(Boolean)) return null;
   const byKey = new Map<string, { cat: string; kind: number; net: number }>();
+  const statement: PastDaySummary['statement'] = [];
   let closing = 0, closingKnown = true;
   h.accounts.forEach((a, i) => {
     const cells = h.cells[i];
-    let before = 0, upTo = 0;
+    let before = 0, upTo = 0, after = 0, inP = 0, outP = 0;
     for (let k = 0; k < cells.length; k += 4) {
       const cd = cells[k], v = cells[k + 3];
       if (a.openingDay !== null && cd < a.openingDay) before += v;
       if (cd <= d) upTo += v;
+      if (a.closingDay !== null && cd > d && cd <= a.closingDay) after += v;
       if (cd !== d) continue;
+      if (v > 0) inP += v; else outP += v;
       const cat = h.cats[cells[k + 1]], kind = cells[k + 2], key = `${cat}|${kind}`;
       const r = byKey.get(key) ?? { cat, kind, net: 0 };
       r.net += v / 100;
@@ -338,6 +346,12 @@ export function pastDaySummary(h: CashHistory, d: number): PastDaySummary | null
     }
     if (a.opening === null || a.openingDay === null) closingKnown = false;
     else closing += a.opening + (upTo - before) / 100;
+    if (!held[i]) return;
+    // the balance at the end of the day: forward from the first balance shown, else back from the last
+    const end = a.opening !== null && a.openingDay !== null && d >= a.openingDay ? a.opening + (upTo - before) / 100
+      : a.closing !== null && a.closingDay !== null && d <= a.closingDay ? a.closing - after / 100 : null;
+    const r2 = (x: number) => Math.round(x * 100) / 100;
+    statement.push({ key: a.key, opening: end === null ? null : r2(end - (inP + outP) / 100), closing: end === null ? null : r2(end), in: inP / 100, out: outP / 100 });
   });
   const regular: PastDaySummary['regular'] = [];
   for (const s of h.series) for (const [od, p] of s.occ) if (od === d) regular.push({ sig: s.sig, cat: s.cat, amount: p / 100 });
@@ -346,6 +360,7 @@ export function pastDaySummary(h: CashHistory, d: number): PastDaySummary | null
     rows: [...byKey.values()].filter((r) => Math.round(r.net * 100) !== 0),
     accounts: held.filter(Boolean).length, regular,
     closing: closingKnown ? Math.round(closing * 100) / 100 : null,
+    statement,
   };
 }
 

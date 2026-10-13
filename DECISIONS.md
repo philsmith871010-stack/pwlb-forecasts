@@ -602,3 +602,9 @@ Now each upload joins the history through `addToHistory`:
 - **No deal register card on Check the sorting.** It's about the bank lines, and the register belongs with the forecast (Known items and cash), where it's still offered.
 - **Shortcuts:** "Accept all N best guesses" saves every unsure item as its guessed category. "Yes to all N" confirms every possible loan or investment. Each asks first, and each is a single change that one Undo reverses (`sortMany`, a `batch` session change).
 - **One compact table row per item:** description and pattern, amount, the question (a category or Yes / No / Not sure), and Save / Skip. The reason a line looks like a loan sits on the row, with the full text on hover. On a phone, each row stacks. The 25 largest are shown at a time, up from 12 cards. Daily's "sort anything new" uses the same rows.
+
+## Charts drawn at once; a past day as a bank statement
+
+- **Charts no longer animate in.** An entry animation interrupted by an update, or by the tab going into the background, could leave lines half drawn until the mouse moved over the chart. Charts now draw at once (`EChart`).
+- **Look back no longer errors after a reload.** The regular-payments and category-detail panels need the statements read this session. With only the saved history, they now wait quietly instead of throwing.
+- **A past day reads like a bank statement:** one row per account with an opening balance, money in, money out and a closing balance, plus a total. Balances run forward from the first balance shown in the statement files, or back from the last one when the first isn't known. A test checks that they add up and that each day's closing balance is the next day's opening balance. "Money in" and "out" include transfers between your own accounts, as a bank statement would, so they can be more than the category table, which nets those transfers off.

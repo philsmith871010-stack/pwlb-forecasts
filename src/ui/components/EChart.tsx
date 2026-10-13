@@ -67,7 +67,9 @@ export function EChart({ option, height = 320, onClick, onReady, className, notM
   }, []);
 
   useEffect(() => {
-    chart.current?.setOption({ animationDuration: 450, animationEasing: 'cubicOut', ...option } as EChartsCoreOption, { notMerge });
+    // drawn at once, with no animation: an entry animation interrupted by an update (or a tab put in
+    // the background) could leave lines half drawn until the mouse moved over the chart
+    chart.current?.setOption({ ...option, animation: false } as EChartsCoreOption, { notMerge });
   }, [option, notMerge]);
 
   return <div ref={ref} className={className} style={{ height, width: '100%' }} role="img" aria-label={ariaLabel} />;
