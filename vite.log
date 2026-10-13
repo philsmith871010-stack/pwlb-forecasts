@@ -1,0 +1,9 @@
+
+  VITE v8.3.3  ready in 1356 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+6:31:44 AM [vite] (client) hmr update /src/ui/steps/SimpleReview.tsx
+6:31:44 AM [vite] (client) hmr update /src/theme/base.css
+6:32:36 AM [vite] (client) hmr update /src/ui/steps/SimpleReview.tsx
+6:33:30 AM [vite] (client) hmr update /src/ui/steps/SimpleReview.tsx

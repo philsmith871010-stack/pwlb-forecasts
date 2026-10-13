@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { RegisterCard } from '../register/RegisterCard';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useStore, useEyebrow } from '../../state/store';
 import { PageHead, StepFooter, Money, ToMenu } from '../components/common';
 import { engine } from '../../worker/client';
@@ -23,9 +22,9 @@ const CADENCE_WORDS: Record<string, string> = {
 
 const monthYear = (d: number) => { const { y, m } = ymdFromDay(d); return `${MONTH_NAMES[m - 1]} ${y}`; };
 
-function FriendlySelect({ value, onChange, categories, label }: { value: string; onChange: (v: string) => void; categories: Category[]; label: string }) {
+function FriendlySelect({ value, onChange, categories, label, guess }: { value: string; onChange: (v: string) => void; categories: Category[]; label: string; guess?: boolean }) {
   return (
-    <select className="select" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} style={{ maxWidth: 300 }}>
+    <select className={`select sm${guess ? ' guess' : ''}`} aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} title={guess ? 'Our best guess: change it if it’s wrong' : undefined}>
       <option value="">Choose…</option>
       {FRIENDLY_GROUPS.map(([g, l]) => (
         <optgroup key={g} label={l}>{categories.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>
@@ -50,7 +49,7 @@ function confirmWithUndo(text: string) {
 }
 
 export function SimpleReview() {
-  const { cat, catBusy, register } = useStore();
+  const { cat, catBusy, team, askConfirm, sortMany } = useStore();
   const eyebrow = useEyebrow('review');
   const unsorted = useQueue(() => engine().uncategorisedQueue(200));
   const deals = useQueue(() => engine().dealQueue(200));
@@ -62,6 +61,23 @@ export function SimpleReview() {
   if (!cat) return null;
   const allDone = groups.length === 0 && questions.length === 0;
   const skip = (k: string) => setSkipped(new Set([...skipped, k]));
+  const catIds = cat?.catIds ?? [];
+  // the shortcuts: every item with a best guess saved as guessed, every possible loan confirmed
+  const guessed = groups.filter((g) => g.catIdx >= 0 && team.categories.some((c) => c.id === catIds[g.catIdx]));
+  const acceptGuesses = async () => {
+    const ok = await askConfirm({ title: guessed.length === 1 ? 'Accept our best guess?' : `Accept all ${guessed.length} best guesses?`, body: `${guessed.length === 1 ? 'It’s' : 'Each is'} saved as the category we guessed, and remembered for next time. You can undo it straight away, or change ${guessed.length === 1 ? 'it' : 'any of them'} later.`, ok: guessed.length === 1 ? 'Accept' : 'Accept all' });
+    if (!ok) return;
+    sortMany(guessed.map((g) => { const c = team.categories.find((x) => x.id === catIds[g.catIdx])!; return { type: 'alias' as const, pattern: g.signature, categoryId: c.id, dealFlag: c.group === 'treasury' ? 'deal' as const : 'not_deal' as const, confidence: 'high' as const }; }), [], `${guessed.length} best guesses accepted`);
+    confirmWithUndo(`Saved ${guessed.length} item${guessed.length === 1 ? '' : 's'} as guessed.`);
+  };
+  const allLoans = async () => {
+    const ok = await askConfirm({ title: questions.length === 1 ? 'Confirm it as a loan or investment?' : `Confirm all ${questions.length} as loans or investments?`, body: 'They’re kept out of the everyday forecast, and remembered for next time. You can undo it straight away. If any is everyday money, answer that one first.', ok: 'Confirm all' });
+    if (!ok) return;
+    const rules = questions.filter(loanAsRule).map((q) => ({ type: 'alias' as const, pattern: q.signature, categoryId: q.catId, dealFlag: 'deal' as const, confidence: 'high' as const }));
+    const overrides = questions.filter((q) => !loanAsRule(q)).flatMap((q) => q.rows.map((r) => ({ key: r.key, categoryId: q.catId, dealFlag: 'deal' as const })));
+    sortMany(rules, overrides, `${questions.length} confirmed as loans or investments`);
+    confirmWithUndo(`Confirmed ${questions.length} as loans or investments: kept out of the forecast.`);
+  };
   return (
     <div className="page narrow">
       <PageHead eyebrow={eyebrow} title="Check the sorting">
@@ -82,9 +98,6 @@ export function SimpleReview() {
         {catBusy && <span className="spinner" title="Updating" />}
       </div>
 
-      {!register && questions.length >= 5 && !allDone && (
-        <section className="review-sec"><RegisterCard quiet hint={`Quicker than answering the ${questions.length} loan questions below: the register lists your loans and investments, so most are recognised for you.`} /></section>
-      )}
       {useStore.getState().advanced && <RegisterNote />}
 
       {allDone ? (
@@ -96,17 +109,24 @@ export function SimpleReview() {
         <>
           {groups.length > 0 && (
             <section className="review-sec">
-              <h3>Items we weren’t sure about <span className="muted">({groups.length})</span></h3>
-              <p className="small muted">Choose what it is, then <strong>Save</strong>. Not sure? <strong>Skip</strong>.</p>
-              <div className="stack" style={{ gap: 12 }}>{groups.slice(0, 12).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => skip(`g${g.sigIdx}`)} />)}
-                {groups.length > 12 && <div className="small muted center">Showing the 12 largest. More appear as you go.</div>}</div>
+              <div className="sec-head">
+                <div><h3>Items we weren’t sure about <span className="muted">({groups.length})</span></h3>
+                  <p className="small muted">Choose what it is, then <strong>Save</strong>. Not sure? <strong>Skip</strong>.</p></div>
+                {guessed.length > 0 && <button className="btn sm navy" onClick={() => void acceptGuesses()}><i className="bi bi-check2-all" /> {guessed.length > 1 ? `Accept all ${guessed.length} best guesses` : 'Accept our best guess'}</button>}
+              </div>
+              <SortTable ask="What is it?">{groups.slice(0, 25).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => skip(`g${g.sigIdx}`)} />)}</SortTable>
+              {groups.length > 25 && <div className="small muted center mt">Showing the 25 largest. More appear as you go.</div>}
             </section>
           )}
           {questions.length > 0 && (
             <section className="review-sec">
-              <h3>Possible loans or investments <span className="muted">({questions.length})</span></h3>
-              <p className="small muted">Loans and investments are left out of the everyday forecast, so it matters which these are. Each says why we’re asking.</p>
-              <div className="stack" style={{ gap: 12 }}>{questions.slice(0, 12).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</div>
+              <div className="sec-head">
+                <div><h3>Possible loans or investments <span className="muted">({questions.length})</span></h3>
+                  <p className="small muted">They’re left out of the everyday forecast, so it matters which these are. Each says why we’re asking.</p></div>
+                <button className="btn sm navy" onClick={() => void allLoans()}><i className="bi bi-check2-all" /> {questions.length > 1 ? `Yes to all ${questions.length}` : 'Yes, it is'}</button>
+              </div>
+              <SortTable ask="Loan or investment?">{questions.slice(0, 25).map((q) => <LoanCard key={q.key} q={q} onSkip={() => skip(q.key)} />)}</SortTable>
+              {questions.length > 25 && <div className="small muted center mt">Showing the 25 largest. More appear as you go.</div>}
             </section>
           )}
           <StepFooter />
@@ -136,6 +156,16 @@ function RegisterNote() {
   );
 }
 
+/** The compact table the items and loan questions sit in: one row each. */
+export function SortTable({ ask, children }: { ask: string; children: ReactNode }) {
+  return (
+    <div className="sort-table" role="table">
+      <div className="st-row st-head" role="row"><span role="columnheader">Description</span><span role="columnheader" className="num">Amount</span><span role="columnheader">{ask}</span><span /></div>
+      {children}
+    </div>
+  );
+}
+
 export function SortCard({ g, onSkip }: { g: ReviewGroup; onSkip: () => void }) {
   const { team, addRule } = useStore();
   const guess = g.catIdx >= 0 ? useStore.getState().cat?.catIds[g.catIdx] ?? '' : '';
@@ -146,23 +176,21 @@ export function SortCard({ g, onSkip }: { g: ReviewGroup; onSkip: () => void }) 
     addRule({ type: 'alias', pattern: g.signature, categoryId: c.id, dealFlag: c.group === 'treasury' ? 'deal' : 'not_deal', confidence: 'high' }, `“${g.signature}” → ${c.name} (${g.count} lines)`);
     confirmWithUndo(`Saved: ${g.count} transaction${g.count > 1 ? 's' : ''} → ${c.name}`);
   };
-  const dir = g.direction === 'in' ? 'coming in' : g.direction === 'out' ? 'going out' : 'in and out';
+  const dir = g.direction === 'in' ? 'in' : g.direction === 'out' ? 'out' : 'in and out';
   return (
-    <div className="sort-card tick-in">
-      <div className="sc-main">
-        <div className="sc-desc">{g.samples[0]}</div>
-        <div className="sc-meta">
-          {int(g.count)} transaction{g.count > 1 ? 's' : ''} {dir}
-          {g.cadence && CADENCE_WORDS[g.cadence] ? `, ${CADENCE_WORDS[g.cadence]}` : ''} · {monthYear(g.firstDay)}{g.lastDay !== g.firstDay ? ` to ${monthYear(g.lastDay)}` : ''}
-        </div>
+    <div className="st-row tick-in" role="row">
+      <div className="st-desc" role="cell">
+        <div className="sc-desc" title={g.samples[0]}>{g.samples[0]}</div>
+        <div className="sc-meta">{int(g.count)} {dir}{g.cadence && CADENCE_WORDS[g.cadence] ? `, ${CADENCE_WORDS[g.cadence]}` : ''} · {monthYear(g.firstDay)}{g.lastDay !== g.firstDay ? ` to ${monthYear(g.lastDay)}` : ''}</div>
       </div>
-      <div className="sc-amount"><Money v={g.total} /><div className="xs muted">in total</div></div>
-      <div className="sc-actions">
-        <span className="sc-q">What is this?</span>
-        <FriendlySelect value={catId} onChange={setCatId} categories={team.categories} label={`Category for ${g.samples[0]}`} />
-        {guess && catId === guess && <span className="badge soft" title="Picked by the tool — change it if it’s wrong">our best guess</span>}
-        <button className="btn primary" disabled={!catId} onClick={save}>Save</button>
-        <button className="btn ghost" onClick={onSkip}>Skip</button>
+      <div className="st-amt num" role="cell"><Money v={g.total} /></div>
+      <div className="st-ask" role="cell">
+        {guess && catId === guess && <span className="st-guess" title="Our best guess: change it if it’s wrong">guess</span>}
+        <FriendlySelect value={catId} onChange={setCatId} categories={team.categories} label={`Category for ${g.samples[0]}`} guess={!!guess && catId === guess} />
+      </div>
+      <div className="st-act" role="cell">
+        <button className="btn sm primary" disabled={!catId} onClick={save}>Save</button>
+        <button className="btn sm ghost" onClick={onSkip}>Skip</button>
       </div>
     </div>
   );
@@ -210,12 +238,14 @@ function buildLoanQuestions(d: DealQueue | null): LoanQ[] {
   return [...bySig.values()].sort((a, b) => b.amount - a.amount);
 }
 
+/** A specific description (not a generic "TRF REF") can safely become a permanent rule; else just these lines. */
+const loanAsRule = (q: LoanQ) => q.isGroup || /[A-Z]{4,}/.test(q.signature.replace(/\b(TRF|REF|CHAPS|BACS|FPS|INT|PAYMENT)\b/g, ''));
+
 function LoanCard({ q, onSkip }: { q: LoanQ; onSkip: () => void }) {
   const { addTxnOverrides, addRule, team } = useStore();
   const [no, setNo] = useState(false);
   const [catId, setCatId] = useState('');
-  // A specific description (not a generic "TRF REF") can safely become a permanent rule.
-  const specific = /[A-Z]{4,}/.test(q.signature.replace(/\b(TRF|REF|CHAPS|BACS|FPS|INT|PAYMENT)\b/g, ''));
+  const specific = loanAsRule(q);
   const yes = () => {
     if (specific || q.isGroup) addRule({ type: 'alias', pattern: q.signature, categoryId: q.catId, dealFlag: 'deal', confidence: 'high' }, `“${q.signature}” is a loan/investment`);
     else addTxnOverrides(q.rows.map((r) => ({ key: r.key, categoryId: q.catId, dealFlag: 'deal' as const })), `${q.count} × “${q.signature}” confirmed as loan/investment`);
@@ -229,30 +259,27 @@ function LoanCard({ q, onSkip }: { q: LoanQ; onSkip: () => void }) {
     confirmWithUndo(`Saved as ${c.name} — included in the forecast.`);
   };
   return (
-    <div className="sort-card loan tick-in">
-      <div className="sc-main">
-        <div className="sc-desc">{q.title}</div>
-        <div className="sc-meta">{q.count > 1 ? `${int(q.count)} similar transactions` : q.rows[0] ? day(q.rows[0].day) : ''}</div>
-        <div className="sc-why"><i className="bi bi-question-circle" /> {q.why}</div>
+    <div className="st-row loan tick-in" role="row">
+      <div className="st-desc" role="cell">
+        <div className="sc-desc" title={q.title}>{q.title}</div>
+        <div className="sc-meta">{q.count > 1 ? `${int(q.count)} similar · ` : q.rows[0] ? `${day(q.rows[0].day)} · ` : ''}<i className="bi bi-question-circle st-why" title={q.why} /> <span className="st-why-text">{q.why}</span></div>
       </div>
-      <div className="sc-amount"><div className="num" style={{ fontWeight: 700, fontSize: 18, color: 'var(--pt-navy)' }}>{money(q.amount)}</div><div className="xs muted">{q.count > 1 ? 'in total' : ''}</div></div>
-      <div className="sc-actions">
-        {!no ? (
-          <>
-            <span className="sc-q">Is this a loan or investment?</span>
-            <button className="btn navy" onClick={yes}>Yes</button>
-            <button className="btn" onClick={() => setNo(true)}>No, it’s everyday money</button>
-            <button className="btn ghost" onClick={onSkip}>Not sure</button>
-          </>
-        ) : (
-          <>
-            <span className="sc-q">What is it then?</span>
-            <FriendlySelect value={catId} onChange={setCatId} categories={team.categories.filter((c) => c.group !== 'treasury')} label="Category" />
-            <button className="btn primary" disabled={!catId} onClick={notLoan}>Save</button>
-            <button className="btn ghost" onClick={() => setNo(false)}>Back</button>
-          </>
-        )}
-      </div>
+      <div className="st-amt num" role="cell">{money(q.amount)}</div>
+      {!no ? (
+        <div className="st-ask st-wide" role="cell">
+          <button className="btn sm navy" onClick={yes}>Yes</button>
+          <button className="btn sm" onClick={() => setNo(true)}>No, everyday money</button>
+          <button className="btn sm ghost" onClick={onSkip}>Not sure</button>
+        </div>
+      ) : (
+        <>
+          <div className="st-ask" role="cell"><FriendlySelect value={catId} onChange={setCatId} categories={team.categories.filter((c) => c.group !== 'treasury')} label="What is it then?" /></div>
+          <div className="st-act" role="cell">
+            <button className="btn sm primary" disabled={!catId} onClick={notLoan}>Save</button>
+            <button className="btn sm ghost" onClick={() => setNo(false)}>Back</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

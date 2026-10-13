@@ -1111,3 +1111,32 @@ details.more-detail { margin-top: 2px; }
   .exc-card .tbl td { padding-left: 4px; padding-right: 4px; }
   .exc-head { flex-wrap: wrap; }
 }
+
+/* Check the sorting: one compact row per item */
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.sec-head p { margin: 2px 0 0; }
+.sort-table { background: #fff; border: 1px solid var(--pt-line); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(10,37,64,.04); }
+.st-row { display: grid; grid-template-columns: minmax(0, 1fr) 104px minmax(230px, 300px) 132px; gap: 6px 14px; align-items: center; padding: 8px 14px; border-top: 1px solid var(--pt-line-soft); border-left: 3px solid var(--pt-orange); }
+.st-row.loan { border-left-color: var(--pt-navy-light); }
+.st-row:hover:not(.st-head) { background: #fbfcfd; }
+.st-head { border-top: 0; border-left-color: transparent; background: var(--pt-navy); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding-top: 7px; padding-bottom: 7px; }
+.st-head span:nth-child(3) { color: var(--pt-orange); }
+.st-desc { min-width: 0; }
+.st-desc .sc-desc { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-desc .sc-meta { font-size: 12px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-why { color: var(--pt-navy-light); cursor: help; margin: 0 2px; }
+.st-amt { font-weight: 700; color: var(--pt-navy); font-size: 14px; text-align: right; }
+.st-ask { display: flex; align-items: center; gap: 6px; min-width: 0; position: relative; }
+.st-ask .select { width: 100%; }
+.st-ask.st-wide { grid-column: 3 / -1; justify-content: flex-start; }
+.st-guess { flex: none; font-size: 10px; font-weight: 700; color: var(--pt-orange-hover); background: var(--pt-orange-soft, #fff3e6); border-radius: 999px; padding: 2px 7px; text-transform: uppercase; letter-spacing: .04em; }
+.select.guess { border-color: rgba(253,126,20,.55); }
+.st-act { display: flex; gap: 6px; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .st-head { display: none; }
+  .st-row { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 12px; }
+  .st-ask, .st-ask.st-wide { grid-column: 1 / -1; flex-wrap: wrap; }
+  .st-act { grid-column: 1 / -1; justify-content: flex-start; }
+  .st-desc .sc-meta { white-space: normal; }
+  .st-why { display: none; }
+}

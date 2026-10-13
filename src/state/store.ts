@@ -53,7 +53,7 @@ export const STREAMS: Stream[] = [
     { id: 'map', label: 'Check the files', advanced: true },
     { id: 'categorise', label: 'Sorting results', advanced: true },
     { id: 'review', label: 'Check the sorting' },
-    { id: 'rules', label: 'Your sorting rules' },
+    { id: 'rules', label: 'Your sorting rules', advanced: true },
     { id: 'settings', label: 'Categories and settings', advanced: true },
   ] },
   { id: 'review', label: 'Review history', short: 'History', icon: 'bi-bar-chart-line', what: 'How your cash has behaved, and any past day.', steps: [
@@ -102,7 +102,7 @@ export type ExceptionView = ExceptionItem & { lines: TxnRow[] };
 
 export interface Busy { phase: string; frac: number; rows?: number }
 
-export interface SessionChange { id: string; at: string; label: string; kind: 'rule' | 'txnOverride' | 'seriesOverride' | 'alias'; ref: string }
+export interface SessionChange { id: string; at: string; label: string; kind: 'rule' | 'txnOverride' | 'seriesOverride' | 'alias' | 'batch'; ref: string }
 
 export interface Toast { id: string; text: string; kind?: 'ok' | 'err'; action?: { label: string; run: () => void } }
 
@@ -184,6 +184,8 @@ interface Actions {
   updateTeam: (fn: (t: TeamFile) => TeamFile, opts?: { recategorise?: boolean }) => void;
   addRule: (r: Omit<Rule, 'id' | 'createdAt' | 'createdBy' | 'source'>, label?: string) => string;
   addTxnOverrides: (o: TxnOverride[], label: string) => void;
+  /** several rules and line overrides at once ("accept all"), undone together */
+  sortMany: (rules: Omit<Rule, 'id' | 'createdAt' | 'createdBy' | 'source'>[], overrides: TxnOverride[], label: string) => void;
   setSeriesOverride: (o: SeriesOverride, label: string) => void;
   addAlias: (a: Alias, label: string) => void;
   undoChange: (id: string) => void;
@@ -382,6 +384,13 @@ export const useStore = create<State & Actions>((set, get) => ({
     get().updateTeam((t) => ({ ...t, txnOverrides: [...t.txnOverrides.filter((x) => !keys.has(x.key)), ...os] }), { recategorise: true });
     set((s) => ({ sessionChanges: [{ id: uid('c'), at: new Date().toISOString(), label, kind: 'txnOverride', ref: [...keys].join(',') }, ...s.sessionChanges] }));
   },
+  sortMany: (rs, os, label) => {
+    const at = new Date().toISOString();
+    const rules: Rule[] = rs.map((r) => ({ ...r, id: uid('rule'), createdAt: at, createdBy: get().user || undefined, source: 'team' }));
+    const keys = new Set(os.map((o) => o.key));
+    get().updateTeam((t) => ({ ...t, rules: [...rules, ...t.rules], txnOverrides: [...t.txnOverrides.filter((x) => !keys.has(x.key)), ...os] }), { recategorise: true });
+    set((s) => ({ sessionChanges: [{ id: uid('c'), at, label, kind: 'batch', ref: JSON.stringify({ rules: rules.map((r) => r.id), keys: [...keys] }) }, ...s.sessionChanges] }));
+  },
   setSeriesOverride: (o, label) => {
     get().updateTeam((t) => ({ ...t, seriesOverrides: [...t.seriesOverrides.filter((x) => x.signature !== o.signature), o] }), { recategorise: true });
     set((s) => ({ sessionChanges: [{ id: uid('c'), at: new Date().toISOString(), label, kind: 'seriesOverride', ref: o.signature }, ...s.sessionChanges] }));
@@ -399,6 +408,7 @@ export const useStore = create<State & Actions>((set, get) => ({
     if (!c) return;
     get().updateTeam((t) => {
       if (c.kind === 'rule') return { ...t, rules: t.rules.filter((r) => r.id !== c.ref) };
+      if (c.kind === 'batch') { const b = JSON.parse(c.ref) as { rules: string[]; keys: string[] }; const ids = new Set(b.rules), keys = new Set(b.keys); return { ...t, rules: t.rules.filter((r) => !ids.has(r.id)), txnOverrides: t.txnOverrides.filter((o) => !keys.has(o.key)) }; }
       if (c.kind === 'txnOverride') { const keys = new Set(c.ref.split(',')); return { ...t, txnOverrides: t.txnOverrides.filter((o) => !keys.has(o.key)) }; }
       if (c.kind === 'seriesOverride') return { ...t, seriesOverrides: t.seriesOverrides.filter((o) => o.signature !== c.ref) };
       const [canon, ...vars] = c.ref.split('|');

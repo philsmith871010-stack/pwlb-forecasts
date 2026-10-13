@@ -5,7 +5,7 @@ import { PageHead, Progress } from '../components/common';
 import { DayCard, AlreadyLoaded } from '../history/HistoryCards';
 import { EarlyCheck } from '../forecast/EarlyCheck';
 import { EXCEPTION_KINDS, latestReviews } from '../../lib/governance/exceptions';
-import { SortCard, useQueue } from './SimpleReview';
+import { SortCard, SortTable, useQueue } from './SimpleReview';
 import { engine } from '../../worker/client';
 import { historySpan } from '../../lib/history/cashHistory';
 import { day } from '../../lib/format';
@@ -101,7 +101,7 @@ function TodaySorting() {
     <div className="today-sort mt">
       <h3 style={{ margin: '0 0 4px' }}>Sort {groups.length === 1 ? 'this line' : `these ${groups.length}`}</h3>
       <p className="small muted" style={{ margin: '0 0 10px' }}>Choose what each one is. The tool remembers, so next time it’s sorted automatically.</p>
-      <div className="stack" style={{ gap: 10 }}>{groups.slice(0, 8).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => setSkipped(new Set([...skipped, g.sigIdx]))} />)}</div>
+      <SortTable ask="What is it?">{groups.slice(0, 8).map((g) => <SortCard key={g.sigIdx} g={g} onSkip={() => setSkipped(new Set([...skipped, g.sigIdx]))} />)}</SortTable>
     </div>
   );
 }

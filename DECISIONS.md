@@ -595,3 +595,10 @@ Now each upload joins the history through `addToHistory`:
 - **"Home" wording replaced by "main menu"** on Monitor, which picks the sign-off the menu and Daily report on.
 - **The board report describes payment-convention timing changes** ("on the 15th, or the next working day if that isn't one"). It used to print "day undefined". The forecast's list of changes uses the same words (`timingRuleWords`).
 - **Polish:** the active area or step pill no longer turns blank on hover. The red shading below minimum cash is explained under the forecast chart. The "minimum cash" label moved off the past line. The Exceptions filters are hidden when there's nothing to filter, and the small selects keep room for their arrow. On a phone, the A4 board report shrinks to fit the screen (printing is unchanged), and exception lines drop the account column so the amounts fit.
+
+## Check the sorting: simpler and quicker
+
+- **"Your sorting rules" is an advanced step again.** Searching, editing and deleting rules was too much for most people. It's still there with advanced tools switched on (header menu). Everyone else teaches the tool by answering Check the sorting, and each answer is still kept as a rule.
+- **No deal register card on Check the sorting.** It's about the bank lines, and the register belongs with the forecast (Known items and cash), where it's still offered.
+- **Shortcuts:** "Accept all N best guesses" saves every unsure item as its guessed category. "Yes to all N" confirms every possible loan or investment. Each asks first, and each is a single change that one Undo reverses (`sortMany`, a `batch` session change).
+- **One compact table row per item:** description and pattern, amount, the question (a category or Yes / No / Not sure), and Save / Skip. The reason a line looks like a loan sits on the row, with the full text on hover. On a phone, each row stacks. The 25 largest are shown at a time, up from 12 cards. Daily's "sort anything new" uses the same rows.
