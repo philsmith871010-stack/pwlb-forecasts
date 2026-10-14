@@ -199,7 +199,7 @@ const api = {
   loadTruth(text: string): { ok: boolean; files: number; message: string } {
     try {
       const t = JSON.parse(text) as TruthFile;
-      if (t.kind !== 'cash-flow-insight-truth') return { ok: false, files: 0, message: 'Not a Cash Flow Insight truth file.' };
+      if (t.kind !== 'cash-flow-insight-truth') return { ok: false, files: 0, message: 'Not a PWLBforecast truth file.' };
       truth = t;
       return { ok: true, files: t.files.length, message: `Truth file loaded (${t.files.length} files).` };
     } catch (e) {

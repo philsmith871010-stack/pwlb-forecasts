@@ -5,6 +5,7 @@ import { historyDays, MIN_HISTORY_DAYS } from '../lib/history/cashHistory';
 import { PastDayPage } from './history/PastDay';
 import { RulesPage } from './steps/RulesPage';
 import { ExceptionsPage } from './steps/ExceptionsPage';
+import { APP_NAME, APP_NAME_PARTS } from '../config';
 import { Toasts, Modal } from './components/common';
 import { LoadStep } from './steps/LoadStep';
 import { MonitorPage } from './steps/MonitorPage';
@@ -75,8 +76,8 @@ export function App() {
   return (
     <div className="shell top">
       <header className="shell-header">
-        <a className="brand" href="#" onClick={(e) => { e.preventDefault(); goto('home'); }} aria-label="Cash Flow Insight: main menu">
-          <Logo /><span className="brand-word">Cash Flow <span>Insight</span></span>
+        <a className="brand" href="#" onClick={(e) => { e.preventDefault(); goto('home'); }} aria-label={`${APP_NAME}: main menu`}>
+          <Logo /><span className="brand-word">{APP_NAME_PARTS[0]}<span>{APP_NAME_PARTS[1]}</span></span>
         </a>
         {current && (
           <div className="area-head">

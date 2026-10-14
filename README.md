@@ -1,4 +1,4 @@
-# Cash Flow Insight
+# PWLBforecast
 
 A PWLBtoday prototype that turns a council's raw bank history into a transparent, auditable **cash flow forecast**. The forecast answers a treasury team's real question: *when will we need to borrow, how much, and when will we have cash to invest?*
 

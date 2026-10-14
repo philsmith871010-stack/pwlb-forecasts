@@ -196,7 +196,7 @@ function AdvancedSave() {
               busy={busy === 'xlsx'} onClick={async () => {
                 if (!b || !agg) return;
                 setBusy('xlsx');
-                try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `cash-flow-insight-${sc.name.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
+                try { downloadBlob(await buildWorkbook({ team, agg, scenario: sc, fc: b.fc, backtest: await defaultBacktest(), appName: APP_NAME, strategy: b.strategy, registerName: useStore.getState().register?.name }), `pwlbforecast-${sc.name.replace(/\W+/g, '-').toLowerCase()}.xlsx`); }
                 finally { setBusy(null); }
               }} />
             <ExportRow icon="bi-filetype-csv" title="Categorised transactions (CSV)" text="Every line with its category, deal flag, classification, confidence and the rule that decided it — for your own audit trail." disabled={!cat}

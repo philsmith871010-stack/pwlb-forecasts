@@ -34,7 +34,7 @@ export function parseTeamFile(text: string): ValidationResult {
   try { raw = JSON.parse(text); } catch (e) { return { ok: false, errors: [`Not valid JSON: ${(e as Error).message}`], warnings }; }
   if (!raw || typeof raw !== 'object') return { ok: false, errors: ['File is empty or not an object.'], warnings };
   const o = raw as Record<string, unknown>;
-  if (o.kind !== 'cash-flow-insight-team-file') warnings.push('File does not declare itself as a Cash Flow Insight team file; loading what we can.');
+  if (o.kind !== 'cash-flow-insight-team-file') warnings.push('File does not declare itself as a PWLBforecast team file; loading what we can.');
   if (o.schemaVersion !== undefined && o.schemaVersion !== 1) warnings.push(`Schema version ${String(o.schemaVersion)} is newer than this app understands (1). Unknown fields are ignored.`);
   const base = emptyTeamFile();
   const arr = <T>(k: string): T[] => (Array.isArray(o[k]) ? (o[k] as T[]) : []);
@@ -182,7 +182,7 @@ interface FSWindow {
 
 export const fsAccessSupported = () => typeof window !== 'undefined' && 'showSaveFilePicker' in window;
 
-const PICKER_TYPES = [{ description: 'Cash Flow Insight team file', accept: { 'application/json': ['.json'] } }];
+const PICKER_TYPES = [{ description: 'PWLBforecast team file', accept: { 'application/json': ['.json'] } }];
 
 export async function openWithPicker(): Promise<{ handle: FSHandle; text: string; name: string } | null> {
   const w = window as unknown as FSWindow;

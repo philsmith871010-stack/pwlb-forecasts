@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PWLBforecast · coming soon</title>
+<meta name="description" content="When your council will need to borrow, and how much, straight from its bank statements. A daily cash forecast checked line by line, with options to discuss and a board report. Coming soon to PWLBtoday. Nothing leaves your browser.">
+<!-- A TEASER, NOT A DOOR. This page goes up before the tool does, so it has no
+     way in: where PWLBreports says "Open the tool", this says "Coming soon".
+     Everything else is PWLBreports' page, deliberately: the same ground, type,
+     cards and motion, so the two read as one family. Like that page, it makes
+     no requests at all, not even for a font. -->
+<style>
+/* ===========================================================================
+ * PWLBforecast — the page that announces it.
+ *
+ * Palette, rhythm and components are PWLBreports' own. The one new colour is
+ * the forecast's: the tool draws the past in a pale line and the forecast in
+ * the platform's orange, dashed, with its likely range shaded, so the hero
+ * chart does the same.
+ *
+ * Animation is Web Animations and IntersectionObserver, no library, all of it
+ * skipped under prefers-reduced-motion. Nothing is required to read the page.
+ * ======================================================================== */
+:root{
+  --ground:#061a2e; --ground2:#0a2540; --panel:#0e2f52; --panel2:#143b66;
+  --ink:#eaf1f8; --ink2:#b6c1d0; --muted:#7d95ad; --faint:#8199b0;
+  --line:#1b3a5c; --line2:#27507c;
+  --orange:#f0954a;
+  /* the tool's series colours */
+  --past:#c8d8e8; --min:#e0776a; --band:rgba(240,149,74,.20); --ok:#4cb583;
+  --sans:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --serif:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --wrap:1120px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+.wrap{max-width:var(--wrap); margin:0 auto; padding:0 28px}
+a{color:inherit}
+h1,h2,h3{text-wrap:balance; margin:0}
+
+/* ---- shared rhythm ------------------------------------------------------- */
+section{padding:104px 0; position:relative}
+.eyebrow{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--muted); margin:0 0 20px;
+  display:flex; align-items:center; gap:12px;
+}
+.eyebrow::before{content:""; width:26px; height:1px; background:var(--line2)}
+h2{font-size:clamp(28px,3.6vw,42px); line-height:1.14; letter-spacing:-.022em; font-weight:600}
+.lede{
+  font-family:var(--serif); font-size:clamp(18px,2vw,21px); line-height:1.62;
+  color:var(--ink2); max-width:62ch; margin:22px 0 0;
+}
+.rule{height:1px; background:linear-gradient(90deg,var(--line2),transparent)}
+
+/* ---- hero ---------------------------------------------------------------- */
+.hero{padding:0; min-height:100svh; display:flex; flex-direction:column; justify-content:center;
+  position:relative; overflow:hidden}
+/* A faint grid, like the background of every chart in the tool. */
+.hero::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 90% 70% at 60% 45%,#000 20%,transparent 78%);
+  opacity:.5;
+}
+.masthead{
+  position:fixed; top:0; left:0; right:0; padding:22px 0; z-index:3;
+  border-bottom:1px solid transparent; transition:background .25s ease, border-color .25s ease;
+}
+.masthead .wrap{display:flex; align-items:center; gap:18px}
+@media (max-width:600px){
+  .masthead a.mini{display:none}
+  .masthead .wrap{gap:12px}
+}
+.brand{font-family:var(--mono); font-size:13px; letter-spacing:.13em;
+  text-transform:uppercase; color:var(--ink2); font-weight:500}
+.brand b{color:var(--ink); font-weight:600}
+.masthead .sp{flex:1}
+.masthead a.mini{font-family:var(--sans); font-size:13.5px; color:var(--ink2);
+  text-decoration:none; font-weight:500}
+.masthead a.mini:hover{color:var(--ink)}
+/* where PWLBreports has its way in */
+.soon{font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--orange); border:1px solid rgba(240,149,74,.45); border-radius:999px; padding:5px 11px;
+  white-space:nowrap}
+
+.herogrid{
+  display:grid; grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);
+  gap:56px; align-items:center; position:relative; z-index:2; padding:110px 0 60px;
+}
+h1{
+  font-size:clamp(38px,5.6vw,66px); line-height:1.04; letter-spacing:-.035em;
+  font-weight:600;
+}
+h1 .em{
+  font-family:var(--serif); font-style:italic; font-weight:400;
+  color:var(--orange);
+}
+.sub{
+  font-family:var(--serif); font-size:clamp(17px,1.7vw,20px); line-height:1.6;
+  color:var(--ink2); margin:26px 0 0; max-width:52ch;
+}
+.cta{display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:38px 0 0}
+.btn{
+  display:inline-flex; align-items:center; gap:10px;
+  font-family:var(--sans); font-size:15px; font-weight:600;
+  padding:14px 24px; border-radius:6px; text-decoration:none;
+  border:1px solid var(--orange); background:var(--orange); color:#12243a;
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+.btn.ghost{background:transparent; color:var(--ink); border-color:var(--line2)}
+a.btn:hover{transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,0,0,.4)}
+a.btn.ghost:hover{border-color:var(--ink2)}
+/* "Coming soon" sits where the button will go, and is not one: it does nothing
+   when pressed, so it must not look pressable. Same footprint, no fill. */
+.btn.soonbtn{background:rgba(240,149,74,.10); color:var(--orange); cursor:default}
+.btn .dot{width:8px; height:8px; border-radius:50%; background:var(--orange);
+  box-shadow:0 0 0 0 rgba(240,149,74,.5)}
+html.anim .btn .dot{animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(240,149,74,.55)}70%{box-shadow:0 0 0 9px rgba(240,149,74,0)}100%{box-shadow:0 0 0 0 rgba(240,149,74,0)}}
+.freeline{display:inline-flex; align-items:center; gap:10px; margin:26px 0 0;
+  font-family:var(--sans); font-size:15px; font-weight:600; color:var(--ink);
+  padding:10px 17px 10px 14px; border-radius:999px;
+  border:1px solid rgba(240,149,74,.34); background:rgba(240,149,74,.08)}
+.freeline svg{width:15px; height:15px; flex:none; stroke:var(--orange);
+  fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+
+/* the hero chart */
+.chartcard{
+  background:linear-gradient(180deg,var(--panel),var(--ground2));
+  border:1px solid var(--line2); border-radius:12px; padding:22px 22px 16px;
+  box-shadow:0 24px 70px rgba(0,0,0,.5);
+}
+.chartcard h4{
+  margin:0 0 2px; font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--muted); font-weight:600;
+}
+.chartcard .cap{font-size:13px; color:var(--ink2); margin:0 0 14px}
+.chartcard svg{display:block; width:100%; height:auto}
+/* the two figures the forecast exists to give */
+.kpis{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 14px}
+.kpi{border:1px solid var(--line2); border-radius:8px; padding:10px 12px; background:rgba(6,26,46,.45)}
+.kpi.hl{border-color:rgba(240,149,74,.5); background:rgba(240,149,74,.10)}
+.kpi span{display:block; font-family:var(--mono); font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted)}
+.kpi b{display:block; font-family:var(--mono); font-size:clamp(20px,2.3vw,26px); font-weight:600;
+  letter-spacing:-.02em; font-variant-numeric:tabular-nums; color:var(--ink); line-height:1.25}
+.kpi.hl b{color:var(--orange)}
+.kpi em{display:block; font-style:normal; font-size:12px; line-height:1.4; color:var(--ink2); margin-top:2px}
+.legend{display:flex; flex-wrap:wrap; gap:6px 18px; margin:12px 2px 0}
+.legend span{display:inline-flex; align-items:center; gap:7px;
+  font-family:var(--sans); font-size:12px; color:var(--ink2)}
+.chartcard .legend svg.lsw{flex:none; width:20px; height:6px; display:block}
+.legend i{width:14px; height:2.5px; border-radius:2px; display:block}
+
+/* ---- statement to forecast ----------------------------------------------- */
+.scatterwrap{position:relative; margin:44px 0 0;
+  background:var(--ground2); border:1px solid var(--line); border-radius:10px;
+  padding:26px; overflow:hidden}
+@media (max-width:600px){.scatterwrap{padding:16px}}
+#sorter{display:block; width:100%; height:auto}
+#sorter .sh{font-family:var(--mono); font-size:10.5px; letter-spacing:.16em; fill:var(--muted)}
+#sorter .sr{font-family:var(--mono); font-size:11px; fill:var(--ink2); transition:fill .3s ease}
+#sorter .sr.hot{fill:var(--orange)}
+#sorter .ln{font-family:var(--sans); font-size:14px; font-weight:600; fill:var(--ink)}
+#sorter .lr{font-family:var(--mono); font-size:10px; fill:var(--muted); transition:fill .6s ease}
+#sorter .lr.on{fill:var(--orange)}
+#sorter .ax{font-family:var(--mono); font-size:10px; letter-spacing:.12em; fill:var(--faint)}
+#sorter .ax.fc{fill:var(--orange)}
+#sorter.nar .sh{font-size:12px} #sorter.nar .sr{font-size:13.5px}
+#sorter.nar .ln{font-size:16px} #sorter.nar .lr{font-size:12px} #sorter.nar .ax{font-size:11.5px}
+#sorter .b{transform-box:fill-box; transform-origin:50% 100%}
+#sorter #stg{transition:transform .16s ease}
+.scatterlab{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin:20px 2px 0}
+.scount{font-family:var(--mono); font-weight:600; font-variant-numeric:tabular-nums;
+  font-size:clamp(30px,4.4vw,46px); line-height:1; letter-spacing:-.02em;
+  color:var(--ink2); transition:color .6s ease}
+.scatterlab.done .scount{color:var(--orange)}
+.scatterlab .sstate{font-family:var(--mono); font-size:11.5px;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--muted); max-width:52ch; flex:1}
+.scatterlab .legend{margin:0}
+@media (max-width:600px){.scatterlab .legend{flex-basis:100%}}
+
+/* ---- cards --------------------------------------------------------------- */
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(272px,1fr)); gap:20px; margin:44px 0 0}
+.card{
+  background:var(--ground2); border:1px solid var(--line); border-radius:10px;
+  padding:28px 26px; position:relative;
+}
+.card .n{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; color:var(--muted);
+  display:block; margin-bottom:14px;
+}
+.card h3{font-size:19px; font-weight:600; letter-spacing:-.012em; margin:0 0 10px}
+.card p{margin:0; font-size:15px; color:var(--ink2); line-height:1.6}
+
+/* ---- the steps ----------------------------------------------------------- */
+.steps{margin:48px 0 0; border-top:1px solid var(--line)}
+.step{
+  display:grid; grid-template-columns:76px minmax(0,1fr) minmax(0,1.15fr); gap:30px;
+  padding:32px 0; border-bottom:1px solid var(--line); align-items:start;
+}
+.step .k{font-family:var(--mono); font-size:13px; color:var(--orange); letter-spacing:.08em; padding-top:3px}
+.step h3{font-size:20px; font-weight:600; letter-spacing:-.014em}
+.step h3 small{display:block; font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted); font-weight:500; margin-top:6px}
+.step p{margin:0; color:var(--ink2); font-size:15.5px}
+
+.honest{background:var(--ground2); border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+
+/* ---- close --------------------------------------------------------------- */
+.close{text-align:center; padding:120px 0}
+.close h2{max-width:20ch; margin:0 auto}
+.close .lede{margin:22px auto 0; text-align:center}
+.close .cta{justify-content:center}
+.claims{max-width:62ch; margin:34px auto 0; font-size:13.5px; line-height:1.65;
+  color:var(--muted); border-top:1px solid var(--line); padding-top:22px}
+.claims b{color:var(--ink2); font-weight:600}
+footer{border-top:1px solid var(--line); padding:38px 0 56px; color:var(--muted); font-size:13.5px}
+footer .wrap{display:flex; gap:24px; flex-wrap:wrap; align-items:baseline}
+footer .sp{flex:1}
+
+/* ---- reveal ---------------------------------------------------------------
+ * Visible by DEFAULT; the script hides things only once it is running, and
+ * forces everything visible after a few seconds whatever happens (a background
+ * tab gets no animation frames). PWLBreports learned this the hard way. */
+html.anim .rv{opacity:0; transform:translateY(18px)}
+html.anim .rv.in{opacity:1; transform:none;
+  transition:opacity .7s cubic-bezier(.22,.61,.36,1),
+             transform .7s cubic-bezier(.22,.61,.36,1)}
+
+#worth .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(min-width:1000px){#worth .cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){#worth .cards{grid-template-columns:1fr}}
+
+@media (max-width:900px){
+  .herogrid{grid-template-columns:1fr; gap:40px; padding:120px 0 70px}
+  .step{grid-template-columns:1fr; gap:10px}
+  .step .k{padding-top:0}
+  section{padding:78px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rv{opacity:1; transform:none; transition:none}
+  .btn{transition:none}
+}
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="wrap">
+    <span class="brand"><b>PWLB</b>forecast</span>
+    <span class="sp"></span>
+    <a class="mini" href="#why">Why</a>
+    <a class="mini" href="#how">How it works</a>
+    <a class="mini" href="#worth">What it is worth</a>
+    <span class="soon">Coming soon</span>
+  </div>
+</div>
+
+<!-- ======================= HERO ======================= -->
+<header class="hero">
+  <div class="wrap">
+    <div class="herogrid">
+      <div>
+        <h1 class="rv">When you'll need to borrow, and how much, <span class="em">straight from your bank&nbsp;statements</span>.</h1>
+        <p class="sub rv">Load a few years of bank statements. Every line is sorted, the
+          patterns are learned, and a two-year daily cash forecast comes back, checked line
+          by line, with options to discuss and a board report. Each morning's statement
+          keeps it current.</p>
+        <div class="cta rv">
+          <span class="btn soonbtn"><span class="dot"></span>Coming soon</span>
+          <a class="btn ghost" href="#how">How it works</a>
+        </div>
+        <p class="freeline rv"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5"
+          y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg
+          >Nothing leaves your browser</p>
+      </div>
+
+      <div class="chartcard rv">
+        <h4>Everyday cash &middot; Illustrative council</h4>
+        <p class="cap">The past, then the forecast with its likely range. Shapes are
+          illustrative; the tool draws this from your own bank statements.</p>
+        <div class="kpis">
+          <div class="kpi hl"><span>May need to borrow</span><b id="kBorrow">£24.5m</b><em>by Feb 2028, to keep £10m in the bank</em></div>
+          <div class="kpi"><span>Lowest point</span><b id="kLow">&minus;£14.5m</b><em>Feb 2028</em></div>
+        </div>
+        <svg id="hchart" viewBox="0 0 560 260" role="img"
+             aria-label="An illustrative cash forecast. Everyday cash drifts down through the past
+             two years; the forecast carries on falling, below the minimum cash line, to a low
+             point near the end, with a likely range that widens further ahead.">
+          <g id="hgrid" stroke="#1b3a5c" stroke-width="1"></g>
+          <g id="hax" font-family="IBM Plex Mono, monospace" font-size="10" fill="#8199b0"></g>
+          <path id="band" fill="rgba(240,149,74,.20)" opacity="0"></path>
+          <line id="today" stroke="#27507c" stroke-width="1" stroke-dasharray="3 3" opacity="0"></line>
+          <path id="lnMin" fill="none" stroke="#e0776a" stroke-width="1.4" stroke-dasharray="6 4" opacity="0"></path>
+          <path id="lnPast" fill="none" stroke="#c8d8e8" stroke-width="2"></path>
+          <path id="lnFc" fill="none" stroke="#f0954a" stroke-width="2.6"></path>
+          <circle id="dotLow" r="4" fill="#e0776a" stroke="#0e2f52" stroke-width="2" opacity="0"></circle>
+          <g id="lowLabel" opacity="0">
+            <text id="lowText" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#e0776a">low &minus;£14.5m</text>
+          </g>
+          <g id="minLabel" opacity="0">
+            <text id="minText" font-family="IBM Plex Mono, monospace" font-size="10" fill="#e0776a">minimum cash</text>
+          </g>
+        </svg>
+        <div class="legend">
+          <span><i style="background:#c8d8e8"></i>Past</span>
+          <span><svg class="lsw" width="20" height="6" aria-hidden="true"><line x1="0" y1="3" x2="20" y2="3"
+            stroke="#f0954a" stroke-width="2.6" stroke-dasharray="6 4"/></svg>Forecast</span>
+          <span><i style="background:rgba(240,149,74,.45); height:8px"></i>Likely range</span>
+          <span><svg class="lsw" width="20" height="6" aria-hidden="true"><line x1="0" y1="3" x2="20" y2="3"
+            stroke="#e0776a" stroke-width="1.6" stroke-dasharray="6 4"/></svg>Minimum cash</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= WHY ======================= -->
+<section id="why">
+  <div class="wrap">
+    <p class="eyebrow rv">Why it exists</p>
+    <h2 class="rv">Most cash forecasts are a spreadsheet nobody checks.</h2>
+    <p class="lede rv">Built by hand, from last year's figures and memory, rolled forward a
+      month at a time, and never compared with what actually happened. The bank statement
+      already knows what the council pays, to whom, and when.</p>
+
+    <div class="scatterwrap rv">
+      <!-- An illustrative year of six regular payments, not a real council's.
+           Each line of the statement is read and goes to its payment; once a
+           year is in, each payment's rhythm is learned and carried a year
+           ahead. That is the tool's method in one picture. -->
+      <svg id="sorter" viewBox="0 0 1000 340" role="img"
+           aria-label="A bank statement is read line by line. Each line drops into one of six
+           regular payments: payroll, council tax, business rates, pensions, suppliers and
+           precepts. Once a year of each is in, its rhythm is learned and carried forward as
+           next year's forecast."></svg>
+      <div class="scatterlab" id="scatterLab">
+        <span class="scount" id="scatterCount">0</span>
+        <span class="sstate" id="scatterState">bank lines read</span>
+        <span class="legend">
+          <span><i style="background:#4cb583"></i>In</span>
+          <span><i style="background:#7fb0e0"></i>Out</span>
+          <span><i style="background:#f0954a"></i>Forecast</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card rv">
+        <span class="n">01</span>
+        <h3>Built from the bank, not from memory</h3>
+        <p>Every line of the forecast is learned from your own statements: what was paid, when,
+          and how it has grown.</p>
+      </div>
+      <div class="card rv">
+        <span class="n">02</span>
+        <h3>Checked, line by line</h3>
+        <p>Nothing reaches the forecast until someone has looked at it. Each line shows what was
+          found and what is proposed.</p>
+      </div>
+      <div class="card rv">
+        <span class="n">03</span>
+        <h3>Held to account</h3>
+        <p>Sign a forecast off and it is kept as it stood, then compared with what actually
+          happens, month by month.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="rule"></div></div>
+
+<!-- ======================= HOW ======================= -->
+<section id="how" class="honest">
+  <div class="wrap">
+    <p class="eyebrow rv">How it works</p>
+    <h2 class="rv">Four jobs, each building on the last.</h2>
+    <p class="lede rv">Every number comes from your own statements or from something you entered.
+      The rules that sort them are plain and visible: no AI, nothing a treasurer cannot follow.</p>
+
+    <div class="steps">
+      <div class="step rv"><span class="k">01</span>
+        <div><h3>History<small>Once, then topped up</small></h3></div>
+        <p>Load three to five years of bank statements, as your bank exports them. Every line is
+          sorted by clear rules; the few it is unsure of, you confirm once and it remembers.</p></div>
+      <div class="step rv"><span class="k">02</span>
+        <div><h3>Forecast<small>Build it, check it, sign it off</small></h3></div>
+        <p>Each line is proposed from your history. Check it, add what history cannot know (a land
+          sale, a pay award, your deal register) and sign it off.</p></div>
+      <div class="step rv"><span class="k">03</span>
+        <div><h3>Today's statement<small>Each morning</small></h3></div>
+        <p>Drop in the day's statement. It is sorted in seconds, joins your history, and is
+          checked against the forecast you signed off.</p></div>
+      <div class="step rv"><span class="k">04</span>
+        <div><h3>Monitor<small>Whenever you like</small></h3></div>
+        <p>Every signed-off forecast against what actually happened, month by month, with what
+          it got wrong and why.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= WHAT IT IS WORTH ======================= -->
+<section id="worth">
+  <div class="wrap">
+    <p class="eyebrow rv">What it is worth to an authority</p>
+    <h2 class="rv">The forecast you would build, if you had the week.</h2>
+    <p class="lede rv">Almost none of the work is the forecast itself. It is sorting the bank
+      lines, finding the pattern in each, and keeping it current. That part is done for you.</p>
+
+    <div class="cards">
+      <div class="card rv"><span class="n">01</span><h3>Every number explained</h3>
+        <p>Each line shows the history it came from and how it is projected. Nothing is a black
+          box.</p></div>
+      <div class="card rv"><span class="n">02</span><h3>The need, and when</h3>
+        <p>How much you may need to borrow, by when, and whether it lasts beyond a year or
+          recovers within it.</p></div>
+      <div class="card rv"><span class="n">03</span><h3>Options to discuss</h3>
+        <p>Borrowing, loans falling due, LOBO call dates and cash you could lock away, worked from
+          your forecast and your deal register.</p></div>
+      <div class="card rv"><span class="n">04</span><h3>A board report, ready</h3>
+        <p>Seven pages for your section 151 officer, and Excel with every number behind it.</p></div>
+      <div class="card rv"><span class="n">05</span><h3>A few minutes a day</h3>
+        <p>The morning's statement sorted in seconds, added to your history, and checked against
+          what you signed off.</p></div>
+      <div class="card rv"><span class="n">06</span><h3>It stays yours</h3>
+        <p>No account, no upload. Your bank data never leaves your browser.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= CLOSE ======================= -->
+<section class="close">
+  <div class="wrap">
+    <h2 class="rv">Coming soon to PWLBtoday.</h2>
+    <p class="lede rv">With a five-minute practice run on an example council: every step, exactly
+      as with your own, and no files needed.</p>
+    <div class="cta rv">
+      <span class="btn soonbtn"><span class="dot"></span>Coming soon</span>
+    </div>
+    <p class="claims rv"><b>Your bank data never leaves your browser.</b> No account, no upload,
+      nothing for us to see: your history is held in your browser. <b>What it does not claim.</b>
+      A forecast is an estimate, and the options are for discussion, not advice. Decisions sit with
+      your section 151 officer and your treasury management strategy; rates and counterparty limits
+      are not checked.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span><b>PWLB</b>forecast &middot; from PWLBtoday</span>
+    <span class="sp"></span>
+    <span>Coming soon</span>
+  </div>
+</footer>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------------------
+ * Motion, written natively as on PWLBreports: decoration only, skipped under
+ * reduced motion, and the page reads completely without it.
+ * ------------------------------------------------------------------------ */
+const STILL = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+if(!STILL) document.documentElement.classList.add("anim");
+
+/* ---- the hero chart -------------------------------------------------------
+ * Plausible shapes, not a real council's figures: two years of everyday cash
+ * drifting down with the monthly rhythm of payroll and grants, then a two-year
+ * forecast that carries on, crosses the minimum and bottoms out near the end,
+ * its likely range widening the further ahead it looks. The figures in the two
+ * tiles are read off the same series, so the card cannot contradict itself.
+ */
+const PAST = 24, FUT = 24, N = PAST + FUT;           // months
+const MIN = 10;                                       // £m minimum cash
+const wiggle = i => Math.sin(i * 1.7) * 3.2 + Math.sin(i * 0.55) * 2.1;
+const cash = Array.from({length:N}, (_,i) => {
+  const trend = 34 - i * 0.92 - Math.max(0, i - 30) * 0.32 + Math.max(0, i - 40) * 2.1;
+  return trend + wiggle(i);
+});
+// the low point, and what it takes to stay above the minimum
+let lowI = PAST; for(let i=PAST;i<N;i++) if(cash[i] < cash[lowI]) lowI = i;
+const low = cash[lowI], need = MIN - low;
+const spread = i => i < PAST ? 0 : 1.2 + (i - PAST) * 0.55;
+
+const P = {t:14, r:14, b:24, l:40}, W = 560, H = 260;
+const iw = W - P.l - P.r, ih = H - P.t - P.b;
+const LO = Math.floor((low - spread(N-1) - 4) / 10) * 10, HI = 50;
+const X = i => P.l + (iw * i) / (N - 1);
+const Y = v => P.t + ih - ((v - LO) / (HI - LO)) * ih;
+const path = (a, from, to) => a.slice(from, to + 1).map((v,k)=> (k?"L":"M") + X(from+k).toFixed(1) + " " + Y(v).toFixed(1)).join(" ");
+
+(function frame(){
+  const g = $("#hgrid"), ax = $("#hax");
+  for(let v = LO; v <= HI; v += 20){
+    const y = Y(v).toFixed(1);
+    g.insertAdjacentHTML("beforeend", `<line x1="${P.l}" y1="${y}" x2="${W-P.r}" y2="${y}" opacity="${v===0?0.95:0.5}"/>`);
+    ax.insertAdjacentHTML("beforeend", `<text x="${P.l-8}" y="${(+y+3.4).toFixed(1)}" text-anchor="end">${v<0?"−":""}£${Math.abs(v)}m</text>`);
+  }
+  [[0,"Apr 2024"],[12,"Apr 2025"],[24,"Apr 2026"],[36,"Apr 2027"]].forEach(([i,l]) =>
+    ax.insertAdjacentHTML("beforeend", `<text x="${X(i).toFixed(1)}" y="${H-P.b+16}" text-anchor="middle">${l}</text>`));
+})();
+
+$("#lnPast").setAttribute("d", path(cash, 0, PAST - 1));
+$("#lnFc").setAttribute("d", path(cash, PAST - 1, N - 1));
+const up = [], dn = [];
+for(let i=PAST-1;i<N;i++){ up.push([X(i), Y(cash[i] + spread(i))]); dn.unshift([X(i), Y(cash[i] - spread(i))]); }
+$("#band").setAttribute("d", "M" + up.concat(dn).map(p => p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" L") + " Z");
+$("#lnMin").setAttribute("d", `M${P.l} ${Y(MIN).toFixed(1)} L${W-P.r} ${Y(MIN).toFixed(1)}`);
+$("#today").setAttribute("x1", X(PAST-1)); $("#today").setAttribute("x2", X(PAST-1));
+$("#today").setAttribute("y1", P.t); $("#today").setAttribute("y2", H - P.b);
+$("#dotLow").setAttribute("cx", X(lowI).toFixed(1)); $("#dotLow").setAttribute("cy", Y(low).toFixed(1));
+$("#lowText").setAttribute("text-anchor", "middle"); $("#lowText").setAttribute("x", X(lowI).toFixed(1)); $("#lowText").setAttribute("y", (Y(low - spread(lowI)) + 14).toFixed(1));
+$("#minText").setAttribute("x", (P.l + 4).toFixed(1)); $("#minText").setAttribute("y", (Y(MIN) - 5).toFixed(1));
+// the tiles, from the same numbers
+const m = v => (v < 0 ? "−" : "") + "£" + Math.abs(v).toFixed(1) + "m";
+const mon = i => ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][(i + 3) % 12] + " " + (2024 + Math.floor((i + 3) / 12));
+$("#kBorrow").textContent = m(need);
+$("#kLow").textContent = m(low);
+$("#lowText").textContent = "low " + m(low);
+$("#kBorrow").nextElementSibling.textContent = `by ${mon(lowI)}, to keep £${MIN}m in the bank`;
+$("#kLow").nextElementSibling.textContent = mon(lowI);
+
+function draw(sel, ms, delay){
+  const el = $(sel), len = el.getTotalLength();
+  el.style.strokeDasharray = len; el.style.strokeDashoffset = len;
+  if(STILL){ el.style.strokeDashoffset = 0; if(sel === "#lnFc") el.style.strokeDasharray = "7 4"; return; }
+  el.animate([{strokeDashoffset:len},{strokeDashoffset:0}],
+    {duration:ms, delay:delay, easing:"cubic-bezier(.33,.9,.4,1)", fill:"forwards"})
+    // once drawn, the forecast takes the dash it is read by
+    .finished.then(() => { if(sel === "#lnFc"){ el.getAnimations().forEach(a => a.cancel()); el.style.strokeDashoffset = 0; el.style.strokeDasharray = "7 4"; } }).catch(() => {});
+}
+function fade(sel, delay){
+  const el = $(sel);
+  if(STILL){ el.style.opacity = 1; return; }
+  el.animate([{opacity:0},{opacity:1}], {duration:600, delay:delay, easing:"ease-out", fill:"forwards"});
+}
+function drawHero(){
+  draw("#lnPast", 1300, 250);
+  fade("#today", 1500);
+  draw("#lnFc", 1500, 1550);
+  fade("#band", 1900);
+  fade("#lnMin", 2700);
+  fade("#minLabel", 2850);
+  fade("#dotLow", 3050);
+  fade("#lowLabel", 3200);
+}
+let drawn = false;
+const once = () => { if(drawn) return; drawn = true; drawHero(); };
+if(document.readyState === "complete") once(); else window.addEventListener("load", once);
+setTimeout(once, 2500);
+// a floor under the chart: whatever happened to the animation, it ends drawn
+setTimeout(() => {
+  ["#lnPast","#lnFc"].forEach(k => { $(k).style.strokeDashoffset = 0; });
+  $("#lnFc").style.strokeDasharray = "7 4";
+  ["#band","#today","#lnMin","#minLabel","#dotLow","#lowLabel"].forEach(k => { $(k).style.opacity = 1; });
+}, 5500);
+
+/* ---- reveal on scroll ---------------------------------------------------- */
+(function reveal(){
+  const items = $$(".rv");
+  if(STILL || !("IntersectionObserver" in window)){ items.forEach(el => el.classList.add("in")); return; }
+  const hero = $$(".hero .rv");
+  hero.forEach((el,i) => { el.style.transitionDelay = (i*90)+"ms"; });
+  setTimeout(() => hero.forEach(el => el.classList.add("in")), 40);
+  setTimeout(() => {
+    document.documentElement.classList.remove("anim");
+    items.forEach(el => { el.classList.add("in"); if(el.getAnimations) el.getAnimations().forEach(a => { try{ a.cancel(); }catch(e){} }); });
+  }, 4000);
+  const io = new IntersectionObserver((es) => {
+    es.forEach(e => {
+      if(!e.isIntersecting) return;
+      const sibs = Array.from(e.target.parentElement.children).filter(c => c.classList.contains("rv"));
+      e.target.style.transitionDelay = (Math.max(0, sibs.indexOf(e.target)) * 70) + "ms";
+      e.target.classList.add("in");
+      io.unobserve(e.target);
+    });
+  }, {rootMargin:"0px 0px -12% 0px", threshold:.12});
+  items.filter(el => !hero.includes(el)).forEach(el => io.observe(el));
+})();
+
+/* ---- statement to forecast ------------------------------------------------
+ * The method in one picture. A year of an illustrative council's statement is
+ * read a line at a time; each line drops into its payment's lane at its date,
+ * so the rhythm of each builds up: payroll on the last working day, council
+ * tax in ten instalments, suppliers every Thursday. Then each rhythm is
+ * learned and carried a year ahead, in the forecast's orange. The dates are
+ * computed (weekends rolled the way the tool rolls them), not drawn by hand.
+ */
+(function sorter(){
+  const svg = $("#sorter"), lab = $("#scatterLab"), count = $("#scatterCount"), state = $("#scatterState");
+  const D0 = Date.UTC(2025,3,1), DAY = 864e5, YEAR = 365;
+  const dt = d => new Date(D0 + d*DAY);
+  const work = d => { const w = dt(d).getUTCDay(); return w !== 0 && w !== 6; };
+  const fwd = d => { while(!work(d)) d++; return d; };
+  const back = d => { while(!work(d)) d--; return d; };
+  const on = (y,m,dd) => Math.round((Date.UTC(y,m,dd) - D0) / DAY);
+  const MONTHS = Array.from({length:24}, (_,k) => ({y:2025 + Math.floor((3+k)/12), m:(3+k) % 12}));
+  const TEN = MONTHS.filter(({m}) => m >= 3 || m === 0);           // April to January
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const date = d => { const x = dt(d); return String(x.getUTCDate()).padStart(2,"0") + " " + MON[x.getUTCMonth()]; };
+  const jit = k => { const v = Math.sin(k * 12.9898) * 43758.5453; return v - Math.floor(v); };
+  const thursdays = []; for(let d = (4 - dt(0).getUTCDay() + 7) % 7; d < 2*YEAR; d += 7) thursdays.push(d);
+  // amounts in £m: last year's, then next year's with this year's rises
+  const LANES = [
+    {name:"Payroll",       out:true,  desc:"BACS PAYROLL",     rule:"Last working day",  days:MONTHS.map(({y,m}) => back(on(y,m+1,0))), amt:f => f ? 6.4 : 6.2},
+    {name:"Council tax",   out:false, desc:"CTAX DIRECT DEBIT", rule:"10 instalments, Apr\u2013Jan", days:TEN.map(({y,m}) => fwd(on(y,m,1))),     amt:f => f ? 5.0 : 4.8},
+    {name:"Business rates",out:false, desc:"NNDR RECEIPTS",    rule:"15th, next working day",   days:MONTHS.map(({y,m}) => fwd(on(y,m,15))),   amt:f => f ? 3.2 : 3.1},
+    {name:"Pensions",      out:true,  desc:"LGPS CONTRIBS",    rule:"19th, working day before", days:MONTHS.map(({y,m}) => back(on(y,m,19))),  amt:f => f ? 2.0 : 1.9},
+    {name:"Suppliers",     out:true,  desc:"SUPPLIER RUN",     rule:"Every Thursday", days:thursdays,                                amt:(f,k) => f ? 0.82 : 0.55 + 0.5*jit(k)},
+    {name:"Precepts",      out:true,  desc:"PRECEPT POLICE/FIRE", rule:"10 instalments, 25th",     days:TEN.map(({y,m}) => back(on(y,m,25))),     amt:f => f ? 2.5 : 2.4},
+  ];
+  const EV = [], FC = LANES.map(() => []);
+  LANES.forEach((L,i) => L.days.forEach((d,k) => {
+    if(d < 0 || d >= 2*YEAR) return;
+    const f = d >= YEAR, a = L.amt(f, k);
+    (f ? FC[i] : EV).push({lane:i, d, a, out:L.out, desc:L.desc});
+  }));
+  EV.sort((p,q) => p.d - q.d || p.lane - q.lane);
+  const sign = e => (e.out ? "−" : "+") + "£" + e.a.toFixed(2) + "m";
+
+  let G, rows, bars, fcb, rules, stg, fin = false, timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  function build(){
+    const nar = svg.clientWidth < 600;
+    G = nar
+      ? {W:440, H:600, sw:440, sh:178, r0:56, rh:22, vis:6, dx:84, px0:0, p1:208, today:216, f0:224, f1:438, lt:i => 230 + i*62, lh:56, name:[0,14], rule:[440,14,"end"], ax:206, bmax:32}
+      : {W:1000, H:340, sw:270, sh:340, r0:58, rh:26, vis:11, dx:62, px0:476, p1:720, today:728, f0:736, f1:992, lt:i => 40 + i*50, lh:44, name:[300,24], rule:[300,40], ax:24, bmax:34};
+    svg.classList.toggle("nar", nar);
+    svg.setAttribute("viewBox", `0 0 ${G.W} ${G.H}`);
+    const X = d => d < YEAR ? G.px0 + (d / YEAR) * (G.p1 - G.px0) : G.f0 + ((d - YEAR) / YEAR) * (G.f1 - G.f0);
+    const base = i => G.lt(i) + G.lh;
+    const hgt = a => Math.min(G.bmax, 4 + a * 4.8);
+    const bw = e => e.lane === 4 ? 2 : 3;
+    let h = `<rect x="0.5" y="0.5" width="${G.sw-1}" height="${G.sh-1}" rx="8" fill="#061a2e" stroke="#1b3a5c"/>
+      <text class="sh" x="16" y="30">BANK STATEMENT</text>
+      <line x1="16" x2="${G.sw-16}" y1="40" y2="40" stroke="#1b3a5c"/>
+      <clipPath id="stc"><rect x="0" y="${G.r0 - G.rh + 6}" width="${G.sw}" height="${G.vis * G.rh}"/></clipPath>
+      <g clip-path="url(#stc)"><g id="stg">` +
+      EV.map((e,k) => `<text class="sr" y="${G.r0 + k*G.rh}"><tspan x="16">${date(e.d)}</tspan><tspan x="${G.dx}">${e.desc}</tspan><tspan x="${G.sw-16}" text-anchor="end">${sign(e)}</tspan></text>`).join("") +
+      `</g></g>`;
+    h += `<text class="ax" x="${G.px0}" y="${G.ax}">${nar ? "PAST YEAR" : "PAST YEAR, FROM THE STATEMENT"}</text>
+      <text class="ax fc" x="${G.f0}" y="${G.ax}">${nar ? "NEXT YEAR" : "NEXT YEAR, FORECAST"}</text>
+      <line x1="${G.today}" x2="${G.today}" y1="${G.ax + 8}" y2="${G.H - 2}" stroke="#27507c" stroke-dasharray="3 3"/>`;
+    LANES.forEach((L,i) => {
+      const t = G.lt(i);
+      h += `<line x1="${G.px0}" x2="${G.f1}" y1="${base(i)}" y2="${base(i)}" stroke="#1b3a5c"/>
+        <text class="ln" x="${G.name[0]}" y="${t + G.name[1]}">${L.name}</text>
+        <text class="lr" x="${G.rule[0]}" y="${t + G.rule[1]}" text-anchor="${G.rule[2] || "start"}">${L.rule}</text>`;
+    });
+    h += EV.map(e => { const ht = hgt(e.a); return `<rect class="b" x="${(X(e.d) - bw(e)/2).toFixed(1)}" y="${(base(e.lane) - ht).toFixed(1)}" width="${bw(e)}" height="${ht.toFixed(1)}" rx="1" fill="${e.out ? "#7fb0e0" : "#4cb583"}"/>`; }).join("");
+    h += FC.map((list,i) => list.map(e => { const ht = hgt(e.a); return `<rect class="b f" data-l="${i}" x="${(X(e.d) - bw(e)/2).toFixed(1)}" y="${(base(i) - ht).toFixed(1)}" width="${bw(e)}" height="${ht.toFixed(1)}" rx="1" fill="#f0954a" opacity=".85"/>`; }).join("")).join("");
+    svg.innerHTML = h;
+    rows = Array.from(svg.querySelectorAll(".sr"));
+    bars = Array.from(svg.querySelectorAll(".b:not(.f)"));
+    fcb = LANES.map((_,i) => Array.from(svg.querySelectorAll(`.f[data-l="${i}"]`)));
+    rules = Array.from(svg.querySelectorAll(".lr"));
+    stg = svg.querySelector("#stg");
+    EV.forEach((e,k) => { e.x = X(e.d); e.y = base(e.lane); });
+  }
+  const scroll = k => { stg.style.transform = `translateY(${-Math.max(0, k - G.vis + 1) * G.rh}px)`; };
+  function hide(){
+    [...rows, ...bars, ...fcb.flat()].forEach(el => { el.style.opacity = 0; });
+    rules.forEach(el => { el.style.opacity = 0; });
+    scroll(0);
+  }
+  function finish(){
+    fin = true; timers.forEach(clearTimeout); timers = [];
+    svg.querySelectorAll("*").forEach(el => { if(el.getAnimations) el.getAnimations().forEach(a => a.cancel()); });
+    rows.forEach(el => { el.style.opacity = ""; el.classList.remove("hot"); });
+    [...bars, ...fcb.flat()].forEach(el => { el.style.opacity = ""; });
+    rules.forEach(el => { el.style.opacity = ""; el.classList.add("on"); });
+    scroll(EV.length - 1);
+    count.textContent = String(LANES.length);
+    state.textContent = "regular payments learned from " + EV.length + " bank lines, each carried a year ahead";
+    lab.classList.add("done");
+  }
+  function play(){
+    if(STILL || document.hidden) return finish();
+    const STEP = 46;
+    EV.forEach((e,k) => later(() => {
+      const row = rows[k];
+      row.style.opacity = 1; row.classList.add("hot");
+      if(k) rows[k-1].classList.remove("hot");
+      scroll(k);
+      // the line drops from the statement into its lane
+      const sx = G.sw - 30, sy = G.r0 + Math.min(k, G.vis - 1) * G.rh;
+      const b = bars[k]; b.style.opacity = 1;
+      b.animate([{transform:`translate(${(sx - e.x).toFixed(1)}px,${(sy - e.y).toFixed(1)}px) scale(2.2,.25)`, opacity:.2},
+                 {transform:"none", opacity:1}], {duration:620, easing:"cubic-bezier(.3,.7,.3,1)"});
+      count.textContent = String(k + 1);
+    }, k * STEP));
+    const t0 = EV.length * STEP + 500;
+    later(() => { rows[EV.length-1].classList.remove("hot"); count.textContent = "0"; state.textContent = "regular payments learned, each carried a year ahead"; }, t0);
+    LANES.forEach((_,i) => later(() => {
+      rules[i].style.opacity = 1; rules[i].classList.add("on");
+      fcb[i].forEach((b,j) => { b.style.opacity = ""; b.animate([{transform:"scaleY(0)"},{transform:"none"}], {duration:420, delay:j * (i === 4 ? 9 : 34), easing:"cubic-bezier(.3,.7,.3,1)", fill:"backwards"}); });
+      count.textContent = String(i + 1);
+    }, t0 + 300 + i * 650));
+    later(finish, t0 + 300 + LANES.length * 650 + 900);
+  }
+  build();
+  if(STILL || !("IntersectionObserver" in window)){ finish(); return; }
+  hide();
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if(e.isIntersecting){ io.disconnect(); later(play, 300); }
+  }), {threshold:.35});
+  io.observe(svg);
+  // a background tab gets few timers: show the end rather than a half-told story
+  document.addEventListener("visibilitychange", () => { if(document.hidden && !fin && timers.length) finish(); });
+  // a phone turned sideways: redraw at the new shape, finished
+  let wasNar = svg.classList.contains("nar");
+  window.addEventListener("resize", () => {
+    const nar = svg.clientWidth < 600;
+    if(nar === wasNar) return; wasNar = nar;
+    const done = fin; build(); if(done || timers.length) finish(); else hide();
+  });
+})();
+
+/* ---- masthead hairline once the hero is behind you ----------------------- */
+(function mast(){
+  const mh = $(".masthead");
+  const on = () => {
+    const past = window.scrollY > 60;
+    mh.style.background = past ? "rgba(6,26,46,.88)" : "transparent";
+    mh.style.backdropFilter = past ? "blur(10px)" : "";
+    mh.style.borderBottomColor = past ? "var(--line)" : "transparent";
+  };
+  on(); window.addEventListener("scroll", on, {passive:true});
+})();
+</script>
+</body>
+</html>
