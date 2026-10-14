@@ -4,9 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PWLBforecast · coming soon</title>
-<meta name="description" content="When your council will need to borrow, and how much, straight from its bank statements. A daily cash forecast checked line by line, with options to discuss and a board report. Coming soon to PWLBtoday. Nothing leaves your browser.">
+<meta name="description" content="When your council will need to borrow, and how much, straight from its bank statements. A daily cash forecast checked line by line, with options to discuss and a board report. Coming soon to PWLBtoday: sign up to hear first.">
 <!-- A TEASER, NOT A DOOR. This page goes up before the tool does, so it has no
-     way in: where PWLBreports says "Open the tool", this says "Coming soon".
+     way in: where PWLBreports says "Open the tool", this asks people to sign up
+     (the live site's /register) so they hear first.
      Everything else is PWLBreports' page, deliberately: the same ground, type,
      cards and motion, so the two read as one family. Like that page, it makes
      no requests at all, not even for a font. -->
@@ -89,8 +90,8 @@ h2{font-size:clamp(28px,3.6vw,42px); line-height:1.14; letter-spacing:-.022em; f
 .masthead a.mini{font-family:var(--sans); font-size:13.5px; color:var(--ink2);
   text-decoration:none; font-weight:500}
 .masthead a.mini:hover{color:var(--ink)}
-/* where PWLBreports has its way in */
-.soon{font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+/* where PWLBreports has its way in: sign up, to hear first */
+.soon{text-decoration:none; font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
   color:var(--orange); border:1px solid rgba(240,149,74,.45); border-radius:999px; padding:5px 11px;
   white-space:nowrap}
 
@@ -121,19 +122,14 @@ h1 .em{
 .btn.ghost{background:transparent; color:var(--ink); border-color:var(--line2)}
 a.btn:hover{transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,0,0,.4)}
 a.btn.ghost:hover{border-color:var(--ink2)}
-/* "Coming soon" sits where the button will go, and is not one: it does nothing
-   when pressed, so it must not look pressable. Same footprint, no fill. */
-.btn.soonbtn{background:rgba(240,149,74,.10); color:var(--orange); cursor:default}
-.btn .dot{width:8px; height:8px; border-radius:50%; background:var(--orange);
-  box-shadow:0 0 0 0 rgba(240,149,74,.5)}
-html.anim .btn .dot{animation:pulse 2.4s ease-out infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(240,149,74,.55)}70%{box-shadow:0 0 0 9px rgba(240,149,74,0)}100%{box-shadow:0 0 0 0 rgba(240,149,74,0)}}
 .freeline{display:inline-flex; align-items:center; gap:10px; margin:26px 0 0;
   font-family:var(--sans); font-size:15px; font-weight:600; color:var(--ink);
   padding:10px 17px 10px 14px; border-radius:999px;
   border:1px solid rgba(240,149,74,.34); background:rgba(240,149,74,.08)}
-.freeline svg{width:15px; height:15px; flex:none; stroke:var(--orange);
-  fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+.freeline .dot{width:8px; height:8px; border-radius:50%; background:var(--orange); flex:none}
+html.anim .freeline .dot{animation:pulse 2.4s ease-out infinite}
+a.soon:hover{background:rgba(240,149,74,.12)}
 
 /* the hero chart */
 .chartcard{
@@ -265,7 +261,7 @@ html.anim .rv.in{opacity:1; transform:none;
     <a class="mini" href="#why">Why</a>
     <a class="mini" href="#how">How it works</a>
     <a class="mini" href="#worth">What it is worth</a>
-    <span class="soon">Coming soon</span>
+    <a class="soon" href="/register">Sign up</a>
   </div>
 </div>
 
@@ -280,12 +276,10 @@ html.anim .rv.in{opacity:1; transform:none;
           by line, with options to discuss and a board report. Each morning's statement
           keeps it current.</p>
         <div class="cta rv">
-          <span class="btn soonbtn"><span class="dot"></span>Coming soon</span>
+          <a class="btn" href="/register">Sign up to hear first</a>
           <a class="btn ghost" href="#how">How it works</a>
         </div>
-        <p class="freeline rv"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5"
-          y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg
-          >Nothing leaves your browser</p>
+        <p class="freeline rv"><span class="dot"></span>Coming soon to PWLBtoday</p>
       </div>
 
       <div class="chartcard rv">
@@ -435,8 +429,9 @@ html.anim .rv.in{opacity:1; transform:none;
       <div class="card rv"><span class="n">05</span><h3>A few minutes a day</h3>
         <p>The morning's statement sorted in seconds, added to your history, and checked against
           what you signed off.</p></div>
-      <div class="card rv"><span class="n">06</span><h3>It stays yours</h3>
-        <p>No account, no upload. Your bank data never leaves your browser.</p></div>
+      <div class="card rv"><span class="n">06</span><h3>Made for councils</h3>
+        <p>It knows the shape of a council's year: council tax in ten instalments, precepts,
+          grants, and payroll on the last working day.</p></div>
     </div>
   </div>
 </section>
@@ -445,13 +440,12 @@ html.anim .rv.in{opacity:1; transform:none;
 <section class="close">
   <div class="wrap">
     <h2 class="rv">Coming soon to PWLBtoday.</h2>
-    <p class="lede rv">With a five-minute practice run on an example council: every step, exactly
-      as with your own, and no files needed.</p>
+    <p class="lede rv">Sign up and you'll be the first to hear when it opens, with a five-minute
+      practice run on an example council: every step, exactly as with your own.</p>
     <div class="cta rv">
-      <span class="btn soonbtn"><span class="dot"></span>Coming soon</span>
+      <a class="btn" href="/register">Sign up to hear first</a>
     </div>
-    <p class="claims rv"><b>Your bank data never leaves your browser.</b> No account, no upload,
-      nothing for us to see: your history is held in your browser. <b>What it does not claim.</b>
+    <p class="claims rv"><b>What it does not claim.</b>
       A forecast is an estimate, and the options are for discussion, not advice. Decisions sit with
       your section 151 officer and your treasury management strategy; rates and counterparty limits
       are not checked.</p>
